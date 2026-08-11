@@ -1,0 +1,48 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Serena
+.serena/
+
+# Environment files — NEVER commit
+.env
+.env.*
+!.env.example
+
+# Go
+backend/bin/
+backend/tmp/
+*.test
+*.out
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+
+# Build artifacts
+dist/
+build/
+
+# Logs
+*.log
+
+# Secrets / credentials — NEVER commit
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Temporary
+tmp/
