@@ -34,7 +34,7 @@ There is no general ledger in the ERP.
 |---|---|---|
 | **Admin** | Full | All modules; user management; system configuration |
 | **GM (General Manager)** | Full operational + approval authority | Approve all disbursements and billing; full visibility |
-| **DCS (Disbursing/Check Signing Officer)** | Finance execution | Execute approved payments; record payment references; view approved fund requests |
+| **DCS (Disbursing/Check Signing Officer)** | Finance execution | Execute approved payments; record payment references; view approved fund requests. **DCS = CEO of Padang** — this is a named individual, not a generic finance role. |
 | **Project Manager** | Project-scoped | Own project records, costing, progress; raise PRs; view procurement for own projects |
 | **Procurement Officer** | Procurement + Inventory | Manage PR → PO pipeline; fund requests; supplier SOA; inventory |
 | **Fabrication Supervisor** | Fabrication module | Estimates, job orders, production, delivery, billing for fab |

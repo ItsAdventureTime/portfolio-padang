@@ -82,7 +82,7 @@ padang-bridge-dashboard/
 | Auth | Email + password (bcrypt) + JWT |
 | Containers | Rootless Podman Quadlets |
 | Ingress | Existing Caddy (path-based routing) |
-| OCI Registry | GHCR (`ghcr.io/<org>/padang-erp`) |
+| OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp`) |
 
 ---
 

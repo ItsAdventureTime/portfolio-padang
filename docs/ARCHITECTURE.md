@@ -70,7 +70,7 @@ External services (reached from API container via host network egress):
 | Containerization | Rootless Podman + Podman Quadlets |
 | Ingress | Existing Caddy (path-based routing) |
 | OS | Fedora CoreOS (latest stable) |
-| OCI Registry | GHCR (`ghcr.io/<org>/padang-erp`) — **org TBD** |
+| OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp-{api|frontend}`) |
 | File storage | Backblaze B2 (`bridge-ph` bucket, `s3.us-west-001.backblazeb2.com`) |
 | Email | Resend (current); Azure Communication Services Email (future) |
 | Secrets | Podman secrets (mounted under `/run/secrets/`) |

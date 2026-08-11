@@ -1,0 +1,334 @@
+# ============================================================
+# Shared security configuration
+# ============================================================
+
+(common_security) {
+	encode zstd gzip
+
+	header {
+		>Strict-Transport-Security "max-age=31536000"
+		>Referrer-Policy "strict-origin-when-cross-origin"
+		>Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=()"
+		>X-Content-Type-Options "nosniff"
+		>X-Frame-Options "DENY"
+		>Cross-Origin-Opener-Policy "same-origin-allow-popups"
+		>Cross-Origin-Resource-Policy "same-origin"
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# ============================================================
+# CSP for static sites containing inline <style> blocks
+# ============================================================
+
+(inline_style_static_csp) {
+	header {
+		>Content-Security-Policy "default-src 'none'; script-src 'none'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests"
+	}
+}
+
+# ============================================================
+# CSP for same-origin React/Vite applications
+# ============================================================
+
+(same_origin_web_csp) {
+	header {
+		>Content-Security-Policy "default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-src 'self' blob:; frame-ancestors 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests"
+	}
+}
+
+# ============================================================
+# CSP for Next.js 15 App Router applications (Padang ERP)
+# Note: 'unsafe-inline' required for Next.js hydration scripts
+# Phase 2: implement nonce-based CSP via Next.js middleware
+# ============================================================
+
+(padang_nextjs_csp) {
+	header {
+		>Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; worker-src 'self' blob:; manifest-src 'self'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests"
+	}
+}
+
+# ============================================================
+# CSP for onekarlo.com
+# ============================================================
+
+(onekarlo_portfolio_csp) {
+	header {
+		>Content-Security-Policy "default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-attr 'none'; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; worker-src 'none'; manifest-src 'self'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests"
+	}
+}
+
+# ============================================================
+# Prevent temporary and private sites from being indexed
+# ============================================================
+
+(private_noindex) {
+	header {
+		>X-Robots-Tag "noindex, nofollow, noarchive"
+	}
+}
+
+# ============================================================
+# Shared configuration for temporary static websites
+# ============================================================
+
+(temporary_static_site) {
+	import common_security
+	import inline_style_static_csp
+	import private_noindex
+
+	header {
+		>Cache-Control "public, max-age=300, must-revalidate"
+	}
+
+	file_server
+}
+
+(iamjk_static_site) {
+	import common_security
+	import private_noindex
+
+	header {
+		>Content-Security-Policy "default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests"
+		>Cache-Control "public, max-age=300, must-revalidate"
+	}
+
+	file_server
+}
+
+# ============================================================
+# onekarlo.com
+# ============================================================
+
+onekarlo.com {
+	root * /srv/onekarlo-com
+
+	import common_security
+	import onekarlo_portfolio_csp
+	import private_noindex
+
+	@html path / /index.html
+	header @html >Cache-Control "public, max-age=300, must-revalidate"
+
+	@versioned_assets path /assets/*
+	header @versioned_assets >Cache-Control "public, max-age=31536000, immutable"
+
+	file_server
+}
+
+# ============================================================
+# linguapath.academy
+# ============================================================
+
+linguapath.academy {
+	root * /srv/linguapath-academy
+	import temporary_static_site
+}
+
+# ============================================================
+# delegateops.business
+#
+# Routes:
+#   /accustandard/demo/*
+#   /padang/demo/*        ← PADANG ERP (demo)   [PENDING DEPLOYMENT]
+#   /padang/*             ← PADANG ERP (prod)   [PENDING DEPLOYMENT]
+#   /pimascor/*
+#   /pimascor/demo/*
+#   everything else -> DelegateOps static site
+# ============================================================
+
+delegateops.business {
+	import /etc/caddy/pimascor-production.handlers.Caddyfile
+
+	# PADANG ERP — import handler files (to be created per docs/DEPLOYMENT.md)
+	# import /etc/caddy/padang-demo.handlers.Caddyfile
+	# import /etc/caddy/padang-production.handlers.Caddyfile
+
+	import common_security
+	import private_noindex
+
+	# ------------------------------------------------------------
+	# Accustanda ERP Dashboard demo
+	# ------------------------------------------------------------
+
+	@accustandard_root path /accustandard/demo
+	redir @accustandard_root /accustandard/demo/ 308
+
+	handle_path /accustandard/demo/* {
+		header {
+			>Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-src 'self' blob:; frame-ancestors 'none'; worker-src 'self' blob:; manifest-src 'self'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests"
+			>Cache-Control "public, max-age=0, must-revalidate"
+		}
+
+		root * /srv/bridge-ph-accustandard-demo
+
+		route {
+			try_files {path} /index.html
+
+			@fingerprinted_assets path /_next/* /assets/*
+			header @fingerprinted_assets >Cache-Control "public, max-age=31536000, immutable"
+
+			file_server
+		}
+	}
+
+	# ------------------------------------------------------------
+	# PIMASCOR production
+	# ------------------------------------------------------------
+
+
+	# ------------------------------------------------------------
+	# PIMASCOR demo
+	# ------------------------------------------------------------
+
+	@pimascor_demo_root path /pimascor/demo
+	redir @pimascor_demo_root /pimascor/demo/ 308
+
+	handle /pimascor/demo/api/* {
+		uri strip_prefix /pimascor/demo
+
+		header {
+			>Cache-Control "private, no-store"
+			>CDN-Cache-Control "no-store"
+			>Pragma "no-cache"
+			>X-Robots-Tag "noindex, nofollow, noarchive"
+		}
+
+		reverse_proxy bridge-ph-pimascor-demo-api:8000
+	}
+
+	handle_path /pimascor/demo/* {
+		import same_origin_web_csp
+
+		header {
+			>Cache-Control "public, max-age=0, must-revalidate"
+		}
+
+		root * /srv/bridge-ph-pimascor-demo
+
+		route {
+			try_files {path} /index.html
+
+			@fingerprinted_assets path /assets/*
+			header @fingerprinted_assets >Cache-Control "public, max-age=31536000, immutable"
+
+			file_server
+		}
+	}
+
+	# ------------------------------------------------------------
+	# DelegateOps static-site fallback
+	# ------------------------------------------------------------
+
+	handle {
+		root * /srv/delegateops-business
+
+		import inline_style_static_csp
+
+		header {
+			>Cache-Control "public, max-age=300, must-revalidate"
+		}
+
+		file_server
+	}
+}
+
+# ============================================================
+# iamjk.site
+# ============================================================
+
+iamjk.site {
+	encode zstd gzip
+
+	header {
+		Content-Security-Policy "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; media-src 'none'; object-src 'none'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	@iamjk_api path /api/*
+	header @iamjk_api {
+		Cache-Control "private, no-store"
+		CDN-Cache-Control "no-store"
+		Pragma "no-cache"
+	}
+	request_body @iamjk_api {
+		max_size 16KB
+	}
+	reverse_proxy iamjk-site:4321 {
+		header_up Host {host}
+	}
+}
+
+# ============================================================
+# Linkwarden main application
+# ============================================================
+
+bookmarks.iamjk.site {
+	import common_security
+	import private_noindex
+
+	@preserved_view path /api/v1/preserved/view
+
+	handle @preserved_view {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy linkwarden:3000 {
+			header_up -Forwarded
+			stream_close_delay 5m
+		}
+	}
+}
+
+# ============================================================
+# Linkwarden preserved user-content origin
+# ============================================================
+
+bookmarks-content.iamjk.site {
+	encode zstd gzip
+
+	log {
+		output stdout
+		format json
+	}
+
+	@preserved_view path /api/v1/preserved/view
+
+	handle @preserved_view {
+		header {
+			>Strict-Transport-Security "max-age=31536000"
+			>Referrer-Policy "no-referrer"
+			>X-Content-Type-Options "nosniff"
+			>X-Robots-Tag "noindex, nofollow, noarchive"
+			>Cache-Control "private, no-store"
+			>CDN-Cache-Control "no-store"
+		}
+
+		reverse_proxy linkwarden:3000 {
+			header_up -Forwarded
+			stream_close_delay 5m
+		}
+	}
+
+	handle {
+		header {
+			>Strict-Transport-Security "max-age=31536000"
+			>Referrer-Policy "no-referrer"
+			>X-Content-Type-Options "nosniff"
+			>X-Robots-Tag "noindex, nofollow, noarchive"
+			>Cache-Control "private, no-store"
+			>CDN-Cache-Control "no-store"
+		}
+
+		respond 404
+	}
+}

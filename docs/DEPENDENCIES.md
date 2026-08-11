@@ -51,8 +51,8 @@
 |---|---|---|---|
 | `docker.io/library/postgres` | `17-alpine` | PostgreSQL database | _TBD — verify at build time_ |
 | `docker.io/amazon/aws-cli` | `latest` | B2/S3 CLI operations | _TBD — verify at build time_ |
-| `ghcr.io/<org>/padang-erp-api` | `latest` | Go API | _Built locally; digest recorded after each push_ |
-| `ghcr.io/<org>/padang-erp-frontend` | `latest` | Next.js frontend | _Built locally; digest recorded after each push_ |
+| `ghcr.io/itsadventuretime/padang-erp-api` | `latest` | Go API | _Built locally; digest recorded after each push_ |
+| `ghcr.io/itsadventuretime/padang-erp-frontend` | `latest` | Next.js frontend | _Built locally; digest recorded after each push_ |
 
 > **Before using any image:** verify the digest using `podman pull <image>` and record the `sha256:` digest below.
 > Never assume a tag maps to the same digest as a previous pull.

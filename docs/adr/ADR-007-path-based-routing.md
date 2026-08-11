@@ -1,52 +1,65 @@
 # ADR-007: Path-Based Routing for Demo vs Production
 
 **Date:** 2026-08-11  
-**Status:** Accepted (pending Caddy config verification)  
-**Deciders:** Google Antigravity (Architect); confirmed by client (Bridge-PH)
+**Status:** Accepted — resolved after Caddyfile inspection  
+**Deciders:** Google Antigravity (Architect)
 
 ## Context
 
-Both demo and production are served from the same existing VPS with the same Caddy instance.
+Both demo and production are served from the same existing VPS with the same Caddy instance at `delegateops.business`.
 
 Requirements:
 - Production: `https://delegateops.business/padang`
 - Demo: `https://delegateops.business/padang/demo`
 
-Options:
-1. Subdomain routing: `padang.delegateops.business` / `demo.padang.delegateops.business`
-2. Path-based routing: `/padang` / `/padang/demo` (client's requirement)
+The existing Caddyfile has been inspected. Key findings:
+- PIMASCOR uses separate imported handler files (`pimascor-production.handlers.Caddyfile`)
+- PIMASCOR API routing: `handle /path/api/*` + `uri strip_prefix` → direct `reverse_proxy` to API container
+- PIMASCOR frontend: served as static files from a volume (React/Vite SPA)
+- Caddy reaches containers via dedicated proxy networks (not `caddy.network`)
 
 ## Decision
 
-**Path-based routing as specified by client.**
+**Path-based routing as specified. Separate handler Caddyfile files following PIMASCOR pattern.**
 
-Caddy: `handle_path /padang/demo/*` and `handle_path /padang/*`  
-Next.js: `NEXT_PUBLIC_BASE_PATH=/padang` and `/padang/demo` respectively.
+Files to create:
+- `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile`
+- `/home/jk/caddy/conf/padang-production.handlers.Caddyfile`
 
-## Rationale
+Imported inside `delegateops.business { ... }` block before the `handle { }` fallback.
 
-- Client explicitly specified the URLs: `https://delegateops.business/padang/demo` and `https://delegateops.business/padang`
-- Path-based routing is fully supported by Caddy (`handle_path`) and Next.js (`basePath` config)
-- No DNS changes required; runs under the existing `delegateops.business` domain
-- Caddy's `handle_path` strips the path prefix before forwarding — requires Next.js to use `basePath`
+Routing:
+```
+/padang/demo/api/* → uri strip_prefix /padang/demo → bridge-ph-padang-demo-api:8080
+/padang/demo/*     → reverse_proxy bridge-ph-padang-demo-frontend:3000 (full path kept)
+/padang/api/*      → uri strip_prefix /padang       → bridge-ph-padang-api:8080
+/padang/*          → reverse_proxy bridge-ph-padang-frontend:3000      (full path kept)
+```
 
-## Known Risk
+Networks Caddy joins (to be added to `caddy.container`):
+- `bridge-ph-padang-demo-proxy.network`
+- `bridge-ph-padang-proxy.network`
 
-- Existing Caddy configuration must be inspected before implementation
-- Path conflicts with other existing services on `delegateops.business` must be verified
-- Next.js `basePath` must be set correctly or all asset links and API calls will fail
-- API sub-path (`/padang/api/v1/`) routing must be handled carefully (could go through Next.js rewrites or direct Caddy rule)
+## Key Difference from PIMASCOR
 
-## Action Required
+PIMASCOR frontend = static files served by Caddy from a volume.
+Padang frontend = **Next.js (live container)**; Caddy must `reverse_proxy` to it (not `file_server`).
 
-ChatGPT Codex must:
-1. SSH to VPS and `cat` the existing Caddy Caddyfile/config before adding any rules
-2. Verify no conflicts with existing paths
-3. Add `handle_path` blocks carefully
+This means:
+- Full path is preserved when forwarding to Next.js (use `handle`, NOT `handle_path`)
+- Next.js `basePath` config must match the path prefix (`/padang` or `/padang/demo`)
+
+## CSP Requirement
+
+Next.js 15 App Router requires `'unsafe-inline'` on `script-src` for hydration.
+The existing `same_origin_web_csp` snippet would break Next.js.
+A new `padang_nextjs_csp` snippet is defined (see `docs/DEPLOYMENT.md`).
+Phase 2: implement nonce-based CSP via Next.js middleware to replace `'unsafe-inline'`.
 
 ## Consequences
 
+- `caddy.container` must be updated to join the two proxy networks
+- Caddy reload required: `systemctl --user daemon-reload && systemctl --user restart caddy.service`
 - Next.js `next.config.js` must set `basePath: '/padang'` (prod) or `basePath: '/padang/demo'` (demo)
-- All internal links in Next.js use relative paths — `basePath` is prepended automatically
-- API calls from Next.js must be configured to use the correct base path
-- If Caddy uses JSON config instead of Caddyfile, the implementation approach may differ
+- Go API serves routes at `/api/v1/...`; after stripping `/padang` or `/padang/demo`, path matches correctly
+- Handler import order matters: padang imports must appear before the `handle { }` fallback block
