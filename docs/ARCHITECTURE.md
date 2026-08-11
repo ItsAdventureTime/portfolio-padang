@@ -9,15 +9,13 @@ All components run as rootless Podman containers on a Fedora CoreOS VPS.
 
 ```
 Internet
-  └─ Caddy (existing rootless, caddy.network)
-       └─ Next.js Frontend (bridge-ph-padang-{env}-frontend)
-            ├─ joins caddy.network (inbound from Caddy)
-            └─ joins bridge-ph-padang-{env}.network (outbound to API)
-                  └─ Go API (bridge-ph-padang-{env}-api)
-                       └─ bridge-ph-padang-{env}.network (internal)
-                             └─ PostgreSQL 17 (bridge-ph-padang-{env}-db)
+  └─ Caddy (existing rootless)
+       ├─ caddy.network (edge; no app containers)
+       ├─ bridge-ph-padang-{env}-proxy.network
+       │    └─ Next.js Frontend + Go API (both reachable from Caddy)
+       └─ bridge-ph-padang-{env}.network (internal; API + DB only)
 
-External services (reached from API container via host network egress):
+External services (reached from API container via outbound HTTPS):
   ├─ Backblaze B2 (s3.us-west-001.backblazeb2.com) — file storage
   └─ Resend API (api.resend.com) — transactional email
 ```
@@ -28,49 +26,51 @@ External services (reached from API container via host network egress):
 
 ### Backend
 
-| Component | Technology | Version | Rationale |
-|---|---|---|---|
-| Language | Go | Latest stable (1.24+) | Efficient, single-binary deployment, idiomatic for long-lived services |
-| HTTP Router | Chi | v5 | Idiomatic net/http; minimal; no framework lock-in; clean layered arch |
-| Database driver | pgx | v5 | High-performance native PostgreSQL driver |
-| Query generation | sqlc | v1.x (latest) | Type-safe SQL; compile-time safety; no ORM magic |
-| Migrations | golang-migrate | v4 | CLI + library; up/down migrations; PostgreSQL dialect |
-| Validation | go-playground/validator | v10 | Struct-tag validation; widely adopted |
-| Auth | bcrypt (stdlib crypto) + JWT | — | Password hashing; short-lived access tokens + refresh tokens |
-| File upload | AWS SDK v2 (S3-compatible) | v2 | B2 is S3-compatible; official Go SDK |
-| Email | Resend Go SDK | Latest | Adapter pattern; swappable |
-| OpenAPI | swaggo/swag or huma | Latest | Generate OpenAPI 3.1 spec from Go annotations |
-| Config | env vars via Quadlet | — | No config files for secrets; see SECURITY.md |
+| Component | Technology | Notes |
+|---|---|---|
+| Language | Go | Latest stable — `golang:alpine` image; no version pinned |
+| HTTP Router | Chi | v5 (only major version; no LTS scheme; latest within v5) |
+| Database driver | pgx | v5 — high-performance native PostgreSQL driver |
+| Query generation | sqlc | Latest — type-safe SQL; compile-time safety; no ORM magic |
+| Migrations | golang-migrate | v4 — CLI + library; up/down migrations; PostgreSQL dialect |
+| Validation | go-playground/validator | v10 — struct-tag validation |
+| Auth | Email OTP (production) / auto-login (demo) | 6-digit code; 10-min TTL; single-use; rate-limited; no passwords |
+| File upload | AWS SDK v2 (S3-compatible) | B2 S3-compatible API |
+| Email | Resend Go SDK | Adapter pattern; swappable to Azure |
+| OpenAPI | swaggo/swag or huma | Generate OpenAPI 3.1 spec from Go annotations |
+| Config | Env vars via Quadlet `Environment=` | No config files for secrets; see SECURITY.md |
 
 ### Frontend
 
-| Component | Technology | Version | Rationale |
-|---|---|---|---|
-| Framework | Next.js (App Router) | 15.x | Hybrid SSR/CSR; excellent dashboard support; stable App Router |
-| Language | TypeScript | 5.x | Type safety; OpenAPI-generated types from Go backend |
-| Styling | Tailwind CSS | v4.x | Utility-first; integrates with shadcn/ui |
-| UI components | shadcn/ui | Latest | Full code ownership; Radix UI primitives; accessible |
-| Data tables | TanStack Table | v8 | Headless; server-side pagination/sort/filter |
-| Forms | React Hook Form + Zod | Latest | Efficient multi-field forms; Zod schemas mirror API validation |
-| Server state | TanStack Query (React Query) | v5 | Caching, background sync, optimistic updates |
-| Charts | Recharts | v2.x | React-native; lightweight; suitable for PH ERP scale |
-| Type generation | openapi-typescript | Latest | Generate TypeScript interfaces from OpenAPI spec |
+| Component | Technology | Notes |
+|---|---|---|
+| Framework | Next.js (App Router) | 16.x active LTS — `node:lts-alpine` image; no version pinned |
+| Language | TypeScript | Latest — type safety; OpenAPI-generated types from Go backend |
+| Styling | Tailwind CSS | v4 — utility-first; integrates with shadcn/ui |
+| UI components | shadcn/ui | Latest — full code ownership; Radix UI primitives; accessible |
+| Data tables | TanStack Table | v8 — headless; server-side pagination/sort/filter |
+| Forms | React Hook Form + Zod | Latest — efficient multi-field forms; Zod schemas mirror API validation |
+| Server state | TanStack Query (React Query) | v5 — caching, background sync, optimistic updates |
+| Charts | Recharts | Latest — React-native; lightweight; suitable for PH ERP scale |
+| Type generation | openapi-typescript | Latest — generate TypeScript interfaces from OpenAPI spec |
 
 ### Database
 
-| Component | Technology | Version | Rationale |
-|---|---|---|---|
-| RDBMS | PostgreSQL | 17 (current stable) | Relational model; JSONB; RLS; advisory locks; battle-tested |
-| Connection pooling | PgBouncer (optional) | — | Evaluate if connection count becomes a concern |
+| Component | Technology | Notes |
+|---|---|---|
+| RDBMS | PostgreSQL | 17 — one below latest (18); `postgres:17-alpine`; no patch pinned |
+| Connection pooling | PgBouncer (optional) | Evaluate if connection count becomes a concern |
 
 ### Infrastructure
 
 | Component | Technology |
 |---|---|
-| Containerization | Rootless Podman + Podman Quadlets |
-| Ingress | Existing Caddy (path-based routing) |
+| Containerization | Rootless Podman + Podman Quadlets (`AutoUpdate=registry`) |
+| Build strategy | All builds via `podman run --rm`; multi-stage Containerfiles; no host toolchain required |
+| Image tags | Mutable, no pinned version numbers; `podman auto-update` tracks digest changes |
+| Ingress | Existing Caddy (path-based routing; proxy-network pattern) |
 | OS | Fedora CoreOS (latest stable) |
-| OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp-{api|frontend}`) |
+| OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp-{api\|frontend}`) |
 | File storage | Backblaze B2 (`bridge-ph` bucket, `s3.us-west-001.backblazeb2.com`) |
 | Email | Resend (current); Azure Communication Services Email (future) |
 | Secrets | Podman secrets (mounted under `/run/secrets/`) |
@@ -170,12 +170,12 @@ See `docs/API.md` for full conventions and endpoint reference.
 See `docs/SECURITY.md` for full detail.
 
 **Summary:**
-- Email + password (bcrypt, cost factor ≥ 12)
-- Short-lived JWT access token (15 min)
+- **Production:** Email OTP (passwordless) — user enters email → receives 6-digit code → 10-min TTL → single-use → rate-limited
+- **Demo:** No auth; all requests auto-authenticated as Admin with switchable role header
+- Short-lived JWT access token (15 min) issued after OTP verification
 - Refresh token (7 days, rotated on use, stored server-side hash)
-- All routes require auth except: `/api/v1/health`, `/api/v1/auth/login`, `/api/v1/auth/refresh`
+- All routes require auth except: `/api/v1/health`, `/api/v1/auth/request-otp`, `/api/v1/auth/verify-otp`, `/api/v1/auth/refresh`
 - RBAC enforced in middleware: role → module → action permissions matrix
-- Demo: no auth; all requests treated as Admin with switchable role header
 
 ---
 
@@ -277,9 +277,11 @@ See `docs/adr/` for all ADRs.
 | ADR | Title |
 |---|---|
 | ADR-001 | Go + Chi as backend framework |
-| ADR-002 | Next.js 15 App Router as frontend framework |
+| ADR-002 | Next.js 16 App Router as frontend framework |
 | ADR-003 | PostgreSQL 17 as database |
 | ADR-004 | sqlc for type-safe database access |
 | ADR-005 | Backblaze B2 for file storage |
 | ADR-006 | Provider-neutral email adapter pattern |
 | ADR-007 | Path-based routing for demo vs production |
+| ADR-008 | Email OTP as production authentication method |
+| ADR-009 | Containerized build strategy (podman run --rm) |

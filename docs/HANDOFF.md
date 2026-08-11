@@ -68,16 +68,18 @@ RESOLVED QUESTIONS:
 ---
 
 ARCHITECTURAL DECISIONS (all resolved):
-- Go (1.24+) + Chi v5 — idiomatic, minimal, long-lived ERP backend
-- Next.js 15 App Router + TypeScript + shadcn/ui + Tailwind CSS v4 — hybrid SSR/CSR frontend
-- PostgreSQL 17 — relational ERP data model
+- Go (latest stable, `golang:alpine`) + Chi v5 — idiomatic, minimal, long-lived ERP backend
+- Next.js 16 App Router (active LTS, `node:lts-alpine`) + TypeScript + shadcn/ui + Tailwind CSS v4
+- PostgreSQL 17 (`postgres:17-alpine`, major version pinned, patch auto-updates via podman)
 - sqlc + pgx v5 — type-safe SQL, no ORM
 - golang-migrate — DB migrations (up/down SQL files)
 - Backblaze B2 (existing bucket `bridge-ph`) — file storage + production backups
 - Resend → Azure (future) — provider-neutral email adapter
-- Rootless Podman Quadlets — all containers
+- Rootless Podman Quadlets — all containers; `AutoUpdate=registry`; no pinned version numbers
+- All builds via `podman run --rm`; multi-stage Containerfiles; no host build toolchain
 - Path-based routing: /padang (prod), /padang/demo (demo) — existing Caddy; PIMASCOR pattern
 - Proxy network architecture: Caddy + frontend + API on proxy.network; API + DB on internal.network
+- Email OTP (passwordless) — 6-digit code, 10-min TTL, single-use, rate-limited; no passwords stored
 - RS256 JWT — access (15min) + refresh (7d, rotating, server-side hashed)
 - GHCR `itsadventuretime` as OCI registry
 - Git remote: https://github.com/ItsAdventureTime/bridge-padang.git

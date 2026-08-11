@@ -11,32 +11,53 @@
 
 ## Authentication
 
-### Password Policy
-- Minimum 12 characters
-- bcrypt hashing; cost factor ≥ 12
-- No maximum length (bcrypt pre-hashed with SHA-512 to prevent length-extension)
-- No password complexity rules imposed (NIST 800-63B guidance: length > complexity)
-- Common/breached password rejection list (optional Phase 2)
+### Method: Email OTP (Passwordless) — Production
 
-### JWT Tokens
+No passwords. Users authenticate by entering their registered email address and a one-time code delivered via email.
+
+**OTP Flow:**
+1. User enters registered email → `POST /api/v1/auth/request-otp`
+2. Server generates a cryptographically secure 6-digit code
+3. Code stored server-side (PostgreSQL `otp_codes` table) as bcrypt hash; linked to user email + expiry
+4. Email sent via Resend with the 6-digit code
+5. User enters code → `POST /api/v1/auth/verify-otp`
+6. Server validates: code matches hash, not expired (10 min TTL), not already used, user is active
+7. On success: OTP record deleted (single-use); access token + refresh token issued
+
+**OTP Security Controls:**
+- Code: 6 digits; cryptographically random (crypto/rand); bcrypt hash stored (not plaintext)
+- TTL: 10 minutes from generation
+- Single-use: deleted immediately on first successful verification
+- Rate limiting: 3 OTP requests per email per 15 minutes; 5 verify attempts per OTP before auto-invalidation
+- Account enumeration prevention: identical response for unknown vs known email ("if your email is registered, a code has been sent")
+- Email delivery: Resend with proper SPF/DKIM/DMARC records (avoids spam classification)
+- OTP email body: clearly states context ("Use this code to log into Padang ERP Lite")
+
+**Why Email OTP over Magic Links:**
+- OTP codes are slightly more secure for ERP financial data — prevents link pre-fetching by enterprise email security scanners (which can inadvertently consume a magic link, invalidating the session before the user clicks)
+- Consistent UX on all email clients (no click required; just copy/type the code)
+- Trade-off: slightly more friction (copy/paste) vs. magic link (one-click) — acceptable for an internal tool
+
+### JWT Tokens (issued after OTP verification)
 - Algorithm: RS256 (asymmetric) — backend signs with private key; frontend verifies with public key
 - Access token lifetime: 15 minutes
 - Refresh token lifetime: 7 days, rotating on each use
 - Refresh token: stored server-side as bcrypt hash in `refresh_tokens` table
 - Access token: stored in memory only (never localStorage, never sessionStorage)
 - Refresh token delivery: HttpOnly, Secure, SameSite=Strict cookie (production)
-- Token revocation: refresh token revoked on logout; all tokens invalidated on password change
+- Token revocation: refresh token revoked on logout; all tokens invalidated on OTP re-verification
 
 ### Demo Mode
 - No authentication enforced
-- All requests treated as authenticated as Admin
+- All requests auto-authenticated as Admin
 - `X-Demo-Role` header accepted to simulate role (validated against role enum; no elevation possible)
-- Demo tokens have no signing key exposure to users
+- No OTP codes generated or emails sent in demo environment
 
-### Brute Force Protection
-- Login endpoint: 10 attempts/min per IP; exponential backoff after 5 failures
-- Account lockout: 15-minute lockout after 10 consecutive failures; logged in audit_log
-- Lockout notification: email to registered address on lockout event
+### Rate Limiting (OTP-specific)
+- `/auth/request-otp`: 3 requests per email per 15 minutes per IP
+- `/auth/verify-otp`: 5 failed attempts per OTP before the code is auto-invalidated; 10 attempts/min per IP
+- Lockout notification: email to registered address after 5 consecutive failed verifications
+- All rate-limit events logged in `audit_log`
 
 ---
 
@@ -191,8 +212,8 @@ Per-IP for auth endpoints; per-user for all others.
 - SELinux enforcing; no `--security-opt label=disable`
 - No privileged containers
 - No `--cap-add` beyond what the application strictly requires
-- Database, cache, and API ports NOT exposed to host; internal network only
-- Only the frontend container joins the Caddy network
+- Database and API ports NOT exposed to host; internal network only (proxy-network pattern)
+- Frontend and API containers on proxy network (Caddy-reachable); DB on internal network only
 
 ---
 
@@ -201,12 +222,12 @@ Per-IP for auth endpoints; per-user for all others.
 | OWASP Top 10:2025 | Control |
 |---|---|
 | A01: Broken Access Control | RBAC middleware; ownership checks; no client role trust |
-| A02: Cryptographic Failures | TLS; bcrypt; RS256 JWT; secrets in Podman secrets |
+| A02: Cryptographic Failures | TLS; bcrypt OTP hash; RS256 JWT; OTP code via crypto/rand; secrets in Podman secrets |
 | A03: Injection | sqlc parameterized queries; input validation; no eval |
-| A04: Insecure Design | Separation of concerns; principle of least privilege |
+| A04: Insecure Design | Email OTP eliminates password reuse risk; separation of concerns; least privilege |
 | A05: Security Misconfiguration | Security headers; no debug endpoints in prod; no exposed ports |
 | A06: Vulnerable Components | `go mod verify`; `npm audit`; manual image update review |
-| A07: Auth Failures | bcrypt; JWT rotation; lockout; no secret in logs |
-| A08: Software Integrity | go.sum; package-lock.json; image digests |
-| A09: Logging Failures | Audit log; login events; structured logging; no secret in logs |
+| A07: Auth Failures | Email OTP (no passwords); single-use codes; rate limiting; JWT rotation; no secret in logs |
+| A08: Software Integrity | go.sum; package-lock.json; image auto-update via podman (digest-based) |
+| A09: Logging Failures | Audit log; OTP request/verify events; structured logging; no secret in logs |
 | A10: SSRF | No user-supplied URL fetching; no internal service exposure |

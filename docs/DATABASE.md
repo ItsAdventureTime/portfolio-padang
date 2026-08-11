@@ -32,19 +32,38 @@ Down migrations must be safe and tested.
 
 ```sql
 CREATE TABLE users (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email        TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  full_name    TEXT NOT NULL,
-  role         TEXT NOT NULL, -- admin|gm|dcs|project_manager|procurement_officer|
-                               -- fabrication_supervisor|finance_staff|billing_clerk|
-                               -- inventory_clerk|viewer
-  is_active    BOOLEAN NOT NULL DEFAULT TRUE,
-  last_login_at TIMESTAMPTZ,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at   TIMESTAMPTZ
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email          TEXT NOT NULL UNIQUE,
+  -- No password_hash: authentication via email OTP only (see SECURITY.md)
+  full_name      TEXT NOT NULL,
+  role           TEXT NOT NULL, -- admin|gm|dcs|project_manager|procurement_officer|
+                                 -- fabrication_supervisor|finance_staff|billing_clerk|
+                                 -- inventory_clerk|viewer
+  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+  last_login_at  TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at     TIMESTAMPTZ
 );
+```
+
+### otp_codes
+
+One-time password codes for email-based authentication. Codes are hashed at rest.
+
+```sql
+CREATE TABLE otp_codes (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email        TEXT NOT NULL,            -- target email (may not be a registered user yet)
+  code_hash    TEXT NOT NULL,            -- bcrypt hash of the 6-digit code
+  expires_at   TIMESTAMPTZ NOT NULL,     -- 10 minutes from creation
+  used_at      TIMESTAMPTZ,              -- set on first successful verification
+  attempts     INTEGER NOT NULL DEFAULT 0, -- failed verify attempts; auto-invalidate at 5
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_otp_codes_email_expires ON otp_codes(email, expires_at)
+  WHERE used_at IS NULL;
 ```
 
 ### refresh_tokens

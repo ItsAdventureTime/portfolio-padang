@@ -17,9 +17,10 @@
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/health` | Health check; returns 200 + status |
-| POST | `/api/v1/auth/login` | Email + password → access token + refresh token |
-| POST | `/api/v1/auth/refresh` | Refresh token → new access token |
+| GET  | `/api/v1/health`              | Health check; returns 200 + status |
+| POST | `/api/v1/auth/request-otp`    | Submit email → send 6-digit OTP code via email |
+| POST | `/api/v1/auth/verify-otp`     | Submit code → access token + refresh token (HttpOnly cookie) |
+| POST | `/api/v1/auth/refresh`        | Refresh token cookie → new access token |
 
 ### Protected Endpoints
 
@@ -286,8 +287,9 @@ All report endpoints support:
 
 | Endpoint class | Limit |
 |---|---|
-| `/auth/login` | 10 req/min per IP |
-| `/auth/refresh` | 20 req/min per IP |
+| `/auth/request-otp` | 3 req per email per 15 min; 10 req/min per IP |
+| `/auth/verify-otp`  | 5 failed attempts per OTP before code invalidated; 10 req/min per IP |
+| `/auth/refresh`     | 20 req/min per IP |
 | All other endpoints | 300 req/min per user |
 
 ---
