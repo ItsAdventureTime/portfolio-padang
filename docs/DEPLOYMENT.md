@@ -548,14 +548,14 @@ at `/padang/demo/`:
 
 ```bash
 # macOS, from the repository root
-scripts/deploy-lemans-demo.sh --host VPS_HOST
+ scripts/deploy-padang-demo.sh --host VPS_HOST
 ```
 
 The macOS side performs no compilation, package installation, or application
 execution. It uses `rsync` to upload the source tree to
 `/home/jk/bridge-ph/padang-demo/source/`, excluding Git metadata, dependency
 directories, build output, `.env` files, and credential-looking files, then
-hands control to `scripts/deploy-lemans-demo-remote.sh` on the VPS.
+ hands control to `scripts/deploy-padang-demo-remote.sh` on the VPS.
 
 The remote script:
 
@@ -584,7 +584,7 @@ The remote script:
   separate from production;
 - runs migrations, performs the guarded synthetic demo seed, and starts the
   30-minute reset timer; and
-- makes only the required Caddy network and `/padang/demo/api/*` route changes,
+  - makes only the required Caddy network and `/padang/demo/api/*` route changes,
   stages the Caddyfile, formats it with `caddy fmt --overwrite`, validates it
   with `caddy validate`, then atomically replaces it after a timestamped backup;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
@@ -597,9 +597,8 @@ Caddy reaches the app and API through the dedicated
 `bridge-ph-padang-demo` network so it can reach PostgreSQL; PostgreSQL and the
 reset container never join any Caddy-facing network. The API route is required
 because the browser calls the same-origin `/padang/demo/api/*` path, while the
-existing supplied Caddy route may still contain the legacy `/lemans/demo/*`
-block. The deployment script removes that managed legacy block and installs
-the authoritative `/padang/demo/*` route.
+  existing supplied Caddyfile must use the authoritative `/padang/demo/*`
+  route.
 
 Runtime Quadlets use floating official `postgres:alpine`, `node:lts-alpine`,
 `alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts

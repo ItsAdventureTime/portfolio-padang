@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 readonly REMOTE_ROOT="/home/jk/bridge-ph/padang-demo"
 readonly REMOTE_SOURCE="${REMOTE_ROOT}/source"
-readonly REMOTE_SCRIPT="${REMOTE_SOURCE}/scripts/deploy-lemans-demo-remote.sh"
+readonly REMOTE_SCRIPT="${REMOTE_SOURCE}/scripts/deploy-padang-demo-remote.sh"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "${SCRIPT_DIR}/.." && pwd -P)
@@ -16,7 +16,7 @@ DEPLOY_MODE="--apply"
 
 usage() {
   cat <<'USAGE'
-Usage: deploy-lemans-demo.sh --host HOST [--user USER] [--port PORT]
+Usage: deploy-padang-demo.sh --host HOST [--user USER] [--port PORT]
                               [--apply|--dry-run]
 
 Options may also be supplied as VPS_HOST, VPS_USER, and VPS_PORT.
@@ -28,7 +28,7 @@ USAGE
 }
 
 die() {
-  printf 'deploy-lemans-demo: %s\n' "$*" >&2
+  printf 'deploy-padang-demo: %s\n' "$*" >&2
   exit 1
 }
 

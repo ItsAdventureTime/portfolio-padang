@@ -370,7 +370,7 @@ install_caddy_route() {
   }
 
   api_block=$(cat <<EOF
-# BEGIN PADANG DEMO API ROUTE (managed by deploy-lemans-demo-remote.sh)
+# BEGIN PADANG DEMO API ROUTE (managed by deploy-padang-demo-remote.sh)
 @padang_demo_api path /padang/demo/api/*
 handle @padang_demo_api {
   header {
@@ -386,7 +386,7 @@ handle @padang_demo_api {
 EOF
 )
   app_block=$(cat <<EOF
-# BEGIN PADANG DEMO ROUTE (managed by deploy-lemans-demo-remote.sh)
+# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
 @padang_demo_root path /padang/demo
 redir @padang_demo_root /padang/demo/ 308
 
@@ -403,24 +403,6 @@ handle @padang_demo {
 # END PADANG DEMO ROUTE
 EOF
 )
-
-  # Remove the previously supplied legacy Le Mans block, if present. The
-  # public Padang route is authoritative; this keeps repeated deployments
-  # idempotent without leaving a stale second public route behind.
-  if grep -q '^# BEGIN LEMANS DEMO API ROUTE' "$caddy_tmp" ||
-    grep -q '^# BEGIN LEMANS DEMO ROUTE' "$caddy_tmp"; then
-    tmp_file="$caddy_tmp.next"
-    awk '
-      /^# BEGIN LEMANS DEMO API ROUTE/ { skip=1; next }
-      /^# END LEMANS DEMO API ROUTE/ { skip=0; next }
-      /^# BEGIN LEMANS DEMO ROUTE/ { skip=1; next }
-      /^# END LEMANS DEMO ROUTE/ { skip=0; next }
-      !skip { print }
-    ' "$caddy_tmp" > "$tmp_file"
-    mv "$tmp_file" "$caddy_tmp"
-    changed=1
-    caddyfile_changed=1
-  fi
 
   if ! grep -q '^@padang_demo_api path ' "$caddy_tmp"; then
     tmp_file="$caddy_tmp.next"
