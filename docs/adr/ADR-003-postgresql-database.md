@@ -1,4 +1,4 @@
-# ADR-003: PostgreSQL 17 as Database
+# ADR-003: PostgreSQL as Database
 
 **Date:** 2026-08-11  
 **Status:** Accepted  
@@ -15,7 +15,9 @@ The ERP stores:
 
 ## Decision
 
-**PostgreSQL 17 (current stable, released Oct 2024).**
+**The latest supported PostgreSQL release from the official floating Alpine
+channel (`postgres:alpine`).** PostgreSQL has no Node-style LTS channel, so a
+changed floating digest must pass migration and restore validation before use.
 
 ## Rationale
 
@@ -26,9 +28,10 @@ The ERP stores:
 - Advisory locks: safe for application-level locking (e.g., billing number generation)
 - `gen_random_uuid()` built-in: no extension needed for UUID PKs
 - Generated columns: for computed fields (e.g., budget item totals)
-- Excellent pgx v5 driver for Go: high performance, native protocol
+- Excellent current pgx driver for Go: high performance, native protocol
 - sqlc: generates type-safe Go code from SQL; PostgreSQL-native
-- Supported until November 2029
+- Support follows the upstream release selected by the floating channel; the
+  resolved digest and detected major version are recorded at each update
 
 ## Alternatives Considered
 

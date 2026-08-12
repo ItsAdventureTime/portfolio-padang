@@ -86,10 +86,10 @@ a gold ribbon banner, and clean bold typography.
 | **Body / UI** | Inter | 400, 500, 600 | All body text, labels, buttons, navigation |
 | **Monospace / Numbers** | JetBrains Mono | 400, 500 | Financial figures, reference numbers, codes |
 
-Import in CSS:
-```css
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-```
+Load fonts through Next.js `next/font/google` or `next/font/local`, not a
+runtime CSS `@import`. Next.js downloads and self-hosts the selected font
+files at build time, so browsers make no request to Google and the CSP can
+remain same-origin.
 
 ### Type Scale
 
@@ -128,48 +128,28 @@ Based on 4px base unit:
 
 ---
 
-## Elevation & Glassmorphism
+## Elevation and Surfaces
 
-### Navigation Surfaces (Glassmorphic)
-
-Applied to: sidebar, top navigation bar, modal overlays, dropdown menus.
+The launch theme is light-only. Navigation, cards, tables, forms, and stat
+cards use opaque light surfaces. No dark-mode tokens or glassmorphism are part
+of the product contract.
 
 ```css
-.glass-surface {
-  background: rgba(26, 26, 26, 0.72);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  border: 1px solid rgba(200, 168, 75, 0.12);
+.navigation-surface {
+  background: var(--color-surface-100);
+  border: 1px solid var(--color-surface-200);
 }
-```
 
-### Card Surfaces (Opaque — data-dense content)
-
-Applied to: data tables, financial summaries, form panels, stat cards with detailed data.
-
-```css
 .card-surface {
-  background: var(--color-surface-800);
-  border: 1px solid var(--color-surface-700);
+  background: var(--color-surface-0);
+  border: 1px solid var(--color-surface-200);
   border-radius: 12px;
-}
-```
-
-### Stat Cards (Elevated)
-
-Applied to: KPI summary cards on dashboard.
-
-```css
-.stat-card {
-  background: var(--color-surface-750);
-  border: 1px solid var(--color-surface-700);
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .stat-card:hover {
-  border-color: rgba(200, 168, 75, 0.35);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(200, 168, 75, 0.12);
+  border-color: var(--color-gold-300);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.10);
   transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 ```
@@ -193,7 +173,7 @@ Applied to: KPI summary cards on dashboard.
 ### Navigation Sidebar
 
 - Width: 256px (expanded), 64px (collapsed — icon-only mode)
-- Glass surface treatment
+- Opaque light navigation surface with subtle border
 - Logo at top (shield mark + wordmark)
 - Nav items: icon + label; gold left-border indicator on active item
 - Collapse toggle at bottom
@@ -202,7 +182,7 @@ Applied to: KPI summary cards on dashboard.
 ### Top Bar (Header)
 
 - Height: 56px
-- Glass surface treatment
+- Opaque light navigation surface with subtle border
 - Breadcrumb navigation (left)
 - Page title (center or left of breadcrumb)
 - Demo: role switcher dropdown (right)
@@ -218,20 +198,20 @@ Applied to: KPI summary cards on dashboard.
 
 | Status | Background | Text | Border |
 |---|---|---|---|
-| Draft | `surface-700` | `text-secondary` | `surface-600` |
-| Pending / Submitted | `warning-900` | `warning-400` | `warning-700` |
-| GM Approval | `warning-900` | `warning-400` | `warning-700` |
-| Approved | `info-900` | `info-400` | `info-700` |
-| Issued / Active | `info-900` | `info-400` | `info-700` |
-| DCS for Payment | `gold-800` | `gold-400` | `gold-700` |
-| Completed / Paid | `success-900` | `success-400` | `success-700` |
-| Rejected / Cancelled | `error-900` | `error-400` | `error-700` |
-| On Hold | `surface-700` | `text-secondary` | `surface-500` |
+| Draft | `surface-100` | `text-secondary` | `surface-300` |
+| Pending / Submitted | `warning-50` | `warning-700` | `warning-600` |
+| GM Approval | `warning-50` | `warning-700` | `warning-600` |
+| Approved | `info-50` | `info-700` | `info-600` |
+| Issued / Active | `info-50` | `info-700` | `info-600` |
+| DCS for Payment | `gold-100` | `gold-700` | `gold-400` |
+| Completed / Paid | `success-50` | `success-700` | `success-600` |
+| Rejected / Cancelled | `error-50` | `error-700` | `error-600` |
+| On Hold | `surface-100` | `text-secondary` | `surface-300` |
 
 ### Data Tables
 
 - Full-width, server-side paginated
-- Alternating row subtle shading (`surface-800` / `surface-750`)
+- Alternating row subtle shading (`surface-0` / `surface-50`)
 - Column sort indicators (gold chevrons on active column)
 - Row hover: gold left-border flash + subtle background lift
 - Selection checkbox: gold accent
@@ -275,7 +255,7 @@ Fallback: instant if not supported.
 ### Loading States
 
 Skeleton loaders (not spinners) for all async content.
-Skeleton color: `surface-700` with shimmer animation (`linear-gradient` sweep).
+Skeleton color: `surface-200` with shimmer animation (`linear-gradient` sweep).
 
 ### Micro-animations
 

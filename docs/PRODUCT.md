@@ -30,23 +30,29 @@ There is no general ledger in the ERP.
 
 ### Role Definitions
 
-| Role | Access Level | Key Permissions |
-|---|---|---|
-| **Admin** | Full | All modules; user management; system configuration |
-| **GM (General Manager)** | Full operational + approval authority | Approve all disbursements and billing; full visibility |
-| **DCS (Disbursing/Check Signing Officer)** | Finance execution | Execute approved payments; record payment references; view approved fund requests. **DCS = CEO of Padang** — this is a named individual, not a generic finance role. |
-| **Project Manager** | Project-scoped | Own project records, costing, progress; raise PRs; view procurement for own projects |
-| **Procurement Officer** | Procurement + Inventory | Manage PR → PO pipeline; fund requests; supplier SOA; inventory |
-| **Fabrication Supervisor** | Fabrication module | Estimates, job orders, production, delivery, billing for fab |
-| **Finance Staff** | Finance Ops | Fund requests, reimbursements, liquidations, supplier payments |
-| **Billing Clerk** | Billing & Collections | Create progress billings, SOA, AR/OR references, collection monitoring |
-| **Inventory Clerk** | Inventory | Stock in, stock out, material issues |
-| **Viewer** | Read-only | Dashboard and reports; no write access |
+| Role | Canonical identifier | Access Level | Key Permissions |
+|---|---|---|---|
+| **Admin** | `administrator` | Full | All modules; user management; system configuration |
+| **GM (General Manager)** | `general_manager` | Full operational + approval authority | Approve all disbursements and billing; full visibility |
+| **DCS (Disbursing/Check Signing Officer)** | `disbursing_check_signing_officer` | Finance execution | Execute approved payments; record payment references; view approved fund requests. **DCS = CEO of Padang** — this is a named individual, not a generic finance role. |
+| **Project Manager** | `project_manager` | Project-scoped | Own project records, costing, progress; raise PRs; view procurement for own projects |
+| **Procurement Officer** | `procurement_officer` | Procurement + Inventory | Manage PR → PO pipeline; fund requests; supplier SOA; inventory |
+| **Fabrication Supervisor** | `fabrication_supervisor` | Fabrication module | Estimates, job orders, production, delivery, billing for fab |
+| **Finance Staff** | `finance_staff` | Finance Ops | Fund requests, reimbursements, liquidations, supplier payments |
+| **Billing Clerk** | `billing_clerk` | Billing & Collections | Create progress billings, SOA, AR/OR references, collection monitoring |
+| **Inventory Clerk** | `inventory_clerk` | Inventory | Stock in, stock out, material issues |
+| **Viewer** | `viewer` | Read-only | Dashboard and reports; no write access |
 
 ### Authentication
 
-- **Production:** Email + password (bcrypt). JWT with refresh tokens.
-- **Demo:** No authentication. Auto-logged in as Admin. Role switcher available in the UI header.
+- **Production:** Passwordless Email OTP. RS256 JWT access tokens with rotating
+  refresh tokens; no passwords are stored.
+- **Demo:** No authentication. Requests receive a guarded synthetic identity;
+  the role switcher is available in the UI header for demo simulation.
+
+The demo behavior is deployment-scoped. `X-Demo-Role` is honored only when
+the server is explicitly running as the demo environment; production ignores
+it and always performs normal authentication and authorization.
 
 ### User Count
 
@@ -369,6 +375,15 @@ Export includes: QBO mapping fields, sync status flag, export timestamp.
 - Real-time sync via QBO API
 - Sync status per record
 - Error/conflict resolution workflow
+
+### 10. Future Mobile Clients
+
+The Go REST API is the single source of truth for the Next.js web client and
+future iOS/Android clients. Shared OpenAPI-generated TypeScript types,
+validation schemas, role identifiers, error envelopes, pagination, and domain
+calculations may live in repository packages. A future Expo/React Native app
+will use Keychain/Keystore-backed refresh-token storage while retaining the
+same rotating-token protocol and server-side authorization.
 
 ---
 

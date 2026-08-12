@@ -27,6 +27,7 @@ For future PITR consideration: evaluate `pg_basebackup` + WAL shipping to B2 if 
 |---|---|---|---|
 | Daily | 02:00 PHT (18:00 UTC) | 30 most recent | `bridge-ph/padang/backups/daily/` |
 | Weekly | Sunday 01:00 PHT (17:00 UTC) | 12 most recent | `bridge-ph/padang/backups/weekly/` |
+| Attachments + manifest | Daily with database backup | 30 most recent manifests; B2 object retention applies to files | `bridge-ph/padang/attachments-backups/` |
 
 Object naming:
 ```
@@ -72,7 +73,7 @@ weekly/padang_prod_{YYYY-MM-DD}_weekly.dump
 Description=Padang ERP Production - Database Backup
 
 [Container]
-Image=docker.io/library/postgres:17-alpine
+Image=ghcr.io/itsadventuretime/padang-erp-backup:latest
 ContainerName=bridge-ph-padang-backup
 Network=bridge-ph-padang.network
 
@@ -87,9 +88,7 @@ Secret=bridge-ph-padang-prod-db-password,type=mount,target=/run/secrets/db-passw
 Secret=bridge-ph-padang-prod-b2-key-id,type=mount,target=/run/secrets/b2-key-id
 Secret=bridge-ph-padang-prod-b2-app-key,type=mount,target=/run/secrets/b2-app-key
 
-Exec=/scripts/backup.sh
-
-Volume=/home/jk/bridge-ph/padang/scripts/backup.sh:/scripts/backup.sh:ro,Z
+Exec=/usr/local/bin/backup.sh
 
 [Service]
 Type=oneshot
@@ -115,16 +114,22 @@ WantedBy=timers.target
 
 ## Backup Script
 
-See `scripts/backup.sh` for implementation.
+The implementation will live in the dedicated backup utility image. The image
+contains the PostgreSQL client, AWS CLI-compatible B2 client, and the backup
+scripts; the production Quadlet does not bind-mount an executable from the
+host.
 
 Logic:
 1. Read DB password from `/run/secrets/db-password`
 2. Read B2 credentials from `/run/secrets/b2-key-id` and `/run/secrets/b2-app-key`
 3. Run `pg_dump -Fc -h $DB_HOST -U $DB_USER $DB_NAME` → stdout
-4. Pipe stdout to `aws s3 cp --sse AES256 - s3://{bucket}/{key}` (using AWS CLI with B2 endpoint)
-5. No intermediate file (dump piped directly to B2)
-6. Log success/failure with timestamp (no secret values in logs)
-7. Exit non-zero on failure (systemd records failure; can alert)
+4. Pipe stdout to the AWS CLI-compatible B2 client and upload directly to the
+   dated database key; no plaintext dump is persisted on the VPS
+5. Copy production attachment objects to the dated attachment-backup prefix,
+   generating a SHA-256 manifest for every copied object
+6. Verify uploaded object sizes and manifest checksums before reporting success
+7. Log success/failure with timestamp (no secret values in logs)
+8. Exit non-zero on any database, attachment, manifest, or verification error
 
 Retention cleanup:
 - After upload, list objects in prefix
@@ -178,7 +183,7 @@ podman exec bridge-ph-padang-db \
 podman run --rm \
   -v /tmp/restore:/restore:ro,Z \
   --network bridge-ph-padang \
-  docker.io/library/postgres:17-alpine \
+  docker.io/library/postgres:alpine \
   pg_restore -h bridge-ph-padang-db -U padang_prod_user \
   -d padang_prod /restore/$BACKUP_FILE
 
@@ -257,7 +262,8 @@ Do NOT store in Git or in the application.
 | Demo database | Ephemeral by design |
 | Next.js frontend build | Rebuilt from source |
 | Go API binary | Rebuilt from source |
-| B2 files (attachments) | B2 has its own redundancy; evaluate B2 versioning for additional protection |
+| B2 access keys and Podman secrets | Must be recovered from the secure offline credential process; never export as plaintext |
+| B2 file versions superseded by retention policy | Lifecycle/Object Lock policy governs recoverability; verify policy during operations review |
 
 ---
 
@@ -265,11 +271,16 @@ Do NOT store in Git or in the application.
 
 Files uploaded by users (contracts, drawings, photos) are stored in B2 under `bridge-ph/padang/`.
 
-Recommendation:
-- Enable B2 file versioning on the `bridge-ph` bucket
-- Versioning ensures overwritten or deleted files remain recoverable
-- Do NOT delete file objects without confirmation
+Production attachment objects are included in the daily backup run. The backup
+utility copies the objects and writes a dated SHA-256 manifest, so a database
+restore can be checked against the files it references. The `bridge-ph` bucket
+must also retain versioning/Object Lock and lifecycle settings approved for the
+production recovery policy.
 
-This is separate from the database backup.
-The database backup contains attachment *metadata* (file names, storage keys).
-Recovery of attachment files requires both: database restore + B2 file availability.
+Do NOT delete file objects or change lifecycle/Object Lock settings without an
+operations change review.
+
+The database backup contains attachment *metadata* (file names, storage keys),
+while the attachment backup contains the referenced objects and manifest.
+Recovery requires both: database restore + attachment-object restore + manifest
+verification.

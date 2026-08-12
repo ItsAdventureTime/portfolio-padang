@@ -10,7 +10,8 @@
 - Status transitions enforced in service layer (not DB constraints alone)
 - Audit log: append-only `audit_log` table; no UPDATE or DELETE on this table
 - File attachments: polymorphic `attachments` table (`entity_type`, `entity_id`)
-- PostgreSQL 17; migration tool: golang-migrate
+- Latest supported PostgreSQL release via the official floating Alpine channel;
+  migration tool: golang-migrate
 
 ---
 
@@ -36,7 +37,7 @@ CREATE TABLE users (
   email          TEXT NOT NULL UNIQUE,
   -- No password_hash: authentication via email OTP only (see SECURITY.md)
   full_name      TEXT NOT NULL,
-  role           TEXT NOT NULL, -- admin|gm|dcs|project_manager|procurement_officer|
+  role           TEXT NOT NULL, -- administrator|general_manager|disbursing_check_signing_officer|project_manager|procurement_officer|
                                  -- fabrication_supervisor|finance_staff|billing_clerk|
                                  -- inventory_clerk|viewer
   is_active      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -412,6 +413,7 @@ CREATE TABLE collections (
   payment_mode   TEXT NOT NULL, -- check|bank_transfer|cash
   or_number      TEXT, -- Official Receipt number
   ar_reference   TEXT, -- Acknowledgment Receipt reference
+  bir_2307_reference TEXT, -- BIR Form 2307 reference from client
   bank_reference TEXT,
   check_number   TEXT,
   check_date     DATE,
@@ -523,3 +525,58 @@ Database name: `padang_prod`
 Schema: managed by golang-migrate up migrations
 Backup: daily `pg_dump -Fc` → compressed → encrypted → B2
 See `docs/BACKUP_RESTORE.md`
+
+---
+
+## Complete Operational Coverage Addendum
+
+The tables below are required by the product workflows and must be included in
+the TASK-001 migration package. They close the gaps between the original
+logical schema and the complete product requirements. Exact columns follow
+the same UUID, timestamp, actor, soft-delete, numeric precision, and audit
+principles above.
+
+| Capability | Required source tables | Required relationships / rules |
+|---|---|---|
+| Client tax profile | `clients` | Project and fabrication billing reference a client; `ewt_enabled`, `ewt_rate`, TIN, and contact fields live here |
+| Project budget history | `project_budget_revisions`, `project_budget_revision_items` | Revision reason, actor, approver, effective date; approved revision is the costing baseline |
+| Project costing | `project_cost_entries` | Links project, BOQ item, source module/entity, amount, cost date, and posting actor |
+| Retention ledger | `retention_transactions` | Billing accrual and later release/adjustment; running balance is derived from immutable entries |
+| Fabrication estimates | `fabrication_estimates`, `fabrication_estimate_items` | Estimate status and material/labor/overhead lines; approved estimate may create a job |
+| Fabrication delivery | `fabrication_deliveries` | Job, delivery receipt, date, destination, recipient, inspection notes, attachments |
+| Fabrication billing | `fabrication_billings`, `fabrication_billing_items` | Job/delivery linkage, VAT/EWT/retention fields, workflow status, collections linkage |
+| Purchase order detail | `purchase_order_items` | PO line items, quantities, unit costs, receipt quantities, inventory linkage |
+| Supplier SOA/payment | `supplier_payments` | PO/supplier linkage, payment reference, mode, date, amount; SOA is derived from PO invoices and payments |
+| Reimbursements | `reimbursements` | Employee/requester, amount, purpose, receipt metadata, fund-request workflow linkage |
+| Liquidations | `liquidations`, `liquidation_items` | Advance/fund-request linkage, official receipts, liquidated amount, unliquidated balance |
+| QBO export history | `qbo_export_batches`, `qbo_export_records` | Record type, source entity, mapping status, exported timestamp, file checksum, error detail |
+
+### Migration ordering
+
+Migrations must create shared parents before children. The minimum dependency
+order is:
+
+1. extensions, users, clients, and reference sequences;
+2. projects, fabrication jobs, suppliers, and inventory items;
+3. project budgets, fabrication estimates/jobs, PR/PO headers and line items;
+4. fund requests, payments, reimbursements, liquidations, and inventory transactions;
+5. project costs, billings, retention, collections, and fabrication billing;
+6. attachments, audit log, QBO export metadata, indexes, and append-only rules.
+
+`purchase_request_items` must not reference `inventory_items` before
+`inventory_items` exists. Down migrations must reverse this dependency order.
+
+### Required integrity rules
+
+- `clients.ewt_rate` is zero when EWT is disabled and defaults to the approved
+  2% rate when enabled.
+- Billing calculations persist their inputs and outputs so printed documents
+  can be reproduced; services remain the authority for transition rules.
+- Collection amounts cannot exceed the remaining billing balance unless an
+  explicit adjustment workflow records the reason and actor.
+- Inventory stock transactions are immutable; corrections are compensating
+  transactions, not edits to historical movements.
+- QBO exports are immutable batches; a re-export creates a new batch and does
+  not erase the prior result.
+- Audit log UPDATE and DELETE are rejected at database level as well as by
+  application policy.

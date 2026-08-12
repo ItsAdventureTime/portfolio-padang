@@ -30,6 +30,11 @@ systemctl --user status bridge-ph-padang-backup.service
 systemctl --user list-timers bridge-ph-padang-backup.timer
 ```
 
+The backup service uses the dedicated backup utility image. A successful run
+means the database dump, attachment copy, and SHA-256 manifest verification all
+completed. Review the service journal and B2 manifest before recording a
+successful restore test in the operations log.
+
 ### Demo Reset Status
 
 ```bash
@@ -98,7 +103,7 @@ podman exec -it bridge-ph-padang-api \
 podman run --rm -it \
   --network bridge-ph-padang \
   --secret bridge-ph-padang-prod-db-password \
-  docker.io/library/postgres:17-alpine \
+  docker.io/library/postgres:alpine \
   sh -c 'PGPASSWORD=$(cat /run/secrets/bridge-ph-padang-prod-db-password) psql -h bridge-ph-padang-db -U padang_prod_user padang_prod'
 ```
 
@@ -180,6 +185,7 @@ Record significant operational events below.
 ### 502 from Caddy
 
 1. Check frontend container is running
-2. Check Caddy can reach frontend container (same caddy.network)
+2. Check Caddy can reach the frontend container through the dedicated Padang
+   proxy network; the frontend does not join the existing shared `caddy.network`
 3. Check frontend → API connectivity (same app network)
 4. Review Caddy logs: `journalctl --user -u caddy.service -n 50`

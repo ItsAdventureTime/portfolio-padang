@@ -2,36 +2,57 @@
 
 ---
 
-CURRENT AGENT: Google Antigravity (Architect)
-CURRENT PHASE: Phase A1 — Product, Architecture, UI/UX & Implementation Specification
-STATUS: Complete. All specifications updated, light corporate enterprise theme established, task package ready for Codex.
+CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
+CURRENT PHASE: Planning clarification addendum — documentation only
+STATUS: Documentation updated from owner answers; implementation remains paused
+until an explicit `GO: CODEX C1` instruction.
 BRANCH: docs/phase-0
 BASE COMMIT: (initial commit)
 LATEST COMMIT: See git log — latest includes Phase A1 specification package
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Pending push to origin/docs/phase-0
+REMOTE PUSH STATUS: Will be synchronized after this documentation commit
 
 ---
 
 ## Specification Overview & Architectural Decisions
 
+The resolved intake decisions and their detailed explanations are in
+`docs/PLANNING_CLARIFICATIONS.md`. They are normative for implementation
+planning and supersede older contradictory wording in this document.
+
 1. **Brand & UI/UX**: Light Corporate Enterprise UI (Primary launch theme). Clean white (`#FFFFFF`) and slate (`#F8FAFC`) surfaces, crisp data tables, rich gold (`#C8A84B`, `#D4A843`) brand accents derived from the official logo. Typography: Outfit (display), Inter (UI), JetBrains Mono (financial figures). Logo vector SVG to be generated at `frontend/public/assets/padang-logo.svg`.
 2. **Tech Stack**:
-   - Backend: Go (latest stable, `golang:alpine`) + Chi router v5. sqlc + pgx v5 for type-safe database queries. golang-migrate for SQL migrations.
-   - Frontend: Next.js App Router (`node:lts-alpine` floating LTS tag) + TypeScript + Tailwind CSS v4 + shadcn/ui + TanStack Query/Table.
-   - RDBMS: PostgreSQL 17 (`postgres:17-alpine`).
+   - Backend: latest supported Go release (`golang:alpine`) + Chi. sqlc + pgx for type-safe database queries. golang-migrate for SQL migrations.
+   - Frontend: latest supported Next.js App Router release + TypeScript + Tailwind CSS + shadcn/ui + TanStack Query/Table, built with the official floating `node:lts-alpine` image.
+   - RDBMS: latest supported PostgreSQL release via floating `postgres:alpine`.
    - File Storage: Backblaze B2 (`bridge-ph` bucket, prefix `padang/demo/` for demo, `padang/` for prod). Shared keys stored in separate Podman secrets per environment (`bridge-ph-padang-{env}-b2-key-id`, `bridge-ph-padang-{env}-b2-app-key`).
    - Email: Resend Go SDK with swappable adapter pattern (`EMAIL_PROVIDER=resend`).
-   - Auth: Production uses passwordless Email OTP (6-digit, 10-min TTL, bcrypt hash in DB, rate-limited) + RS256 JWT (15-min access, 7-day rotating refresh cookie). Demo auto-authenticates as Admin with header-based role switching (`X-Demo-Role`).
+   - Auth: Production uses passwordless Email OTP (6-digit, 10-min TTL, bcrypt hash in DB, rate-limited) + RS256 JWT (15-min access, 7-day rotating refresh cookie). Demo has no authentication and uses a guarded synthetic identity with validated header-based role switching (`X-Demo-Role`).
 3. **Philippine Regulatory Compliance**:
    - VAT: 12% on gross billings.
    - EWT: 2% creditable withholding tax (configurable toggle per client, BIR Form 2307 reference tracking).
    - Retention: 10% standard deduction per progress billing; running total retained payable tracking.
    - Variation Orders: Cumulative cap at 10% of contract amount (8% warning alert, 10% hard stop alert).
 4. **Container & Infrastructure Design**:
-   - Rootless Podman Quadlets with `AutoUpdate=registry`.
+   - Rootless Podman Quadlets with floating channel tags and `AutoUpdate=registry`; updates remain manually applied.
    - Proxy-Network isolation pattern: Caddy + Frontend + API on `proxy.network`; API + DB on internal `network`. DB is non-routable from host or edge.
-   - Ingress: Path-based routing via existing Caddy (`/padang` prod, `/padang/demo` demo).
+   - Ingress: Path-based routing via existing Caddy (`/padang` prod, `/padang/demo` demo). Frontend is built twice from one source revision because Next.js `basePath` is build-time.
+
+### Planning Clarification Decisions
+
+- One source codebase, separate demo and production frontend artifacts.
+- Canonical role identifiers use full names everywhere; abbreviations are not
+  valid API/database values.
+- The schema addendum covers clients/tax profiles, project and fabrication
+  costing, estimates/deliveries/billings, PO lines, supplier payments, finance
+  operations, retention, collections, and QBO export history.
+- A dedicated backup utility image contains both PostgreSQL client tools and
+  AWS CLI for B2; the previous PostgreSQL-only backup example was invalid.
+- The API is the shared boundary for web and future Expo/React Native clients.
+- The launch design is light-only, with self-hosted fonts through `next/font`
+  and light CSP-compatible tokens.
+- Demo reset is operator/systemd-only and fails closed on environment/database
+  identity checks.
 
 ---
 
@@ -42,7 +63,7 @@ Codex must implement the application sequentially following the ordered tasks be
 ---
 
 ### TASK-001: Database Schema & Migrations
-- **GOAL:** Initialize repository structure (`backend/`), set up Go module, write complete database migration files for PostgreSQL 17, set up `sqlc`, and verify migrations.
+- **GOAL:** Initialize repository structure (`backend/`), set up Go module, write complete database migration files for the latest supported PostgreSQL release, set up `sqlc`, and verify migrations.
 - **CONTEXT:** Schema design is specified in `docs/DATABASE.md`.
 - **FILES/AREAS:** `backend/`, `backend/migrations/`, `backend/sqlc.yaml`, `backend/internal/repository/`
 - **DEPENDENCIES:** None
@@ -55,10 +76,14 @@ Codex must implement the application sequentially following the ordered tasks be
   - All indexes, sequences (`seq_pr_number`, `seq_po_number`, `seq_fr_number`), and polymorphic `attachments` table.
 - **ACCEPTANCE CRITERIA:**
   - All tables from `docs/DATABASE.md` created with constraints, foreign keys, and indexes.
-  - Up and down migrations execute without errors against PostgreSQL 17.
+  - Up and down migrations execute without errors against the selected floating PostgreSQL image.
   - `sqlc generate` generates type-safe Go structs and query functions cleanly.
-- **REQUIRED TESTS:** Ephemeral Podman test running `golang-migrate` up and down against a clean PostgreSQL 17 container.
+- **REQUIRED TESTS:** Ephemeral Podman test running `golang-migrate` up and down against a clean `postgres:alpine` container.
 - **DEFINITION OF DONE:** Migration files committed, `sqlc` configured and generating Go code, up/down test verified cleanly.
+
+TASK-001 also includes the complete operational data-model addendum in
+`docs/DATABASE.md` and ADR-012. No product workflow may be implemented with
+an undocumented placeholder table.
 
 ---
 
@@ -70,13 +95,16 @@ Codex must implement the application sequentially following the ordered tasks be
 - **CONSTRAINTS:**
   - Strict layered architecture (Handler → Service → Repository → Domain).
   - Production auth: Email OTP with 6-digit bcrypt-hashed single-use codes (10-min TTL, rate-limited: 3 req/15min, 5 verify attempts max).
-  - Demo auth: Bypass OTP; auto-login as Admin; accept `X-Demo-Role` header.
+  - Demo mode has no authentication; use a synthetic identity and accept
+    `X-Demo-Role` only after validating the canonical demo role enum.
   - JWT RS256 tokens (15-min access, 7-day rotating refresh cookie).
   - Podman secrets read from `/run/secrets/`.
   - OpenAPI 3.1 handler at `/api/v1/openapi.json`.
+  - Demo mode has no authentication and must fail closed outside `APP_ENV=demo`.
 - **ACCEPTANCE CRITERIA:**
   - `GET /api/v1/health` returns `{"status":"ok"}`.
-  - Complete OTP request & verify flow works in production mode; demo mode auto-authenticates.
+  - Complete OTP request & verify flow works in production mode; demo mode
+    uses only its guarded synthetic identity.
   - RBAC middleware enforces permissions matrix defined in `docs/SECURITY.md`.
   - File upload service generates presigned B2 URLs; email service logs or sends via Resend adapter.
 - **REQUIRED TESTS:** Go unit tests for OTP generation/hashing, JWT issuance, RBAC middleware permissions; integration test for health endpoint.
@@ -85,7 +113,7 @@ Codex must implement the application sequentially following the ordered tasks be
 ---
 
 ### TASK-003: Next.js Frontend Shell & Design System (Light Corporate)
-- **GOAL:** Initialize Next.js App Router in `frontend/`, configure Tailwind CSS v4, shadcn/ui, custom light corporate theme, font imports (Outfit, Inter, JetBrains Mono), logo SVG asset, collapsible sidebar, top bar with demo role switcher, and OpenAPI TypeScript generator.
+- **GOAL:** Initialize Next.js App Router in `frontend/`, configure the latest supported Tailwind CSS release, shadcn/ui, custom light corporate theme, font imports (Outfit, Inter, JetBrains Mono), logo SVG asset, collapsible sidebar, top bar with demo role switcher, and OpenAPI TypeScript generator.
 - **CONTEXT:** Governed by `docs/DESIGN_SYSTEM.md` and `docs/UI_UX.md`.
 - **FILES/AREAS:** `frontend/app/`, `frontend/components/`, `frontend/public/assets/`, `frontend/lib/`, `frontend/types/`
 - **DEPENDENCIES:** TASK-002 (for OpenAPI spec)
@@ -94,6 +122,8 @@ Codex must implement the application sequentially following the ordered tasks be
   - Generate clean SVG logo from root photo assets at `frontend/public/assets/padang-logo.svg`.
   - Setup `openapi-typescript` script to generate frontend types from backend spec.
   - Support `basePath` configuration (`/padang` prod, `/padang/demo` demo).
+  - Build two frontend artifacts from one source revision: `demo-latest` for
+    `/padang/demo` and `latest` for `/padang`; `basePath` is build-time.
   - Role switcher in top bar for demo mode.
 - **ACCEPTANCE CRITERIA:**
   - Layout renders crisp sidebar, header, breadcrumbs, role selector, and content area.
@@ -192,6 +222,8 @@ Codex must implement the application sequentially following the ordered tasks be
   - Seed data MUST be realistic and rich: 3–5 projects in varied statuses, 3–5 fab jobs, suppliers, inventory, progress billings with partial collections, pending GM and DCS approvals.
   - Seed process MUST be idempotent (TRUNCATE tables with RESTART IDENTITY → INSERT seed records).
   - Reset container MUST connect strictly to `padang_demo` database and cannot physically/logically reach `padang_prod`.
+  - Reset must fail closed on missing or contradictory `APP_ENV`, `RUN_MODE`,
+    database, or resolved-target guards.
 - **ACCEPTANCE CRITERIA:**
   - Running seed script populates demo DB with complete operational state across all roles.
   - Running reset container wipes modified demo data and restores clean seed state.
@@ -210,7 +242,10 @@ Codex must implement the application sequentially following the ordered tasks be
   - Quadlet `AutoUpdate=registry` enabled; no pinned version numbers in Quadlets.
   - Caddy CSP snippet includes `padang_nextjs_csp`.
   - Secrets setup script (`scripts/secrets-setup.sh`) manages all required Podman secrets.
-  - Daily database backup script (`scripts/backup.sh`) streams `pg_dump -Fc` directly to B2.
+  - Dedicated backup utility image runs the database and attachment backup;
+    `pg_dump -Fc` streams directly to B2 with manifest/checksum verification.
+  - Backup uses the dedicated utility image specified by ADR-013, including
+    both `pg_dump` and AWS CLI, plus attachment manifests/checksums.
 - **ACCEPTANCE CRITERIA:**
   - Backend and frontend containers build cleanly via Podman.
   - All Quadlet systemd files pass validation.
@@ -233,5 +268,9 @@ Codex must implement the application sequentially following the ordered tasks be
 
 ## Authorization & Handoff State
 
-- **Phase A1 Status:** COMPLETE.
-- **Implementation Handoff:** Pre-authorized for Codex to begin implementation starting at **TASK-001**.
+- **Phase A1 Status:** COMPLETE, with planning clarification addendum applied.
+- **Current instruction:** Documentation-only planning work is complete for
+  this pass. Do not implement application code, execute runtime/build/test
+  commands, or deploy until the owner sends **GO: CODEX C1**. The documentation
+  commit and GitHub synchronization for this clarification pass are permitted.
+  After **GO: CODEX C1**, follow the full containerized implementation protocol.

@@ -8,6 +8,39 @@ Initial product discovery and architecture selection for Padang ERP Lite.
 
 ---
 
+## Planning Refresh: Current Official Guidance (2026-08-12)
+
+This refresh was completed before implementation work. It uses primary
+maintainer documentation and changes planning guidance only; it does not claim
+that the application has been built or validated.
+
+| Area | Current guidance applied |
+|---|---|
+| Node.js | Use Active or Maintenance LTS for production; the container policy therefore uses the floating official `node:lts-alpine` tag. |
+| Next.js | `basePath` is build-time configuration; demo and production therefore require separate artifacts from the same source revision. Standalone output and a reverse proxy are the planned self-hosting pattern. |
+| Fonts/CSP | Self-host fonts with `next/font`; keep the CSP policy same-origin and document any Next.js nonce work as implementation follow-up. |
+| Caddy | Preserve the frontend prefix with `handle`; strip only the external API prefix before proxying to the path-neutral API. Route order is explicit. |
+| Podman | Keep `AutoUpdate=registry` as an eligible image policy, while the automatic timer remains disabled so updates are manually applied. |
+| Future mobile | TypeScript is supported by React Native; Expo/React Native is the future client direction behind the shared API/OpenAPI boundary. |
+| Security baseline | OWASP ASVS 5.0.0 is the verification baseline for implementation and review. |
+
+Primary references:
+
+- [Node.js release schedule](https://nodejs.org/en/about/previous-releases)
+- [Next.js `basePath`](https://nextjs.org/docs/pages/api-reference/config/next-config-js/basePath)
+- [Next.js standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
+- [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting)
+- [Next.js fonts](https://nextjs.org/docs/app/getting-started/fonts)
+- [Next.js CSP guidance](https://nextjs.org/docs/pages/guides/content-security-policy)
+- [Caddy `reverse_proxy`](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
+- [Caddy `route`](https://caddyserver.com/docs/caddyfile/directives/route)
+- [Podman auto-update](https://docs.podman.io/en/v4.9.0/markdown/podman-auto-update.1.html)
+- [React Native TypeScript](https://reactnative.dev/docs/typescript)
+- [Expo New Architecture](https://docs.expo.dev/guides/new-architecture/)
+- [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
+
+---
+
 ## 1. Philippine Construction Industry — Billing, Retention, Variation Orders
 
 **Sources:** CIAP official communications; RA 9184 (Government Procurement Reform Act); CIAP Document 102 (2022 rev.)
@@ -55,7 +88,8 @@ Initial product discovery and architecture selection for Padang ERP Lite.
 
 ## 3. Tech Stack Selection
 
-**Sources:** Web research; official documentation for Chi, Next.js 15, PostgreSQL 17, sqlc
+**Sources:** Web research; official documentation for Chi, Next.js, PostgreSQL,
+sqlc, and the selected container/runtime channels
 
 ### Go HTTP Framework
 
@@ -72,21 +106,23 @@ Initial product discovery and architecture selection for Padang ERP Lite.
 
 | Option | Verdict |
 |---|---|
-| **Next.js 15 (App Router)** | ✅ Selected — hybrid SSR/CSR; excellent ERP dashboard support; stable App Router |
+| **Next.js (App Router)** | ✅ Selected — latest supported release; hybrid SSR/CSR; excellent ERP dashboard support |
 | Vite + React SPA | Strong alternative; simpler but no SSR |
 | Remix | Strong alternative; server-centric |
 
-**Rationale:** Next.js 15 App Router provides hybrid rendering (RSC for shells, client components for interactive tables/forms), View Transitions API support, and Streaming/Suspense for data-heavy dashboards. shadcn/ui + TanStack Table + React Hook Form is the de-facto ERP dashboard stack for 2025.
+**Rationale:** The selected Next.js App Router release provides hybrid rendering (RSC for shells, client components for interactive tables/forms), View Transitions API support, and Streaming/Suspense for data-heavy dashboards. shadcn/ui + TanStack Table + React Hook Form is the selected dashboard stack.
 
 ### Database
 
 | Option | Verdict |
 |---|---|
-| **PostgreSQL 17** | ✅ Selected — industry standard; relational model ideal for ERP; excellent Go support |
+| **PostgreSQL via `postgres:alpine`** | ✅ Selected — industry standard; relational model ideal for ERP; excellent Go support |
 | MySQL/MariaDB | Common but weaker JSONB/analytical capabilities |
 | SQLite | ❌ Not suitable for multi-user concurrent ERP |
 
-PostgreSQL 17 released October 2024. Supported until November 2029.
+PostgreSQL has no Node-style LTS channel. The floating official Alpine tag is
+used, with the resolved digest and detected major version recorded before each
+approved update and restore validation required for major changes.
 
 ### Type-Safe DB Access
 
@@ -104,15 +140,16 @@ PostgreSQL 17 released October 2024. Supported until November 2029.
 
 ### Key Findings
 
-- **Glassmorphism:** Apply to navigation chrome (sidebars, top bars). Do NOT apply to data-dense tables or financial figures — use opaque surfaces for legibility.
-- **Dark mode:** Not simple inversion. Surface hierarchy via dark gray shades. WCAG contrast audited.
+- **Light-only theme:** Use opaque light navigation and content surfaces for legibility in data-dense tables and financial figures.
 - **Role-based personalization:** Each role sees relevant KPIs. Approval queues are actionable, not just informational.
 - **Mobile-first:** Field teams need tablet access. Core approval and status flows at 375px.
 - **Action-oriented dashboards:** Approve/reject directly from dashboard without full page navigation.
 - **Scroll-driven animations:** CSS `animation-timeline: scroll()` for subtle reveals.
 - **View Transitions API:** For smooth route transitions in Next.js.
 
-**Design Decision:** Deep charcoal-black (`#0D0D0D`) base with rich gold (`#C8A84B`) accent derived from Padang logo. Outfit (display) + Inter (body) + JetBrains Mono (financial figures). Dark mode only at launch.
+**Design Decision:** Light-only launch theme with white/slate surfaces, accessible
+gold accent, Outfit (display), Inter (body), and JetBrains Mono (financial
+figures). No dark-mode or glassmorphism token set is part of the launch design.
 
 ---
 
@@ -173,16 +210,16 @@ PostgreSQL 17 released October 2024. Supported until November 2029.
 | CIAP Short Form 2024 | CIAP Template Short Form of Construction Contract (2024) |
 | BIR EWT rates | BIR.gov.ph; RR No. 24-2025 |
 | Forvis Mazars PH | forvismazars.com — EWT/VAT guidance |
-| PostgreSQL 17 | postgresql.org/docs/17/ |
+| PostgreSQL | postgresql.org/docs/ |
 | Go Chi | github.com/go-chi/chi |
 | sqlc | sqlc.dev |
 | golang-migrate | github.com/golang-migrate/migrate |
-| Next.js 15 | nextjs.org/docs |
-| TanStack Query v5 | tanstack.com/query |
-| TanStack Table v8 | tanstack.com/table |
+| Next.js | nextjs.org/docs |
+| TanStack Query | tanstack.com/query |
+| TanStack Table | tanstack.com/table |
 | shadcn/ui | ui.shadcn.com |
 | openapi-typescript | github.com/drwpow/openapi-typescript |
-| Tailwind CSS v4 | tailwindcss.com |
+| Tailwind CSS | tailwindcss.com |
 | Backblaze B2 S3 API | backblaze.com/b2/docs/s3_compatible_api.html |
 | Resend Go SDK | resend.com/docs/send-with-go |
 | PCAB verification | pcabgovph.com |

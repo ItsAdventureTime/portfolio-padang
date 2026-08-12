@@ -51,7 +51,8 @@ This means:
 
 ## CSP Requirement
 
-Next.js 15 App Router requires `'unsafe-inline'` on `script-src` for hydration.
+The selected Next.js App Router release requires the documented CSP allowance
+for its hydration/runtime behavior.
 The existing `same_origin_web_csp` snippet would break Next.js.
 A new `padang_nextjs_csp` snippet is defined (see `docs/DEPLOYMENT.md`).
 Phase 2: implement nonce-based CSP via Next.js middleware to replace `'unsafe-inline'`.
@@ -60,6 +61,8 @@ Phase 2: implement nonce-based CSP via Next.js middleware to replace `'unsafe-in
 
 - `caddy.container` must be updated to join the two proxy networks
 - Caddy reload required: `systemctl --user daemon-reload && systemctl --user restart caddy.service`
-- Next.js `next.config.js` must set `basePath: '/padang'` (prod) or `basePath: '/padang/demo'` (demo)
+- Each frontend artifact must set its build-time `basePath` to `/padang`
+  (production) or `/padang/demo` (demo); one image cannot safely serve both
+  paths without rebuilding (see ADR-010)
 - Go API serves routes at `/api/v1/...`; after stripping `/padang` or `/padang/demo`, path matches correctly
 - Handler import order matters: padang imports must appear before the `handle { }` fallback block

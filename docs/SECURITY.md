@@ -2,7 +2,7 @@
 
 ## Standards Applied
 
-- OWASP ASVS 5.x (Application Security Verification Standard)
+- OWASP ASVS 5.0.0 (Application Security Verification Standard)
 - OWASP Top 10:2025
 - OWASP Secrets Management Cheat Sheet
 - WCAG 2.2 (UI accessibility, covered in UI_UX.md)
@@ -49,9 +49,12 @@ No passwords. Users authenticate by entering their registered email address and 
 
 ### Demo Mode
 - No authentication enforced
-- All requests auto-authenticated as Admin
-- `X-Demo-Role` header accepted to simulate role (validated against role enum; no elevation possible)
+- Requests receive a synthetic demo identity only when `APP_ENV=demo`
+- `X-Demo-Role` is accepted only in demo and must match the canonical role enum;
+  it is ignored in production
 - No OTP codes generated or emails sent in demo environment
+- Demo reset is operator/systemd-only and fails closed unless `APP_ENV=demo`,
+  `RUN_MODE=seed`, and `DB_NAME=padang_demo` all match
 
 ### Rate Limiting (OTP-specific)
 - `/auth/request-otp`: 3 requests per email per 15 minutes per IP
@@ -65,12 +68,14 @@ No passwords. Users authenticate by entering their registered email address and 
 
 ### Enforcement
 - Role check in middleware (before handler is called)
-- Resource ownership check in service layer (e.g., PM can only edit own projects)
-- No reliance on client-supplied role claims; role read from database per request
+- Resource ownership check in service layer (e.g., Project Manager can only
+  edit own projects)
+- No reliance on client-supplied role claims in production; role is read from
+  the database per request
 
 ### Permission Matrix
 
-| Action | admin | gm | dcs | pm | proc | fab | finance | billing | inventory | viewer |
+| Action | administrator | general_manager | disbursing_check_signing_officer | project_manager | procurement_officer | fabrication_supervisor | finance_staff | billing_clerk | inventory_clerk | viewer |
 |---|---|---|---|---|---|---|---|---|---|---|
 | User management | ✓ | — | — | — | — | — | — | — | — | — |
 | View all modules | ✓ | ✓ | partial | partial | partial | partial | partial | partial | partial | ✓ |
@@ -84,7 +89,8 @@ No passwords. Users authenticate by entering their registered email address and 
 | Export data | ✓ | ✓ | — | partial | partial | partial | partial | partial | — | — |
 | System settings | ✓ | — | — | — | — | — | — | — | — | — |
 
-Partial = filtered to relevant scope (e.g., PM sees only their projects).
+Partial = filtered to relevant scope (e.g., the Project Manager sees only their
+projects).
 
 ---
 
@@ -110,6 +116,10 @@ Partial = filtered to relevant scope (e.g., PM sees only their projects).
 | `bridge-ph-padang-prod-resend-key` | Resend API key (prod) | API container (prod) |
 | `bridge-ph-padang-prod-b2-key-id` | B2 application key ID | API container, backup container (prod) |
 | `bridge-ph-padang-prod-b2-app-key` | B2 application key secret | API container, backup container (prod) |
+
+The backup utility image also receives these B2 secrets as mounted files. It
+creates only an ephemeral in-container AWS credentials file under `/run` for
+the upload process; the file is never persisted or logged.
 
 ### Generation
 - Database passwords: `openssl rand -base64 32`
@@ -139,7 +149,8 @@ See `scripts/secrets-setup.sh` for the interactive management script.
 - All JSON responses: `Content-Type: application/json; charset=utf-8`
 - No HTML rendering in API responses
 - Frontend: React handles output encoding by default; no `dangerouslySetInnerHTML` usage
-- CSP headers prevent inline script execution
+- CSP headers restrict scripts and styles to the documented Next.js launch
+  policy; nonce-based CSP is a hardening follow-up
 
 ---
 
@@ -155,8 +166,17 @@ See `scripts/secrets-setup.sh` for the interactive management script.
 
 - Stateless API; no server-side session state
 - Refresh token invalidated on logout
-- All refresh tokens invalidated on password change
+- All refresh tokens invalidated on OTP re-verification or explicit account
+  security reset
 - `refresh_tokens` table pruned of expired tokens periodically (scheduled job or on login)
+
+### Future Mobile Clients
+
+Mobile clients use the same API, token lifetimes, rotation, revocation, and
+server-side hashing. They do not use browser cookies: refresh tokens are
+stored only in iOS Keychain or Android Keystore-backed secure storage. Access
+tokens remain memory-only. API authorization is always server-enforced and
+never derived from a client-supplied role.
 
 ---
 

@@ -19,7 +19,7 @@ The VPS host (Fedora CoreOS, rootless Podman) should not have Go, Node.js, or an
 | Compile Go binary | `podman run --rm -v ./backend:/app:Z -w /app docker.io/library/golang:alpine go build -o dist/api ./cmd/api/` |
 | Build Next.js | `podman run --rm -v ./frontend:/app:Z -w /app docker.io/library/node:lts-alpine sh -c "npm ci && npm run build"` |
 | Run sqlc | `podman run --rm -v ./backend:/app:Z -w /app docker.io/sqlc/sqlc generate` |
-| Run migrations (local) | `podman run --rm -v ./backend/migrations:/migrations:Z docker.io/library/postgres:17-alpine ... ` |
+| Run migrations (local) | `podman run --rm -v ./backend/migrations:/migrations:Z docker.io/library/postgres:alpine ... ` |
 | Run tests (Go) | `podman run --rm -v ./backend:/app:Z -w /app docker.io/library/golang:alpine go test ./...` |
 
 ## OCI Image Approach for Deployable Images
@@ -78,7 +78,9 @@ All image tags are **mutable — no version numbers pinned**:
 - `golang:alpine` — latest stable Go with Alpine
 - `node:lts-alpine` — latest active LTS Node.js with Alpine
 - `alpine:latest` — latest Alpine for final runtime stage
-- `postgres:17-alpine` — PostgreSQL 17.x (major version intentional; no patch pin)
+- `postgres:alpine` — latest official PostgreSQL Alpine channel; PostgreSQL has
+  no Node-style LTS channel, so major-version upgrade validation is mandatory
+  before accepting a changed floating digest
 
 `AutoUpdate=registry` is set in all Quadlet `.container` files. Podman auto-update detects digest changes and restarts the service when a new image digest is available.
 

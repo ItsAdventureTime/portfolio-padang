@@ -58,3 +58,9 @@ See Section 7 of the full constitution.
 All sensitive values in Podman secrets only.
 Never in Git, source files, `.env`, Quadlet `Environment=`, logs, or CLI args.
 See Section 14–15 of the full constitution.
+
+## Planning Clarifications
+
+`docs/PLANNING_CLARIFICATIONS.md` records the resolved demo/production,
+floating-runtime, mobile-client, complete-data-model, backup, light-theme,
+and demo-reset decisions that govern implementation planning.

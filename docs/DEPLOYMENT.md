@@ -4,7 +4,8 @@
 
 - **OS:** Fedora CoreOS (latest stable), rootless Podman, SELinux enforcing
 - **User:** `jk` (rootless; `systemctl --user`)
-- **Ingress:** Existing Caddy container + caddy.network
+- **Ingress:** Existing Caddy container joined to the dedicated Padang proxy
+  networks; app containers do not join the existing `caddy.network`
 - **URL routing:** Path-based (`/padang` prod, `/padang/demo` demo)
 
 ---
@@ -26,8 +27,9 @@ Slug format: `{client}-{app}-{env}-{component}`
 | Backup container | N/A | `bridge-ph-padang-backup` |
 | DB name | `padang_demo` | `padang_prod` |
 | DB user | `padang_demo_user` | `padang_prod_user` |
-| OCI image (API) | `ghcr.io/itsadventuretime/padang-erp-api:latest` | same tag (prod pins digest) |
-| OCI image (Frontend) | `ghcr.io/itsadventuretime/padang-erp-frontend:latest` | same tag (prod pins digest) |
+| OCI image (API) | `ghcr.io/itsadventuretime/padang-erp-api:demo-latest` | `ghcr.io/itsadventuretime/padang-erp-api:latest` |
+| OCI image (Frontend) | `ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest` (`/padang/demo`) | `ghcr.io/itsadventuretime/padang-erp-frontend:latest` (`/padang`) |
+| OCI image (Backup) | N/A | `ghcr.io/itsadventuretime/padang-erp-backup:latest` |
 | Git remote | `https://github.com/ItsAdventureTime/bridge-padang.git` | — |
 | GHCR org | `itsadventuretime` | — |
 
@@ -114,7 +116,7 @@ Description=Padang ERP Demo - PostgreSQL
 After=network-online.target
 
 [Container]
-Image=docker.io/library/postgres:17-alpine
+Image=docker.io/library/postgres:alpine
 ContainerName=bridge-ph-padang-demo-db
 Network=bridge-ph-padang-demo.network
 Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql/data:Z
@@ -146,7 +148,7 @@ Description=Padang ERP Demo - Go API
 After=bridge-ph-padang-demo-db.service
 
 [Container]
-Image=ghcr.io/itsadventuretime/padang-erp-api:latest
+Image=ghcr.io/itsadventuretime/padang-erp-api:demo-latest
 ContainerName=bridge-ph-padang-demo-api
 Network=bridge-ph-padang-demo.network
 Network=bridge-ph-padang-demo-proxy.network
@@ -190,13 +192,15 @@ Description=Padang ERP Demo - Next.js Frontend
 After=bridge-ph-padang-demo-api.service
 
 [Container]
-Image=ghcr.io/itsadventuretime/padang-erp-frontend:latest
+Image=ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
 ContainerName=bridge-ph-padang-demo-frontend
 # proxy.network only — Caddy reaches this container; no direct DB access
 Network=bridge-ph-padang-demo-proxy.network
 
 Environment=NODE_ENV=production
 Environment=APP_ENV=demo
+# NEXT_PUBLIC_BASE_PATH is compiled into this image; this runtime value is
+# informational and must match the build-time value.
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 # Internal API URL: frontend → API via shared proxy network
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
@@ -223,7 +227,7 @@ WantedBy=default.target
 Description=Padang ERP Demo - Reset (one-shot)
 
 [Container]
-Image=ghcr.io/itsadventuretime/padang-erp-api:latest
+Image=ghcr.io/itsadventuretime/padang-erp-api:demo-latest
 ContainerName=bridge-ph-padang-demo-reset
 Network=bridge-ph-padang-demo.network
 
@@ -232,6 +236,7 @@ Environment=RUN_MODE=seed
 Environment=DB_HOST=bridge-ph-padang-demo-db
 Environment=DB_NAME=padang_demo
 Environment=DB_USER=padang_demo_user
+Environment=RESET_GUARD=demo-only
 
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 
@@ -239,6 +244,11 @@ Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-passw
 Type=oneshot
 RemainAfterExit=no
 ```
+
+The reset command must refuse to run unless `APP_ENV=demo`, `RUN_MODE=seed`,
+`DB_NAME=padang_demo`, `DB_HOST=bridge-ph-padang-demo-db`, and the resolved
+database identity all prove that the target is demo. Production images do not
+include the reset command, and reset is never exposed as an HTTP endpoint.
 
 **`bridge-ph-padang-demo-reset.timer`**
 ```ini
@@ -256,6 +266,24 @@ WantedBy=timers.target
 
 ---
 
+## Frontend Build Artifact Strategy
+
+`NEXT_PUBLIC_BASE_PATH` is a build-time input, not a runtime switch. Build the
+same source revision twice:
+
+```text
+demo:       podman build --build-arg NEXT_PUBLIC_BASE_PATH=/padang/demo \
+            -t ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest .
+production: podman build --build-arg NEXT_PUBLIC_BASE_PATH=/padang \
+            -t ghcr.io/itsadventuretime/padang-erp-frontend:latest .
+```
+
+The exact commands are implemented during C1/TASK-009. The snippets above are
+planning notation only; all builds remain containerized. Both images must be
+derived from the same approved source revision. The API image may use the same
+source strategy with `demo-latest` and `latest` channels so demo validation is
+performed before production promotion.
+
 ## Caddy Configuration
 
 ### How It Works (based on actual Caddyfile inspection)
@@ -270,14 +298,15 @@ Follows the same pattern as PIMASCOR: separate handler files imported inside the
   - Full path preserved; Next.js `basePath` matches `/padang` or `/padang/demo`
 - Root redirect: `/padang/demo` → `/padang/demo/` (308)
 
-**IMPORTANT — Next.js CSP:** Next.js 15 injects inline scripts for hydration.
+**IMPORTANT — Next.js CSP:** the selected Next.js release may require the
+documented launch-time hydration allowance.
 The existing `same_origin_web_csp` snippet (`script-src 'self'`) will **break** Next.js.
 A new snippet is required.
 
 ### 1. New CSP Snippet (add to Caddyfile globals)
 
 ```caddyfile
-# CSP for Next.js 15 App Router applications
+# CSP for the selected Next.js App Router release
 # Note: 'unsafe-inline' required for Next.js hydration scripts
 # Phase 2: implement nonce-based CSP via Next.js middleware to remove 'unsafe-inline'
 (padang_nextjs_csp) {
@@ -464,8 +493,8 @@ podman auto-update --dry-run
 # 3. Update DEMO first
 systemctl --user stop bridge-ph-padang-demo-frontend.service
 systemctl --user stop bridge-ph-padang-demo-api.service
-podman pull ghcr.io/itsadventuretime/padang-erp-api:latest
-podman pull ghcr.io/itsadventuretime/padang-erp-frontend:latest
+podman pull ghcr.io/itsadventuretime/padang-erp-api:demo-latest
+podman pull ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
 systemctl --user start bridge-ph-padang-demo-api.service
 systemctl --user start bridge-ph-padang-demo-frontend.service
 
@@ -482,7 +511,7 @@ systemctl --user start bridge-ph-padang-frontend.service
 # 6. Verify production health
 # Run health check script
 
-# 7. Record old and new image digests in docs/DEPENDENCIES.md
+# 7. Record old and new resolved image digests in docs/DEPENDENCIES.md
 ```
 
 ---

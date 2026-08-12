@@ -51,14 +51,16 @@ Key units requiring tests:
 - Role-based transition enforcement
 
 **Auth:**
-- Password hashing and verification
-- JWT generation and validation
-- Refresh token rotation
-- Lockout after N failures
+- Production Email OTP generation, hashing, single-use verification, and TTL
+- JWT generation and validation in production
+- Refresh token rotation and web cookie attributes
+- Demo synthetic identity and canonical `X-Demo-Role` validation
+- Demo auth path fails closed when `APP_ENV` is not `demo`
 
 ### Integration Tests
 
-Tool: `testcontainers-go` (spins up real PostgreSQL 17 in Docker/Podman)
+Tool: `testcontainers-go` (spins up the selected floating PostgreSQL Alpine
+image in Docker/Podman)
 Location: `backend/internal/repository/*_integration_test.go`
 
 Run: `go test ./... -tags=integration`
@@ -76,7 +78,8 @@ Key integration tests:
 Tool: `net/http/httptest`
 Tests all endpoints for:
 - Correct HTTP status codes
-- Auth enforcement (401 without token)
+- Production auth enforcement (401 without token)
+- Demo no-auth behavior is available only in the demo configuration
 - RBAC enforcement (403 with wrong role)
 - Validation errors (400 with expected field errors)
 - Business rule errors (422)
@@ -104,6 +107,20 @@ Key components:
 TypeScript compilation (`tsc --noEmit`) = type-level test of API contract.
 Run: `npm run typecheck`
 
+### Environment Build Matrix
+
+The same frontend source must be built and checked twice because Next.js
+`basePath` is build-time configuration:
+
+| Artifact | Build-time base path | Required smoke checks |
+|---|---|---|
+| Demo | `/padang/demo` | assets, navigation, API calls, demo role switcher |
+| Production | `/padang` | assets, navigation, OTP/auth screens, API calls |
+
+The artifacts share source and lockfiles but use separate mutable image
+channels. A runtime-only environment-variable change is not a substitute for
+the two builds.
+
 ---
 
 ## End-to-End Tests (Playwright)
@@ -124,6 +141,14 @@ Environment: Demo environment (no auth complications; role switcher available)
 | **F7: Report export** | Generate project profitability report → export as Excel → verify file downloads |
 | **F8: Variation order** | Create VO → verify cumulative VO cap warning at 8%; verify error at 10% |
 | **F9: Demo reset** | Trigger manual reset → verify data is refreshed to seed state |
+
+Additional release checks:
+
+- Production pages never expose the demo role switcher or reset controls.
+- Demo reset refuses to run with production environment, non-demo database
+  identity, or missing reset guard.
+- Backup restore tests restore database and attachment objects into an isolated
+  target and verify the SHA-256 manifest.
 
 Run: `npx playwright test`
 Run headed: `npx playwright test --headed`

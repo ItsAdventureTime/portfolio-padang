@@ -57,10 +57,11 @@ padang-bridge-dashboard/
 │   ├── BACKUP_RESTORE.md        ← Backup schedule, B2 config, restore procedure
 │   ├── DEPENDENCIES.md          ← Major deps, versions, support windows, OCI digests
 │   ├── RESEARCH.md              ← Technical research findings and sources
+│   ├── PLANNING_CLARIFICATIONS.md ← Resolved intake decisions and analogies
 │   ├── HANDOFF.md               ← Current handoff state (always up to date)
 │   └── adr/                     ← Architecture Decision Records
-├── backend/                     ← Go API (Chi + sqlc + PostgreSQL 17)
-├── frontend/                    ← Next.js 15 (App Router + shadcn/ui)
+├── backend/                     ← Go API (Chi + sqlc + PostgreSQL floating Alpine channel)
+├── frontend/                    ← Next.js latest supported release (App Router + shadcn/ui)
 ├── quadlets/                    ← Podman Quadlet templates (demo + prod)
 ├── scripts/                     ← Operational bash scripts
 └── seed/                        ← Demo seed data
@@ -76,13 +77,19 @@ padang-bridge-dashboard/
 | API | REST/JSON + OpenAPI 3.1 |
 | Frontend | Next.js App Router (LTS) + TypeScript |
 | UI library | shadcn/ui + Tailwind CSS |
-| Database | PostgreSQL 17 |
+| Database | Latest supported PostgreSQL release via floating official Alpine channel |
 | File storage | Backblaze B2 (`bridge-ph` bucket) |
 | Email | Resend (adapter pattern; future Azure) |
 | Auth | Passwordless Email OTP + RS256 JWT |
 | Containers | Rootless Podman Quadlets |
 | Ingress | Existing Caddy (path-based routing) |
 | OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp`) |
+
+The web source is one codebase, but demo and production use separate Next.js
+frontend artifacts because `/padang/demo` and `/padang` are compiled into
+`basePath` at build time. See `docs/PLANNING_CLARIFICATIONS.md` and ADR-010.
+The Go API remains the shared API for the web client and future iOS/Android
+clients; see ADR-011.
 
 ---
 

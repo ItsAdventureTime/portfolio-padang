@@ -6,7 +6,8 @@
 
 ## Context
 
-The system requires authentication for the production environment (demo is auto-logged-in as Admin).
+The system requires authentication for the production environment. Demo is a
+synthetic-data preview with no authentication and a guarded synthetic identity.
 
 Original plan was email + password (bcrypt). The client reviewed and requested passwordless authentication.
 
@@ -52,7 +53,8 @@ No passwords stored anywhere. No `password_hash` column in the `users` table.
 - **Rate limiting:** 3 requests per email per 15 minutes; 5 failed verify attempts → code auto-invalidated
 - **Account enumeration prevention:** identical HTTP response and timing for unknown vs known email
 - **JWT issuance:** on successful OTP verification → RS256 access token (15 min) + rotating refresh token (7 days)
-- **Demo:** no OTP sent; auto-authenticated as Admin; `X-Demo-Role` header for role simulation
+- **Demo:** no OTP sent and no authentication is performed; use a guarded
+  synthetic identity and `X-Demo-Role` only for canonical demo role simulation
 
 ## API Endpoints
 

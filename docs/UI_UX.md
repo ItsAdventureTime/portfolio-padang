@@ -261,6 +261,7 @@ Each empty state has:
 
 - Top bar: orange banner strip: **"DEMO MODE — Data resets every 30 minutes"**
 - Role switcher: prominent gold chip in top bar
-- No login screen; lands directly on dashboard
+- Demo only: no login screen; lands directly on the dashboard with a
+  synthetic identity. Production always starts with the Email OTP flow.
 - Settings page: visible but shows "Admin role required in production" overlay
 - No email sending in demo (email events are logged to console only)

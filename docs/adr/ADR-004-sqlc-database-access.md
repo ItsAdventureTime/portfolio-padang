@@ -22,7 +22,7 @@ The Go backend needs database access that is:
 - Compile-time type checking: if SQL and Go types don't match, `sqlc generate` fails
 - Plain SQL is fully reviewable, portable, and debuggable (vs. ORM query builder)
 - No runtime reflection; no "magic" that hides query structure
-- Works natively with pgx v5 (PostgreSQL native driver)
+- Works natively with the current pgx PostgreSQL driver
 - Transaction support is explicit and straightforward
 - Avoids N+1 problems that ORMs often introduce (developer controls exact queries)
 

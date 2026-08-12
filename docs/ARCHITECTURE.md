@@ -34,7 +34,7 @@ External services (reached from API container via outbound HTTPS):
 | Query generation | sqlc | Latest — type-safe SQL; compile-time safety; no ORM magic |
 | Migrations | golang-migrate | v4 — CLI + library; up/down migrations; PostgreSQL dialect |
 | Validation | go-playground/validator | v10 — struct-tag validation |
-| Auth | Email OTP (production) / auto-login (demo) | 6-digit code; 10-min TTL; single-use; rate-limited; no passwords |
+| Auth | Email OTP (production) / no auth (demo) | 6-digit code in production; 10-min TTL; single-use; rate-limited; demo uses guarded synthetic identity |
 | File upload | AWS SDK v2 (S3-compatible) | B2 S3-compatible API |
 | Email | Resend Go SDK | Adapter pattern; swappable to Azure |
 | OpenAPI | swaggo/swag or huma | Generate OpenAPI 3.1 spec from Go annotations |
@@ -44,7 +44,7 @@ External services (reached from API container via outbound HTTPS):
 
 | Component | Technology | Notes |
 |---|---|---|
-| Framework | Next.js (App Router) | 16.x active LTS — `node:lts-alpine` image; no version pinned |
+| Framework | Next.js (App Router) | Latest supported release selected by the package manifest; `node:lts-alpine` floating image |
 | Language | TypeScript | Latest — type safety; OpenAPI-generated types from Go backend |
 | Styling | Tailwind CSS | v4 — utility-first; integrates with shadcn/ui |
 | UI components | shadcn/ui | Latest — full code ownership; Radix UI primitives; accessible |
@@ -58,7 +58,7 @@ External services (reached from API container via outbound HTTPS):
 
 | Component | Technology | Notes |
 |---|---|---|
-| RDBMS | PostgreSQL | 17 — one below latest (18); `postgres:17-alpine`; no patch pinned |
+| RDBMS | PostgreSQL | Latest official supported Alpine channel; `postgres:alpine` floating tag |
 | Connection pooling | PgBouncer (optional) | Evaluate if connection count becomes a concern |
 
 ### Infrastructure
@@ -67,7 +67,7 @@ External services (reached from API container via outbound HTTPS):
 |---|---|
 | Containerization | Rootless Podman + Podman Quadlets (`AutoUpdate=registry`) |
 | Build strategy | All builds via `podman run --rm`; multi-stage Containerfiles; no host toolchain required |
-| Image tags | Mutable, no pinned version numbers; `podman auto-update` tracks digest changes |
+| Image tags | Official floating channels; resolved digests recorded for audit; updates remain manually applied |
 | Ingress | Existing Caddy (path-based routing; proxy-network pattern) |
 | OS | Fedora CoreOS (latest stable) |
 | OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp-{api\|frontend}`) |
@@ -124,7 +124,7 @@ backend/
 ```
 frontend/
 ├── app/                     ← Next.js App Router
-│   ├── (auth)/              ← Auth routes (login, etc.) — production only
+│   ├── (auth)/              ← Email OTP routes — production only
 │   ├── (dashboard)/         ← Protected dashboard routes
 │   │   ├── layout.tsx       ← Dashboard shell (sidebar, header)
 │   │   ├── page.tsx         ← Dashboard home
@@ -171,10 +171,12 @@ See `docs/SECURITY.md` for full detail.
 
 **Summary:**
 - **Production:** Email OTP (passwordless) — user enters email → receives 6-digit code → 10-min TTL → single-use → rate-limited
-- **Demo:** No auth; all requests auto-authenticated as Admin with switchable role header
+- **Demo:** No authentication; requests use a demo-only synthetic identity with a validated `X-Demo-Role` header
 - Short-lived JWT access token (15 min) issued after OTP verification
 - Refresh token (7 days, rotated on use, stored server-side hash)
-- All routes require auth except: `/api/v1/health`, `/api/v1/auth/request-otp`, `/api/v1/auth/verify-otp`, `/api/v1/auth/refresh`
+- In production, all routes require auth except: `/api/v1/health`,
+  `/api/v1/auth/request-otp`, `/api/v1/auth/verify-otp`, and
+  `/api/v1/auth/refresh`. Demo routes use only the guarded synthetic identity.
 - RBAC enforced in middleware: role → module → action permissions matrix
 
 ---
@@ -248,13 +250,32 @@ See `docs/DATABASE.md` for full schema.
 
 ---
 
+## Environment-Specific Frontend Builds
+
+The source code remains one frontend codebase. Deployment produces two
+frontend artifacts because Next.js `basePath` is inlined at build time:
+
+| Artifact | Build-time value | Channel |
+|---|---|---|
+| Demo frontend | `NEXT_PUBLIC_BASE_PATH=/padang/demo` | `frontend:demo-latest` |
+| Production frontend | `NEXT_PUBLIC_BASE_PATH=/padang` | `frontend:latest` |
+
+Both artifacts come from the same approved source revision. Caddy preserves
+the frontend prefix and strips only `/padang` or `/padang/demo` from API
+requests before proxying to the path-neutral Go API. See ADR-010.
+
 ## Mobile Compatibility
 
 The backend API is designed for future iOS/Android clients:
-- Stateless REST API (no server-side session state)
-- OpenAPI spec enables SDK generation for Swift/Kotlin
-- No browser-specific auth mechanisms (no cookies; Bearer JWT only)
-- Response payloads designed for efficient mobile parsing
+
+- one versioned, stateless REST API remains the product source of truth;
+- OpenAPI 3.1 enables generated clients and shared TypeScript contracts;
+- browser refresh cookies are not required by mobile clients;
+- mobile refresh tokens use iOS Keychain or Android Keystore-backed storage;
+- access tokens remain memory-only on web and mobile;
+- response payloads use stable envelopes, pagination, and explicit error codes;
+- future mobile UI may use Expo/React Native while sharing domain and API
+  packages with the web client.
 
 ---
 
@@ -277,11 +298,15 @@ See `docs/adr/` for all ADRs.
 | ADR | Title |
 |---|---|
 | ADR-001 | Go + Chi as backend framework |
-| ADR-002 | Next.js 16 App Router as frontend framework |
-| ADR-003 | PostgreSQL 17 as database |
+| ADR-002 | Next.js App Router as frontend framework; latest supported release |
+| ADR-003 | PostgreSQL database via floating supported Alpine channel |
 | ADR-004 | sqlc for type-safe database access |
 | ADR-005 | Backblaze B2 for file storage |
 | ADR-006 | Provider-neutral email adapter pattern |
 | ADR-007 | Path-based routing for demo vs production |
 | ADR-008 | Email OTP as production authentication method |
 | ADR-009 | Containerized build strategy (podman run --rm) |
+| ADR-010 | Environment-specific Next.js build artifacts |
+| ADR-011 | API-first web and mobile clients |
+| ADR-012 | Complete operational data model |
+| ADR-013 | Dedicated database and file backup utility |

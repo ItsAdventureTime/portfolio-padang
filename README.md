@@ -20,7 +20,8 @@ QuickBooks Online (QBO) remains the official accounting system of record. This E
 1. Read `AGENTS.md` for the project map.
 2. Read `docs/PROJECT_CONSTITUTION.md` for engineering rules.
 3. Read `docs/HANDOFF.md` for current phase and next action.
-4. Read the relevant `docs/` file for your work area.
+4. Read `docs/PLANNING_CLARIFICATIONS.md` for resolved intake decisions.
+5. Read the relevant `docs/` file for your work area.
 
 ## Local Development
 
@@ -66,6 +67,7 @@ podman machine start
 | `docs/BACKUP_RESTORE.md` | Backup schedule and restore procedure |
 | `docs/DEPENDENCIES.md` | Dependencies, versions, OCI digests |
 | `docs/RESEARCH.md` | Technical research findings |
+| `docs/PLANNING_CLARIFICATIONS.md` | Resolved planning decisions and implementation analogies |
 | `docs/HANDOFF.md` | Current handoff state |
 | `docs/adr/` | Architecture Decision Records |
 
@@ -76,7 +78,12 @@ podman machine start
 | Environment | URL | Purpose |
 |---|---|---|
 | Demo | `https://delegateops.business/padang/demo` | Stakeholder preview; auto-resets every 30 min; no authentication |
-| Production | `https://delegateops.business/padang` | Live system; email + password auth; full backups |
+| Production | `https://delegateops.business/padang` | Live system; Email OTP auth; full backups |
+
+The demo has no authentication and contains synthetic data only. Production
+uses passwordless Email OTP, RS256 access tokens, and rotating refresh tokens.
+Future iOS and Android clients use the same API and business rules with
+platform-appropriate secure refresh-token storage.
 
 ---
 

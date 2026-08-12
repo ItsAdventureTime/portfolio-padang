@@ -2,10 +2,16 @@
 
 ## Policy
 
-- **No pinned version numbers.** Tags are intentionally mutable (e.g., `golang:alpine`, `node:lts-alpine`).
+- **Upstream runtime tags are floating.** Use official mutable channels such as
+  `golang:alpine` and `node:lts-alpine`; do not put actual runtime version
+  numbers in Quadlet image tags.
+- **Application lockfiles remain committed.** They pin the resolved package
+  graph required by the constitution; this is separate from floating base
+  image channels.
 - `AutoUpdate=registry` is set on all Quadlet containers. Podman auto-update tracks digest changes.
 - OCI image digests recorded below for auditability and rollback reference.
-- Digests last verified: **2026-08-11**
+- Digests: verification pending containerized implementation validation; record
+  the resolved digest after each approved pull or release.
 - Update digests after each `podman auto-update` or manual pull.
 - All builds happen inside `podman run --rm`; no compiler or Node.js installed on the VPS host.
 
@@ -32,7 +38,7 @@
 
 | Dependency | Version policy | Purpose | Status |
 |---|---|---|---|
-| Next.js | Active LTS — `node:lts-alpine` image (no version pin) | Framework | Active (tracks active LTS) |
+| Next.js | Latest supported release; build/runtime uses `node:lts-alpine` | Framework | Active (tracks supported release) |
 | React | Latest compatible with Next.js LTS | UI runtime | Active |
 | TypeScript | Latest | Type safety | Active |
 | Tailwind CSS | v4.x latest | Styling | Active |
@@ -59,10 +65,12 @@
 
 | Image | Tag | Purpose |
 |---|---|---|
-| `docker.io/library/postgres` | `17-alpine` | PostgreSQL 17 database (major version intentional; no patch pin) |
-| `docker.io/amazon/aws-cli` | `latest` | B2/S3 CLI operations (backups) |
+| `docker.io/library/postgres` | `alpine` | Latest supported PostgreSQL Alpine channel; floating tag |
+| `ghcr.io/itsadventuretime/padang-erp-backup` | `latest` | PostgreSQL dump + B2/S3 backup utility |
 | `ghcr.io/itsadventuretime/padang-erp-api` | `latest` | Go API (built via Containerfile) |
-| `ghcr.io/itsadventuretime/padang-erp-frontend` | `latest` | Next.js frontend (built via Containerfile) |
+| `ghcr.io/itsadventuretime/padang-erp-api` | `demo-latest` | Go API demo channel |
+| `ghcr.io/itsadventuretime/padang-erp-frontend` | `latest` | Next.js production frontend (`/padang`) |
+| `ghcr.io/itsadventuretime/padang-erp-frontend` | `demo-latest` | Next.js demo frontend (`/padang/demo`) |
 
 ### Build Images (used in `podman run --rm` build pipeline only; NOT in Quadlets)
 
@@ -78,12 +86,13 @@
 ### Digest Record
 
 ```
-# Update this section after each podman auto-update or manual pull
+# Update this section after each approved pull or manual update
 # Format: image:tag@sha256:digest | date | notes
 
-docker.io/library/postgres:17-alpine@sha256:TBD   | 2026-08-11 | Initial setup
-docker.io/library/golang:alpine@sha256:TBD         | 2026-08-11 | Build image
-docker.io/library/node:lts-alpine@sha256:TBD       | 2026-08-11 | Build image
+docker.io/library/postgres:alpine@sha256:TBD       | pending | Floating PostgreSQL Alpine channel
+docker.io/library/golang:alpine@sha256:TBD         | pending | Floating Go build image
+docker.io/library/node:lts-alpine@sha256:TBD       | pending | Floating Node LTS build/runtime image
+ghcr.io/itsadventuretime/padang-erp-backup:latest@sha256:TBD | pending | Dedicated backup utility
 ```
 
 ---
@@ -114,10 +123,10 @@ docker.io/library/node:lts-alpine@sha256:TBD       | 2026-08-11 | Build image
 
 | Component | EOL / Support End |
 |---|---|
-| Go 1.24 | Supported until Go 1.26 release (~Aug 2027) |
-| PostgreSQL 17 | Supported until November 2029 |
-| Next.js 15 | Active; LTS policy: supported for ~2 years |
-| Node.js (Next.js runtime) | LTS 22.x — support until April 2027 |
+| Go | Follow the current supported Go release; Go has no LTS channel |
+| PostgreSQL | No LTS channel; follow the floating supported Alpine channel and validate major changes |
+| Next.js | Follow the current supported release and its support policy |
+| Node.js (Next.js runtime) | Official Active or Maintenance LTS only |
 | Fedora CoreOS | Rolling; always-current stream |
 | Podman | Fedora CoreOS ships latest stable |
 
