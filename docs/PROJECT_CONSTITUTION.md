@@ -21,8 +21,11 @@ The Git repository is the sole source of truth. Neither agent's chat history is 
 
 ## Authorization Protocol
 
-Execution requires explicit `GO: <PHASE NAME>` authorization.
-Questions are answered first. Files are changed only after authorization.
+`docs/HANDOFF.md` is the single source of go/no-go for each phase.
+
+- If HANDOFF.md says a phase is **pre-authorized**, begin immediately — no keyword or phrase from the user is required.
+- If HANDOFF.md says **approval required**, stop and wait for the user to confirm before writing any code.
+- Any material deviation from the documented architecture must be flagged to Antigravity (Architect) before proceeding, regardless of authorization status.
 
 ## Branch Strategy
 
