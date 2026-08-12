@@ -93,7 +93,9 @@ Primary C1 references:
   `padang-demo` state root and the official `/padang/demo/` route; it uses
   `bridge-ph` + `padang/demo/` and
   requires only read/write/delete file capabilities for its presigned-object
-  operations.
+  operations. `listAllBucketNames` is conditional and should be added only if
+  an S3 client performs `ListBuckets` or `HeadBucket` with a bucket-restricted
+  key.
 
 Primary deployment references:
 

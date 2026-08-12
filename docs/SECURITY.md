@@ -123,6 +123,12 @@ as mounted files. It creates only an ephemeral rclone configuration under
 `/run` for the Backblaze S3-compatible upload process; the file is never
 persisted or logged.
 
+Backblaze keys must be restricted to the required bucket and file prefix. Use
+`readFiles`, `writeFiles`, and `deleteFiles` for the application workflows. Do
+not grant `listAllBucketNames` by default; add it only if a bucket-restricted
+S3 client must call `ListBuckets` or `HeadBucket`, and record that exception in
+the operations log.
+
 ### Generation
 - Human-provided values are entered through the no-echo interactive script.
 - JWT keys are generated with OpenSSL in a mode-0700 temporary directory, then

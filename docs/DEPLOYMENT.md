@@ -571,6 +571,9 @@ The remote script:
 - expects a least-privilege Backblaze application key restricted to bucket
   `bridge-ph`, prefix `padang/demo/`, and the required `readFiles`, `writeFiles`,
   and `deleteFiles` capabilities. Never use the Backblaze master key;
+  if a future client performs `ListBuckets` or `HeadBucket` with a
+  bucket-restricted key, grant `listAllBucketNames` only for that integration
+  and document the justification;
 - runs Go tests/vet/compilation in `podman run --rm golang:alpine`;
 - runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
   with `NEXT_PUBLIC_BASE_PATH=/padang/demo`;

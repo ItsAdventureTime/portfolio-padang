@@ -67,6 +67,12 @@ Backblaze endpoint for this bucket's region.
 | Object Lock | Recommended: COMPLIANCE mode, 30-day minimum retention |
 | Lifecycle rules | Automatic deletion after retention period (configured in B2 console) |
 
+Use a bucket- and prefix-restricted application key. The backup client needs
+object listing, read, write, and delete capabilities for retention cleanup and
+restore verification. Backblaze documents `listAllBucketNames` as conditional:
+grant it only if the selected S3 client performs `ListBuckets` or `HeadBucket`
+against a bucket-restricted key; do not grant account-wide listing otherwise.
+
 ---
 
 ## Backup Container (Quadlet)
