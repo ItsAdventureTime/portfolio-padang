@@ -55,6 +55,15 @@
 
 ## OCI Container Images
 
+### Project release/channel identities
+
+- Demo: `padang-bridge-ph:demo`
+- Production: `padang-bridge-ph:prod`
+
+These are project-level release identities. Runtime Quadlets continue to use
+separate API, frontend, database, and backup images so the demo and production
+Next.js artifacts can carry different build-time `basePath` values.
+
 ### Policy: No Pinned Version Numbers
 
 > Image tags are mutable. Version numbers MUST NOT be pinned in Quadlet files.

@@ -37,6 +37,7 @@ planning and supersede older contradictory wording in this document.
    - Rootless Podman Quadlets with floating channel tags and `AutoUpdate=registry`; updates remain manually applied.
    - Proxy-Network isolation pattern: Caddy + Frontend + API on `proxy.network`; API + DB on internal `network`. DB is non-routable from host or edge.
    - Ingress: Path-based routing via existing Caddy (`/padang` prod, `/padang/demo` demo). Frontend is built twice from one source revision because Next.js `basePath` is build-time.
+   - Production target: Quadlets at `/home/jk/.config/containers/systemd/bridge-ph/padang/`, persistent state at `/home/jk/bridge-ph/padang/`, and release identity `padang-bridge-ph:prod`.
 
 ### Planning Clarification Decisions
 

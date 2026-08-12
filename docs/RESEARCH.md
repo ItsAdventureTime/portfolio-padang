@@ -82,6 +82,9 @@ Primary C1 references:
 - Rootless Quadlet files belong under the user's `.config/containers/systemd`
   search path; `.network` references are translated by the generator into
   dependencies on generated `*-network.service` units.
+- The production filesystem targets are `/home/jk/.config/containers/systemd/bridge-ph/padang/`
+  for Quadlets and `/home/jk/bridge-ph/padang/` for persistent state. The
+  project-level production release identity is `padang-bridge-ph:prod`.
 - Caddy's supported operational flow is `caddy fmt`, `caddy validate`, then
   `caddy reload`; the deployment script runs these in disposable Caddy
   containers and replaces the live file only after validation.

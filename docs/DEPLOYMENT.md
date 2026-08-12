@@ -27,11 +27,18 @@ Slug format: `{client}-{app}-{env}-{component}`
 | Backup container | N/A | `bridge-ph-padang-backup` |
 | DB name | `padang_demo` | `padang_prod` |
 | DB user | `padang_demo_user` | `padang_prod_user` |
+| Project release identity | `padang-bridge-ph:demo` | `padang-bridge-ph:prod` |
 | OCI image (API) | `ghcr.io/itsadventuretime/padang-erp-api:demo-latest` | `ghcr.io/itsadventuretime/padang-erp-api:latest` |
 | OCI image (Frontend) | `ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest` (`/padang/demo`) | `ghcr.io/itsadventuretime/padang-erp-frontend:latest` (`/padang`) |
 | OCI image (Backup) | N/A | `ghcr.io/itsadventuretime/padang-erp-backup:latest` |
 | Git remote | `https://github.com/ItsAdventureTime/bridge-padang.git` | — |
 | GHCR org | `itsadventuretime` | — |
+
+The `padang-bridge-ph:demo` and `padang-bridge-ph:prod` values are the
+environment release/channel identities requested for this project. They do
+not replace the separate API and Next.js runtime images: the frontend remains
+compiled with its environment-specific Next.js `basePath`, so the approved
+architecture promotes separately validated component artifacts.
 
 ---
 
