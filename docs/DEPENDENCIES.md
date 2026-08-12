@@ -119,7 +119,7 @@ runtime, or deployment is part of this system.
 | Bucket | `bridge-ph` |
 | Endpoint | `s3.us-west-001.backblazeb2.com` |
 | Key name | `bridge-ph-key` |
-| Key permissions | Read + Write on `bridge-ph/padang/` prefix |
+| Key permissions | Read + Write on `padang/` object-key prefix |
 | S3 API compatibility | B2 S3-compatible API |
 
 ---

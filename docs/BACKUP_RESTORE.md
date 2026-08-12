@@ -25,9 +25,9 @@ For future PITR consideration: evaluate `pg_basebackup` + WAL shipping to B2 if 
 
 | Backup type | Schedule | Retention | B2 Key prefix |
 |---|---|---|---|
-| Daily | 02:00 PHT (18:00 UTC) | 30 most recent | `bridge-ph/padang/backups/daily/` |
-| Weekly | Sunday 01:00 PHT (17:00 UTC) | 12 most recent | `bridge-ph/padang/backups/weekly/` |
-| Attachments + manifest | Daily with database backup | 30 most recent manifests; B2 object retention applies to files | `bridge-ph/padang/attachments-backups/` |
+| Daily | 02:00 PHT (18:00 UTC) | 30 most recent | `padang/backups/daily/` |
+| Weekly | Sunday 01:00 PHT (17:00 UTC) | 12 most recent | `padang/backups/weekly/` |
+| Attachments + manifest | Daily with database backup | 30 most recent manifests; B2 object retention applies to files | `padang/attachments-backups/` |
 
 Object naming:
 ```
@@ -60,9 +60,9 @@ Backblaze endpoint for this bucket's region.
 |---|---|
 | Endpoint | `s3.us-west-001.backblazeb2.com` |
 | Bucket | `bridge-ph` |
-| Backup prefix | `bridge-ph/padang/backups/` |
+| Backup prefix | `padang/backups/` |
 | Key name | `bridge-ph-key` |
-| Key permissions | Read + Write on `bridge-ph/padang/` prefix only |
+| Key permissions | Read + Write on `padang/` prefix only |
 | Server-side encryption | SSE-B2 (enabled) |
 | Object Lock | Recommended: COMPLIANCE mode, 30-day minimum retention |
 | Lifecycle rules | Automatic deletion after retention period (configured in B2 console) |
@@ -280,7 +280,8 @@ Do NOT store in Git or in the application.
 
 ## B2 Attachment Files
 
-Files uploaded by users (contracts, drawings, photos) are stored in B2 under `bridge-ph/padang/`.
+Files uploaded by users (contracts, drawings, photos) are stored in the `bridge-ph`
+bucket under the `padang/` object-key prefix.
 
 Production attachment objects are included in the daily backup run. The backup
 utility copies the objects and writes a dated SHA-256 manifest, so a database

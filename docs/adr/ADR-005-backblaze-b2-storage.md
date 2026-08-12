@@ -20,7 +20,9 @@ An external object storage is required.
 - The S3-compatible API allows use of provider-neutral S3 tooling without
   coupling the application to a Backblaze-specific SDK
 - Existing key name: `bridge-ph-key`; credentials in Podman secrets
-- Demo prefix: `bridge-ph/padang/demo/`; Production prefix: `bridge-ph/padang/`
+- Bucket: `bridge-ph`
+- Demo object-key prefix: `padang/demo/`
+- Production object-key prefix: `padang/`
 - B2 supports: server-side encryption (SSE-B2), Object Lock, file versioning, lifecycle rules
 
 ## Consequences

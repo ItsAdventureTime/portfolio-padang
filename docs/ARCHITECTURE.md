@@ -216,8 +216,8 @@ Application
 **B2 Configuration:**
 - Endpoint: `s3.us-west-001.backblazeb2.com`
 - Bucket: `bridge-ph`
-- Demo prefix: `bridge-ph/padang/demo/`
-- Production prefix: `bridge-ph/padang/`
+- Demo object-key prefix: `padang/demo/`
+- Production object-key prefix: `padang/`
 
 **Object key structure:**
 ```

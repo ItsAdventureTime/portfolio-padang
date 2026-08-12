@@ -170,7 +170,8 @@ Aggregated KPIs across all modules. Role-aware: each role sees relevant widgets.
 **Documents**
 - File attachments: PDF, DOCX, XLSX, JPG, PNG, DWG
 - Max file size: 50 MB per file
-- Stored in Backblaze B2 under `bridge-ph/padang/{env}/projects/{project-id}/`
+- Stored in the Backblaze B2 `bridge-ph` bucket under the
+  `padang/{env}/projects/{project-id}/` object-key prefix.
 - Version tracking (file replaced = new version, old retained)
 - Accepted categories: Contract, Drawing, Permit, Photo, Report, Other
 
