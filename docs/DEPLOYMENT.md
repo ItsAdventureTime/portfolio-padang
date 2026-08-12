@@ -595,7 +595,9 @@ The remote script:
   if a future client performs `ListBuckets` or `HeadBucket` with a
   bucket-restricted key, grant `listAllBucketNames` only for that integration
   and document the justification;
-- runs Go tests/vet/compilation in `podman run --rm golang:alpine`;
+- runs Go tests/vet/compilation in `podman run --rm golang:alpine`, with the
+  source mounted read-only and Go's build/module/workspace caches on a
+  disposable `/tmp` tmpfs;
 - runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
   with `NEXT_PUBLIC_BASE_PATH=/padang/demo`;
 - installs runtime Quadlets in
@@ -659,10 +661,10 @@ scripts/deploy-padang-demo.sh --host VPS_HOST --user jk --port 22 --dry-run
 ```
 
 The apply command prompts on the VPS for the Backblaze demo key ID and
-application key if the corresponding Podman secrets do not already exist. It
-The key ID is visibly entered and confirmed; the application key is entered
-without echo and confirmed. Press Return after each value. The command
-generates the database username and password automatically. Do not place any
+application key if the corresponding Podman secrets do not already exist.
+The key ID is visibly entered once; the application key is entered once
+without echo. Press Return after each value. The command generates the
+database username and password automatically. Do not place any
 of these values in a command line, `.env` file, Quadlet `Environment=`, or Git.
 
 After deployment, inspect the demo from the VPS:

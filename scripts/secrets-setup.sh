@@ -14,30 +14,22 @@ create_secret_from_stdin() {
   echo "created secret: $name"
 }
 prompt_secret() {
-  local name="$1" prompt="$2" value confirm
+  local name="$1" prompt="$2" value
   if secret_exists "$name"; then echo "keeping existing secret: $name"; return; fi
-  while :; do
-    read -r -s -p "$prompt: " value; printf '\n'
-    read -r -s -p "Confirm $prompt: " confirm; printf '\n'
-    [ "$value" = "$confirm" ] && [ -n "$value" ] && break
-    echo "values did not match; try again" >&2
-  done
+  read -r -s -p "$prompt (paste once, then press Return): " value
+  printf '\n'
+  [[ -n "$value" ]] || { echo "empty value refused" >&2; return 1; }
   printf '%s' "$value" | create_secret_from_stdin "$name"
-  unset value confirm
+  unset value
 }
 prompt_value() {
-  local name="$1" prompt="$2" value confirm
+  local name="$1" prompt="$2" value
   if secret_exists "$name"; then echo "keeping existing secret: $name"; return; fi
-  while :; do
-    read -r -p "$prompt (type the value, then press Return): " value
-    printf '\n'
-    read -r -p "Confirm $prompt: " confirm
-    printf '\n'
-    [ "$value" = "$confirm" ] && [ -n "$value" ] && break
-    echo "values did not match; try again" >&2
-  done
+  read -r -p "$prompt (paste once, then press Return): " value
+  printf '\n'
+  [[ -n "$value" ]] || { echo "empty value refused" >&2; return 1; }
   printf '%s' "$value" | create_secret_from_stdin "$name"
-  unset value confirm
+  unset value
 }
 generate_secret() {
   local name="$1"
