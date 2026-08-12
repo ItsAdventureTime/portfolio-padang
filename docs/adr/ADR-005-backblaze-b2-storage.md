@@ -16,15 +16,18 @@ An external object storage is required.
 ## Rationale
 
 - Pre-approved by client (Bridge-PH); account and bucket already exist
-- B2 is significantly cheaper than AWS S3 for storage + egress
-- S3-compatible API allows use of AWS SDK v2 for Go — no proprietary SDK
+- B2 is the approved object-storage provider for this product
+- The S3-compatible API allows use of provider-neutral S3 tooling without
+  coupling the application to a Backblaze-specific SDK
 - Existing key name: `bridge-ph-key`; credentials in Podman secrets
 - Demo prefix: `bridge-ph/padang/demo/`; Production prefix: `bridge-ph/padang/`
 - B2 supports: server-side encryption (SSE-B2), Object Lock, file versioning, lifecycle rules
 
 ## Consequences
 
-- File storage is provider-specific (B2 endpoint); migration to S3 or Azure Blob would require config change (endpoint + credentials)
+- File storage is configured for the Backblaze B2 endpoint; migration to a
+  different provider would require an explicit endpoint, credential, and
+  compatibility review
 - Presigned URLs for download: generated server-side; 1-hour expiry
 - File uploads are server-proxied (not direct client-to-B2 upload) for access control
 - B2 Object Lock recommended for backup files (COMPLIANCE mode, 30 days)

@@ -6,9 +6,10 @@
 
 ## Context
 
-The previous backup example selected a PostgreSQL image but invoked `aws s3
-cp`. The PostgreSQL image provides `pg_dump`; it does not provide the AWS CLI
-needed for Backblaze B2's S3-compatible endpoint.
+The previous backup example selected a PostgreSQL image but invoked a storage
+client that was not present in the image. The PostgreSQL image provides
+`pg_dump`; it does not provide the client needed for Backblaze B2's
+S3-compatible endpoint.
 
 ## Decision
 
@@ -16,14 +17,16 @@ Build and publish a dedicated `ghcr.io/itsadventuretime/padang-erp-backup:latest
 utility image containing:
 
 - PostgreSQL client tools compatible with the selected database major;
-- AWS CLI for B2's S3-compatible API;
+- rclone configured with the S3 backend's `provider=Other` and the explicit
+  Backblaze B2 endpoint;
 - the repository backup, checksum, manifest, retention, and restore helpers.
 
 The one-shot production backup service mounts only Podman secrets and joins
 only the production internal network. It streams the custom-format database
-dump to B2, copies attachment objects to the dated backup prefix, writes
-checksums/manifests, and verifies the uploaded objects. No plaintext secret or
-dump is committed to Git or written to a persistent local deployment path.
+dump to Backblaze B2, copies attachment objects to the dated backup prefix,
+writes checksums/manifests, and verifies the uploaded objects. No plaintext
+secret or dump is committed to Git or written to a persistent local deployment
+path.
 
 The restore test always uses an isolated throwaway database/container and
 never the production database.

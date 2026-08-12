@@ -71,7 +71,8 @@ Key integration tests:
 - Fund request approval workflow (all state transitions)
 - Inventory stock movements (weighted average cost recalculation)
 - Audit log entries created on state changes
-- File attachment CRUD (B2 mocked with localstack or testcontainers)
+- File attachment CRUD (Backblaze S3-compatible API mocked with MinIO or an
+  equivalent S3-compatible test double)
 
 ### API Tests (handler layer)
 

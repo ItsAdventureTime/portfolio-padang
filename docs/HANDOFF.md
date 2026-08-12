@@ -47,7 +47,8 @@ planning and supersede older contradictory wording in this document.
   costing, estimates/deliveries/billings, PO lines, supplier payments, finance
   operations, retention, collections, and QBO export history.
 - A dedicated backup utility image contains both PostgreSQL client tools and
-  AWS CLI for B2; the previous PostgreSQL-only backup example was invalid.
+  rclone configured for Backblaze B2's S3-compatible API; the previous
+  PostgreSQL-only backup example was invalid.
 - The API is the shared boundary for web and future Expo/React Native clients.
 - The launch design is light-only, with self-hosted fonts through `next/font`
   and light CSP-compatible tokens.
@@ -245,7 +246,7 @@ an undocumented placeholder table.
   - Dedicated backup utility image runs the database and attachment backup;
     `pg_dump -Fc` streams directly to B2 with manifest/checksum verification.
   - Backup uses the dedicated utility image specified by ADR-013, including
-    both `pg_dump` and AWS CLI, plus attachment manifests/checksums.
+    `pg_dump`, rclone, and attachment manifests/checksums.
 - **ACCEPTANCE CRITERIA:**
   - Backend and frontend containers build cleanly via Podman.
   - All Quadlet systemd files pass validation.

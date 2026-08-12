@@ -220,6 +220,8 @@ figures). No dark-mode or glassmorphism token set is part of the launch design.
 | shadcn/ui | ui.shadcn.com |
 | openapi-typescript | github.com/drwpow/openapi-typescript |
 | Tailwind CSS | tailwindcss.com |
-| Backblaze B2 S3 API | backblaze.com/b2/docs/s3_compatible_api.html |
+| Backblaze B2 S3-Compatible API | backblaze.com/docs/cloud-storage-s3-compatible-api |
+| Backblaze B2 integration guidance | backblaze.com/docs/en/cloud-storage-get-started-with-a-backblaze-integration |
+| rclone S3 backend | rclone.org/s3 |
 | Resend Go SDK | resend.com/docs/send-with-go |
 | PCAB verification | pcabgovph.com |

@@ -49,7 +49,12 @@ weekly/padang_prod_{YYYY-MM-DD}_weekly.dump
 
 ---
 
-## Backblaze B2 Configuration
+## Backblaze B2 Cloud Storage Configuration
+
+Backups use Backblaze B2 Cloud Storage through its S3-compatible API. Backblaze
+is the storage provider; the S3 syntax is only the interoperability protocol.
+The backup image uses rclone's S3 backend with `provider=Other` and the exact
+Backblaze endpoint for this bucket's region.
 
 | Setting | Value |
 |---|---|
@@ -115,16 +120,16 @@ WantedBy=timers.target
 ## Backup Script
 
 The implementation will live in the dedicated backup utility image. The image
-contains the PostgreSQL client, AWS CLI-compatible B2 client, and the backup
-scripts; the production Quadlet does not bind-mount an executable from the
-host.
+contains the PostgreSQL client, rclone configured for Backblaze B2's
+S3-compatible API, and the backup scripts; the production Quadlet does not
+bind-mount an executable from the host.
 
 Logic:
 1. Read DB password from `/run/secrets/db-password`
 2. Read B2 credentials from `/run/secrets/b2-key-id` and `/run/secrets/b2-app-key`
 3. Run `pg_dump -Fc -h $DB_HOST -U $DB_USER $DB_NAME` → stdout
-4. Pipe stdout to the AWS CLI-compatible B2 client and upload directly to the
-   dated database key; no plaintext dump is persisted on the VPS
+4. Pipe stdout to `rclone rcat` and upload directly to the dated Backblaze B2
+   database key; no plaintext dump is persisted on the VPS
 5. Copy production attachment objects to the dated attachment-backup prefix,
    generating a SHA-256 manifest for every copied object
 6. Verify uploaded object sizes and manifest checksums before reporting success
@@ -159,9 +164,8 @@ systemctl --user stop bridge-ph-padang-api.service
 podman run --rm \
   --secret bridge-ph-padang-prod-b2-key-id \
   --secret bridge-ph-padang-prod-b2-app-key \
-  amazon/aws-cli \
-  s3 ls s3://bridge-ph/padang/backups/daily/ \
-  --endpoint-url https://s3.us-west-001.backblazeb2.com
+  ghcr.io/itsadventuretime/padang-erp-backup:latest \
+  /usr/local/bin/backupctl list-database-backups
 
 # 3. Download backup
 BACKUP_FILE=padang_prod_2025-08-11.dump
@@ -169,9 +173,8 @@ podman run --rm \
   -v /tmp/restore:/restore:Z \
   --secret bridge-ph-padang-prod-b2-key-id \
   --secret bridge-ph-padang-prod-b2-app-key \
-  amazon/aws-cli \
-  s3 cp s3://bridge-ph/padang/backups/daily/$BACKUP_FILE /restore/$BACKUP_FILE \
-  --endpoint-url https://s3.us-west-001.backblazeb2.com
+  ghcr.io/itsadventuretime/padang-erp-backup:latest \
+  /usr/local/bin/backupctl download-database "$BACKUP_FILE" /restore/$BACKUP_FILE
 
 # 4. Drop and recreate database
 podman exec bridge-ph-padang-db \

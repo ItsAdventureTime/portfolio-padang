@@ -35,7 +35,7 @@ External services (reached from API container via outbound HTTPS):
 | Migrations | golang-migrate | v4 — CLI + library; up/down migrations; PostgreSQL dialect |
 | Validation | go-playground/validator | v10 — struct-tag validation |
 | Auth | Email OTP (production) / no auth (demo) | 6-digit code in production; 10-min TTL; single-use; rate-limited; demo uses guarded synthetic identity |
-| File upload | AWS SDK v2 (S3-compatible) | B2 S3-compatible API |
+| File upload | S3-compatible Go client | Backblaze B2 S3-compatible API; endpoint is explicitly configured |
 | Email | Resend Go SDK | Adapter pattern; swappable to Azure |
 | OpenAPI | swaggo/swag or huma | Generate OpenAPI 3.1 spec from Go annotations |
 | Config | Env vars via Quadlet `Environment=` | No config files for secrets; see SECURITY.md |
@@ -210,7 +210,7 @@ Triggered email events (Phase 1):
 ```
 Application
   └─ FileStorageService interface
-       └─ B2Adapter (implements S3-compatible API via AWS SDK v2)
+       └─ B2Adapter (implements Backblaze B2 S3-compatible API via the selected Go client)
 ```
 
 **B2 Configuration:**

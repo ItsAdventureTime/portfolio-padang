@@ -28,7 +28,7 @@
 | golang-migrate/migrate | v4.x latest within v4 | DB migrations | Active |
 | go-playground/validator | v10.x latest within v10 | Struct validation | Active |
 | golang-jwt/jwt | v5.x latest within v5 | JWT (RS256) | Active |
-| aws/aws-sdk-go-v2 | Latest within v2 | B2/S3 storage | Active |
+| S3-compatible Go client | Latest supported release selected during C1 | Backblaze B2 S3 storage | Planned |
 | resend/resend-go | Latest | Email (Resend) | Active |
 | testcontainers/testcontainers-go | Latest | Integration tests | Active |
 
@@ -78,7 +78,7 @@
 |---|---|---|
 | `docker.io/library/golang` | `alpine` | Compile Go binary (no version pin; latest stable) |
 | `docker.io/library/node` | `lts-alpine` | Build Next.js app (tracks active LTS) |
-| `docker.io/library/postgres` | `17-alpine` | Migration testing in CI/local (`podman run --rm`) |
+| `docker.io/library/postgres` | `alpine` | Migration testing in CI/local (`podman run --rm`) |
 
 > **Before using any image:** verify digest using `podman pull <image>@sha256:<digest>` or `podman inspect`.
 > Record sha256 below. Never assume a tag maps to the same digest as a previous pull.
@@ -113,7 +113,7 @@ ghcr.io/itsadventuretime/padang-erp-backup:latest@sha256:TBD | pending | Dedicat
 
 | Service | Purpose | SDK / Integration |
 |---|---|---|
-| Backblaze B2 | File storage, backups | AWS SDK v2 (S3-compatible) |
+| Backblaze B2 Cloud Storage | File storage, backups | S3-compatible Go client and rclone S3 backend |
 | Resend | Transactional email | `resend/resend-go` SDK |
 | GHCR (GitHub Container Registry) | OCI image registry | Podman native pull/push |
 

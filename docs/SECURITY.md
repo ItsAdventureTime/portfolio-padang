@@ -117,9 +117,10 @@ projects).
 | `bridge-ph-padang-prod-b2-key-id` | B2 application key ID | API container, backup container (prod) |
 | `bridge-ph-padang-prod-b2-app-key` | B2 application key secret | API container, backup container (prod) |
 
-The backup utility image also receives these B2 secrets as mounted files. It
-creates only an ephemeral in-container AWS credentials file under `/run` for
-the upload process; the file is never persisted or logged.
+The backup utility image also receives these Backblaze application-key secrets
+as mounted files. It creates only an ephemeral rclone configuration under
+`/run` for the Backblaze S3-compatible upload process; the file is never
+persisted or logged.
 
 ### Generation
 - Database passwords: `openssl rand -base64 32`

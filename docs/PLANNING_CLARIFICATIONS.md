@@ -124,16 +124,19 @@ No payment or client issuance is valid before the required GM approval.
 
 ## 6. Backup architecture correction
 
-The previous example used a PostgreSQL image but invoked the AWS CLI. That is
-like putting a plumber in a truck without the pipe wrench: the image can run
-`pg_dump`, but it does not provide the B2 upload command.
+The previous example used a PostgreSQL image but invoked a storage-upload
+client that was not present in the image. That is like putting a plumber in a
+truck without the pipe wrench: the image can run `pg_dump`, but it does not
+provide the Backblaze upload command.
 
 The plan now uses one dedicated backup image containing both PostgreSQL client
-tools and the AWS CLI. It is built from the project’s approved container
-workflow and published as `backup:latest`. The one-shot service:
+tools and rclone configured for Backblaze B2's S3-compatible API. It is built
+from the project’s approved container workflow and published as
+`backup:latest`. The one-shot service:
 
 1. reads the database and B2 Podman secrets from `/run/secrets`;
-2. streams `pg_dump -Fc` directly to B2 without a plaintext dump file;
+2. streams `pg_dump -Fc` directly to Backblaze B2 with `rclone rcat`, without a
+   plaintext dump file;
 3. writes a checksum and manifest for the dump;
 4. copies attachment objects to the dated backup prefix and records checksums;
 5. applies retention and verifies the uploaded objects;
@@ -141,9 +144,10 @@ workflow and published as `backup:latest`. The one-shot service:
 
 The backup image is not a runtime application image. The production Quadlet
 uses `backup:latest`, while the database uses the floating official
-`postgres:alpine` channel.
-Credentials are mounted as files; no secret value appears in an image,
-repository file, command argument, or log.
+`postgres:alpine` channel. Backblaze application-key credentials are mounted
+as files and converted into an ephemeral rclone configuration under `/run`;
+no secret value appears in an image, repository file, command argument, or
+log.
 
 The restore test downloads a selected dump and attachment manifest into an
 isolated non-production target. Production is never used as a restore test
@@ -212,3 +216,8 @@ or unreadable. Production images do not include the reset command.
 - [React Native TypeScript](https://reactnative.dev/docs/typescript)
 - [Expo SDK reference](https://docs.expo.dev/versions/latest/)
 - [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
+- [Backblaze B2 S3-Compatible API](https://www.backblaze.com/docs/cloud-storage-s3-compatible-api)
+- [Backblaze B2 integration guidance](https://www.backblaze.com/docs/en/cloud-storage-get-started-with-a-backblaze-integration)
+- [rclone S3 backend](https://rclone.org/s3/)
+- [rclone `rcat`](https://rclone.org/commands/rclone_rcat/)
+- [rclone `check`](https://rclone.org/commands/rclone_check/)
