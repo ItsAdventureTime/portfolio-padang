@@ -569,14 +569,14 @@ at `/padang/demo/`:
 
 ```bash
 # macOS, from the repository root
- scripts/deploy-padang-demo.sh --host VPS_HOST
+scripts/deploy-padang-demo.sh --host VPS_HOST
 ```
 
 The macOS side performs no compilation, package installation, or application
 execution. It uses `rsync` to upload the source tree to
 `/home/jk/bridge-ph/padang-demo/source/`, excluding Git metadata, dependency
 directories, build output, `.env` files, and credential-looking files, then
- hands control to `scripts/deploy-padang-demo-remote.sh` on the VPS.
+hands control to `scripts/deploy-padang-demo-remote.sh` on the VPS.
 
 The remote script:
 
@@ -605,7 +605,7 @@ The remote script:
   separate from production;
 - runs migrations, performs the guarded synthetic demo seed, and starts the
   30-minute reset timer; and
-  - makes only the required Caddy network and `/padang/demo/api/*` route changes,
+- makes only the required Caddy network and `/padang/demo/api/*` route changes,
   stages the Caddyfile, formats it with `caddy fmt --overwrite`, validates it
   with `caddy validate`, then atomically replaces it after a timestamped backup;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
@@ -618,8 +618,8 @@ Caddy reaches the app and API through the dedicated
 `bridge-ph-padang-demo` network so it can reach PostgreSQL; PostgreSQL and the
 reset container never join any Caddy-facing network. The API route is required
 because the browser calls the same-origin `/padang/demo/api/*` path, while the
-  existing supplied Caddyfile must use the authoritative `/padang/demo/*`
-  route.
+existing supplied Caddyfile must use the authoritative `/padang/demo/*`
+route.
 
 Runtime Quadlets use floating official `postgres:alpine`, `node:lts-alpine`,
 `alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts
@@ -642,3 +642,70 @@ The first deployment requires an existing `/home/jk/caddy/conf/Caddyfile` and
 fails closed if either is absent, if the Caddy insertion marker is missing, or
 if the user/systemd/Podman prerequisites are unavailable. Set `CADDY_QUADLET`
 explicitly only when the VPS uses a different caddy Quadlet path.
+
+### Operator commands
+
+Run these commands from the repository root on macOS. Replace `VPS_HOST` with
+the VPS hostname or address. The macOS wrapper only performs the source sync
+and remote handoff; compilation and application startup occur on the VPS.
+
+```bash
+# 1. Compile, test, configure, and start the demo on the VPS.
+scripts/deploy-padang-demo.sh --host VPS_HOST --user jk --port 22 --apply
+
+# 2. Optional preflight: synchronize and build/test without changing
+#    Quadlets, runtime data, Caddy, or secrets.
+scripts/deploy-padang-demo.sh --host VPS_HOST --user jk --port 22 --dry-run
+```
+
+The apply command prompts on the VPS for the Backblaze demo key ID and
+application key if the corresponding Podman secrets do not already exist. It
+generates the database username and password automatically. Do not place any
+of these values in a command line, `.env` file, Quadlet `Environment=`, or Git.
+
+After deployment, inspect the demo from the VPS:
+
+```bash
+ssh -p 22 jk@VPS_HOST 'systemctl --user status padang-demo-db.service padang-demo-migrate.service padang-demo-api.service padang-demo-app.service padang-demo-reset.timer --no-pager'
+ssh -p 22 jk@VPS_HOST 'podman ps --format "table {{.Names}}\\t{{.Status}}" | grep padang-demo'
+curl --fail-with-body https://delegateops.business/padang/demo/
+curl --fail-with-body https://delegateops.business/padang/demo/api/v1/health
+```
+
+For remote logs:
+
+```bash
+ssh -p 22 jk@VPS_HOST 'journalctl --user -u padang-demo-api.service -u padang-demo-app.service -n 100 --no-pager'
+ssh -p 22 jk@VPS_HOST 'journalctl --user -u caddy.service -n 100 --no-pager'
+```
+
+The remote script validates and formats the assembled Caddyfile in a
+disposable Caddy container, then uses `caddy reload` for Caddyfile-only
+changes. If the Caddy proxy network must be added to the existing Caddy
+Quadlet, it performs a controlled systemd restart after `daemon-reload`.
+
+### Future production promotion (C4)
+
+Production is not deployed during C1. After demo approval and C4 approval,
+the production promotion must use separate production paths and secrets:
+
+```bash
+# VPS, after the approved production artifacts and Quadlets are available.
+mkdir -p /home/jk/bridge-ph/padang/postgres-data
+mkdir -p /home/jk/.config/containers/systemd/bridge-ph/padang
+
+cp quadlets/prod/* /home/jk/.config/containers/systemd/bridge-ph/padang/
+systemctl --user daemon-reload
+systemctl --user enable --now bridge-ph-padang-db.service
+systemctl --user enable --now bridge-ph-padang-api.service
+systemctl --user enable --now bridge-ph-padang-frontend.service
+systemctl --user enable --now bridge-ph-padang-backup.timer
+
+curl --fail-with-body https://delegateops.business/padang/
+curl --fail-with-body https://delegateops.business/padang/api/v1/health
+```
+
+Before those production commands, provision the production Podman secrets with
+the interactive secret script, verify the production Backblaze key is limited
+to bucket `bridge-ph` and prefix `padang/`, and complete the required isolated
+backup restore test. Production must not receive demo seed or reset Quadlets.
