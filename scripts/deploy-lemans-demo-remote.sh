@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_ROOT="/home/jk/bridge-ph/lemans-demo"
-QUADLET_DIR="/home/jk/.config/containers/systemd/bridge-ph/lemans-demo"
+APP_ROOT="/home/jk/bridge-ph/padang-demo"
+QUADLET_DIR="/home/jk/.config/containers/systemd/bridge-ph/padang-demo"
 SOURCE_ROOT="$APP_ROOT/source"
 BUILD_ROOT="$APP_ROOT/build"
 FRONTEND_BUILD="$BUILD_ROOT/frontend"
@@ -31,8 +31,8 @@ log() { printf 'lemans-demo-remote: %s\n' "$*"; }
 
 [[ "$MODE" == --apply || "$MODE" == --dry-run ]] || die "use --apply or --dry-run"
 [[ "$(id -un)" == jk ]] || die "this script must run as user jk"
-[[ "$APP_ROOT" == /home/jk/bridge-ph/lemans-demo ]] || die "demo root guard failed"
-[[ "$QUADLET_DIR" == /home/jk/.config/containers/systemd/bridge-ph/lemans-demo ]] || die "Quadlet directory guard failed"
+[[ "$APP_ROOT" == /home/jk/bridge-ph/padang-demo ]] || die "demo root guard failed"
+[[ "$QUADLET_DIR" == /home/jk/.config/containers/systemd/bridge-ph/padang-demo ]] || die "Quadlet directory guard failed"
 
 for command_name in podman systemctl awk sed grep find install cmp; do
   command -v "$command_name" >/dev/null 2>&1 || die "$command_name is required"
@@ -347,11 +347,10 @@ install_caddy_route() {
   local caddy_network_changed=0
   local caddyfile_changed=0
   local api_block app_block block_file tmp_file
-  local caddy_tmp quadlet_tmp caddy_tmp_name
+  local caddy_tmp quadlet_tmp caddy_stage_dir
 
   caddy_tmp="$CADDYFILE.tmp.$$"
   quadlet_tmp="$CADDY_QUADLET.tmp.$$"
-  caddy_tmp_name="${caddy_tmp##*/}"
   cp -p "$CADDYFILE" "$caddy_tmp"
   cp -p "$CADDY_QUADLET" "$quadlet_tmp"
 
@@ -444,12 +443,19 @@ EOF
     die "could not verify Le Mans app route"
   }
 
-  podman run --rm -v "$CADDY_CONF_DIR:/etc/caddy:ro,Z" docker.io/library/caddy:alpine \
-    sh -ec 'caddy fmt --overwrite "$1" && caddy validate --config "$1" --adapter caddyfile' \
-    sh "/etc/caddy/$caddy_tmp_name" || {
+  caddy_stage_dir=$(mktemp -d)
+  cp -p "$caddy_tmp" "$caddy_stage_dir/Caddyfile"
+  if ! podman run --rm \
+    -v "$caddy_stage_dir:/stage:Z" \
+    -v "$CADDY_CONF_DIR:/etc/caddy:ro,Z" \
+    docker.io/library/caddy:alpine \
+    sh -ec 'caddy fmt --overwrite /stage/Caddyfile && caddy validate --config /stage/Caddyfile --adapter caddyfile'; then
+    rm -rf "$caddy_stage_dir"
     rm -f "$caddy_tmp" "$quadlet_tmp"
     die "staged Caddyfile formatting or validation failed"
-  }
+  fi
+  cp -p "$caddy_stage_dir/Caddyfile" "$caddy_tmp"
+  rm -rf "$caddy_stage_dir"
   if ! cmp -s "$caddy_tmp" "$CADDYFILE"; then
     changed=1
     caddyfile_changed=1

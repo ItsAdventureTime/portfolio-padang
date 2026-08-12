@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly REMOTE_ROOT="/home/jk/bridge-ph/lemans-demo"
+readonly REMOTE_ROOT="/home/jk/bridge-ph/padang-demo"
 readonly REMOTE_SOURCE="${REMOTE_ROOT}/source"
 readonly REMOTE_SCRIPT="${REMOTE_SOURCE}/scripts/deploy-lemans-demo-remote.sh"
 
@@ -21,7 +21,7 @@ Usage: deploy-lemans-demo.sh --host HOST [--user USER] [--port PORT]
 
 Options may also be supplied as VPS_HOST, VPS_USER, and VPS_PORT.
 REMOTE_HOST, REMOTE_USER, and SSH_PORT remain accepted for compatibility.
-The repository is synchronized to /home/jk/bridge-ph/lemans-demo/source,
+The repository is synchronized to /home/jk/bridge-ph/padang-demo/source,
 then the source-side remote deployment script is invoked.
 USAGE
 }
@@ -141,6 +141,7 @@ credential_file=$(find_credential_file)
 
 readonly SSH_TARGET="${VPS_USER}@${VPS_HOST}"
 SSH=(ssh -p "$VPS_PORT" -- "$SSH_TARGET")
+REMOTE_SSH=(ssh -tt -p "$VPS_PORT" -- "$SSH_TARGET")
 RSYNC=(
   rsync
   --archive
@@ -188,6 +189,6 @@ printf 'Synchronizing repository to %s:%s/ ...\n' "$SSH_TARGET" \
   "${SSH_TARGET}:${REMOTE_SOURCE}/"
 
 printf 'Invoking VPS-side deployment (%s) ...\n' "$DEPLOY_MODE"
-"${SSH[@]}" "bash -- '$REMOTE_SCRIPT' '$DEPLOY_MODE'"
+"${REMOTE_SSH[@]}" "bash -- '$REMOTE_SCRIPT' '$DEPLOY_MODE'"
 
 printf 'Le Mans demo deployment command completed.\n'

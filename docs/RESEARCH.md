@@ -77,7 +77,7 @@ Primary C1 references:
 - [Podman auto-update](https://docs.podman.io/en/v5.5.0/markdown/podman-auto-update.1.html)
 - [Resend Go SDK](https://resend.com/docs/send-with-go)
 
-### Le Mans Deployment Refresh: Current Maintainer Guidance (2026-08-13)
+### Padang Demo Deployment Refresh: Current Maintainer Guidance (2026-08-13)
 
 - Rootless Quadlet files belong under the user's `.config/containers/systemd`
   search path; `.network` references are translated by the generator into
@@ -86,7 +86,9 @@ Primary C1 references:
   `caddy reload`; the deployment script runs these in disposable Caddy
   containers and replaces the live file only after validation.
 - Backblaze S3-compatible application keys should be scoped to the required
-  bucket and prefix. The Le Mans demo uses `bridge-ph` + `lemans/demo/` and
+  bucket and prefix. The Padang filesystem deployment uses the isolated
+  `padang-demo` state root, while its supplied external route remains
+  `/lemans/demo/`; it uses `bridge-ph` + `lemans/demo/` and
   requires only read/write/delete file capabilities for its presigned-object
   operations.
 

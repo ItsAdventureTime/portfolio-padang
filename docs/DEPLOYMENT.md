@@ -546,7 +546,7 @@ scripts/deploy-lemans-demo.sh --host VPS_HOST
 
 The macOS side performs no compilation, package installation, or application
 execution. It uses `rsync` to upload the source tree to
-`/home/jk/bridge-ph/lemans-demo/source/`, excluding Git metadata, dependency
+`/home/jk/bridge-ph/padang-demo/source/`, excluding Git metadata, dependency
 directories, build output, `.env` files, and credential-looking files, then
 hands control to `scripts/deploy-lemans-demo-remote.sh` on the VPS.
 
@@ -555,10 +555,11 @@ The remote script:
 - validates rootless Podman, cgroup v2, and the user systemd bus;
 - automatically generates a random database username, persists only that
   non-secret username at
-  `/home/jk/bridge-ph/lemans-demo/config/db-user`, and generates the database
+  `/home/jk/bridge-ph/padang-demo/config/db-user`, and generates the database
   password inside a disposable Alpine container directly into a Podman secret;
 - prompts interactively only for the Backblaze B2 S3 key ID and application key
-  through `scripts/secrets-setup.sh lemans-demo`; the database credentials are
+  through `scripts/secrets-setup.sh lemans-demo`. The macOS wrapper allocates a
+  remote TTY for this prompt; the database credentials are
   never requested from the operator;
 - expects a least-privilege Backblaze application key restricted to bucket
   `bridge-ph`, prefix `lemans/demo/`, and the required `readFiles`, `writeFiles`,
@@ -567,8 +568,10 @@ The remote script:
 - runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
   with `NEXT_PUBLIC_BASE_PATH=/lemans/demo`;
 - installs runtime Quadlets in
-  `/home/jk/.config/containers/systemd/bridge-ph/lemans-demo/` and persistent
-  state in `/home/jk/bridge-ph/lemans-demo/`. These `lemans-demo-*` names are
+  `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
+  state in `/home/jk/bridge-ph/padang-demo/`. These `lemans-demo-*` runtime names are
+  retained because the supplied Caddy route already targets those container
+  names; the filesystem deployment slug is now `padang-demo`. They are
   intentionally separate from the canonical `bridge-ph-padang-demo-*`
   environment and `/padang/demo` route;
 - runs migrations, performs the guarded synthetic demo seed, and starts the
@@ -596,7 +599,14 @@ or host compiler is required. `--dry-run` uploads and compiles the source and
 may create or replace only the remote build directory and its artifacts. It
 does not create secrets, create Quadlets, change runtime data, or change Caddy.
 An apply run records resolved image references in
-`/home/jk/bridge-ph/lemans-demo/config/image-digests.txt`.
+`/home/jk/bridge-ph/padang-demo/config/image-digests.txt`.
+
+`padang-bridge-ph:demo` is the requested demo release/channel identity. The
+current stack deliberately keeps the Go API and Next.js server as separate
+runtime artifacts, because the frontend is compiled with the `/lemans/demo`
+`basePath`; the identity does not collapse those components into one image or
+introduce a persistent build image. All compilation still happens on the VPS
+inside disposable `podman run --rm` build containers.
 
 The first deployment requires an existing `/home/jk/caddy/conf/Caddyfile` and
 `/home/jk/.config/containers/systemd/caddy/caddy.container`. The remote script

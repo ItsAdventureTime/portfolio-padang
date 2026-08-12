@@ -300,8 +300,8 @@ an undocumented placeholder table.
   compilation, tests, package installation, and runtime startup occur on the
   VPS in disposable `podman run --rm` containers.
 - Le Mans Quadlets install under
-  `/home/jk/.config/containers/systemd/bridge-ph/lemans-demo/`; persistent
-  state installs under `/home/jk/bridge-ph/lemans-demo/`.
+  `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/`; persistent
+  state installs under `/home/jk/bridge-ph/padang-demo/`.
 - The VPS generates and persists the database username in
   `config/db-user`, generates the database password directly into a Podman
   secret, and prompts interactively only for the two Backblaze B2 values.
