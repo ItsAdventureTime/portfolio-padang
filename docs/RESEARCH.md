@@ -87,8 +87,8 @@ Primary C1 references:
   containers and replaces the live file only after validation.
 - Backblaze S3-compatible application keys should be scoped to the required
   bucket and prefix. The Padang filesystem deployment uses the isolated
-  `padang-demo` state root, while its supplied external route remains
-  `/lemans/demo/`; it uses `bridge-ph` + `lemans/demo/` and
+  `padang-demo` state root and the official `/padang/demo/` route; it uses
+  `bridge-ph` + `padang/demo/` and
   requires only read/write/delete file capabilities for its presigned-object
   operations.
 

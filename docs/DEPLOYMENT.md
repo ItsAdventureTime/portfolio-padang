@@ -418,7 +418,7 @@ import /etc/caddy/padang-production.handlers.Caddyfile
 
 The canonical Padang routes above use imported handler files. The separate Le
 Mans demo deployment does not modify those Padang handler imports: its remote
-deployment script manages a small inline Le Mans route block in the supplied
+deployment script manages a small inline Padang demo route block in the supplied
 main Caddyfile, validates the assembled Caddyfile, and preserves timestamped
 backups before changing it.
 
@@ -534,10 +534,10 @@ systemctl --user is-enabled podman-auto-update.timer
 
 Updates are manual only. See update procedure above.
 
-## Automated Le Mans Demo Deployment
+## Automated Padang Demo Deployment
 
-The repository includes a two-stage deployment flow for the separate demo
-route requested at `/lemans/demo/`:
+The repository includes a two-stage deployment flow for the Padang demo route
+at `/padang/demo/`:
 
 ```bash
 # macOS, from the repository root
@@ -558,25 +558,23 @@ The remote script:
   `/home/jk/bridge-ph/padang-demo/config/db-user`, and generates the database
   password inside a disposable Alpine container directly into a Podman secret;
 - prompts interactively only for the Backblaze B2 S3 key ID and application key
-  through `scripts/secrets-setup.sh lemans-demo`. The macOS wrapper allocates a
+  through `scripts/secrets-setup.sh padang-demo`. The macOS wrapper allocates a
   remote TTY for this prompt; the database credentials are
   never requested from the operator;
 - expects a least-privilege Backblaze application key restricted to bucket
-  `bridge-ph`, prefix `lemans/demo/`, and the required `readFiles`, `writeFiles`,
+  `bridge-ph`, prefix `padang/demo/`, and the required `readFiles`, `writeFiles`,
   and `deleteFiles` capabilities. Never use the Backblaze master key;
 - runs Go tests/vet/compilation in `podman run --rm golang:alpine`;
 - runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
-  with `NEXT_PUBLIC_BASE_PATH=/lemans/demo`;
+  with `NEXT_PUBLIC_BASE_PATH=/padang/demo`;
 - installs runtime Quadlets in
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
-  state in `/home/jk/bridge-ph/padang-demo/`. These `lemans-demo-*` runtime names are
-  retained because the supplied Caddy route already targets those container
-  names; the filesystem deployment slug is now `padang-demo`. They are
-  intentionally separate from the canonical `bridge-ph-padang-demo-*`
-  environment and `/padang/demo` route;
+  state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
+  and container names use the `padang-demo` deployment identity and remain
+  separate from production;
 - runs migrations, performs the guarded synthetic demo seed, and starts the
   30-minute reset timer; and
-- makes only the required Caddy network and `/lemans/demo/api/*` route changes,
+- makes only the required Caddy network and `/padang/demo/api/*` route changes,
   stages the Caddyfile, formats it with `caddy fmt --overwrite`, validates it
   with `caddy validate`, then atomically replaces it after a timestamped backup;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
@@ -585,12 +583,13 @@ The remote script:
   PostgreSQL process that is still starting.
 
 Caddy reaches the app and API through the dedicated
-`bridge-ph-lemans-demo-proxy` network. The API also joins the private
-`bridge-ph-lemans-demo` network so it can reach PostgreSQL; PostgreSQL and the
+`bridge-ph-padang-demo-proxy` network. The API also joins the private
+`bridge-ph-padang-demo` network so it can reach PostgreSQL; PostgreSQL and the
 reset container never join any Caddy-facing network. The API route is required
-because the browser calls the same-origin `/lemans/demo/api/*` path, while the
-existing supplied Caddy route otherwise forwards all `/lemans/demo/*` traffic
-to the Next.js app.
+because the browser calls the same-origin `/padang/demo/api/*` path, while the
+existing supplied Caddy route may still contain the legacy `/lemans/demo/*`
+block. The deployment script removes that managed legacy block and installs
+the authoritative `/padang/demo/*` route.
 
 Runtime Quadlets use floating official `postgres:alpine`, `node:lts-alpine`,
 `alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts
@@ -603,7 +602,7 @@ An apply run records resolved image references in
 
 `padang-bridge-ph:demo` is the requested demo release/channel identity. The
 current stack deliberately keeps the Go API and Next.js server as separate
-runtime artifacts, because the frontend is compiled with the `/lemans/demo`
+runtime artifacts, because the frontend is compiled with the `/padang/demo`
 `basePath`; the identity does not collapse those components into one image or
 introduce a persistent build image. All compilation still happens on the VPS
 inside disposable `podman run --rm` build containers.

@@ -21,8 +21,9 @@ Usage: deploy-lemans-demo.sh --host HOST [--user USER] [--port PORT]
 
 Options may also be supplied as VPS_HOST, VPS_USER, and VPS_PORT.
 REMOTE_HOST, REMOTE_USER, and SSH_PORT remain accepted for compatibility.
-The repository is synchronized to /home/jk/bridge-ph/padang-demo/source,
-then the source-side remote deployment script is invoked.
+The Padang demo repository is synchronized to /home/jk/bridge-ph/padang-demo/source,
+then the source-side remote deployment script is invoked. The official URL is
+https://delegateops.business/padang/demo/.
 USAGE
 }
 
@@ -191,4 +192,4 @@ printf 'Synchronizing repository to %s:%s/ ...\n' "$SSH_TARGET" \
 printf 'Invoking VPS-side deployment (%s) ...\n' "$DEPLOY_MODE"
 "${REMOTE_SSH[@]}" "bash -- '$REMOTE_SCRIPT' '$DEPLOY_MODE'"
 
-printf 'Le Mans demo deployment command completed.\n'
+printf 'Padang demo deployment command completed.\n'

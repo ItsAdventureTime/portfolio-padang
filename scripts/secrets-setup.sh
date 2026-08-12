@@ -64,11 +64,17 @@ generate_jwt_secrets() {
 
 environment=${1:-production}
 case "$environment" in
+  padang-demo|padang)
+    prefix=bridge-ph-padang-demo
+    generate_secret "$prefix-db-password"
+    prompt_secret "$prefix-b2-key-id" "Padang demo Backblaze B2 key ID"
+    prompt_secret "$prefix-b2-application-key" "Padang demo Backblaze B2 application key"
+    ;;
   lemans-demo|lemans)
     prefix=bridge-ph-lemans-demo
     generate_secret "$prefix-db-password"
-    prompt_secret "$prefix-b2-key-id" "Le Mans demo Backblaze B2 key ID"
-    prompt_secret "$prefix-b2-application-key" "Le Mans demo Backblaze B2 application key"
+    prompt_secret "$prefix-b2-key-id" "Legacy Le Mans demo Backblaze B2 key ID"
+    prompt_secret "$prefix-b2-application-key" "Legacy Le Mans demo Backblaze B2 application key"
     ;;
   demo)
     prefix=bridge-ph-padang-demo
@@ -85,5 +91,5 @@ case "$environment" in
     prompt_secret "$prefix-backup-encryption-key" "Backup encryption passphrase"
     generate_jwt_secrets "$prefix-jwt-private-key" "$prefix-jwt-public-key"
     ;;
-  *) echo "usage: $0 lemans-demo|demo|production" >&2; exit 2 ;;
+  *) echo "usage: $0 padang-demo|lemans-demo|demo|production" >&2; exit 2 ;;
 esac

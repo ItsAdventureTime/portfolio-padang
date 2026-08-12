@@ -294,18 +294,19 @@ an undocumented placeholder table.
   Antigravity for independent A2 review. Production backup upload/restore and
   Caddy changes remain C2/C4 deployment activities and were not performed.
 
-## Automated Le Mans Demo Deployment Workflow
+## Automated Padang Demo Deployment Workflow
 
 - macOS performs only the synchronized-source upload and remote handoff;
   compilation, tests, package installation, and runtime startup occur on the
   VPS in disposable `podman run --rm` containers.
-- Le Mans Quadlets install under
+- Padang demo Quadlets install under
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/`; persistent
   state installs under `/home/jk/bridge-ph/padang-demo/`.
 - The VPS generates and persists the database username in
   `config/db-user`, generates the database password directly into a Podman
   secret, and prompts interactively only for the two Backblaze B2 values.
-- Caddy uses `/home/jk/caddy/conf/Caddyfile` and
+- Caddy uses the official `/padang/demo` route with
+  `/home/jk/caddy/conf/Caddyfile` and
   `/home/jk/.config/containers/systemd/caddy/caddy.container`; the staged
   Caddyfile is formatted and validated in disposable Caddy containers before
   replacement and graceful reload.
