@@ -219,6 +219,11 @@ Application
 - Demo object-key prefix: `padang/demo/`
 - Production object-key prefix: `padang/`
 
+`B2_PREFIX` is resolved independently inside each environment’s container.
+The demo API receives `padang/demo/`; the production API receives `padang/`.
+These values must not coexist as duplicate assignments in one environment
+file. B2 prefixes are virtual folders within the flat `bridge-ph` bucket.
+
 **Object key structure:**
 ```
 {env-prefix}/{module}/{entity-id}/{timestamp}-{original-filename}

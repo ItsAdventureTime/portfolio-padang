@@ -40,6 +40,27 @@ not replace the separate API and Next.js runtime images: the frontend remains
 compiled with its environment-specific Next.js `basePath`, so the approved
 architecture promotes separately validated component artifacts.
 
+### Backblaze environment scoping
+
+`B2_BUCKET` and `B2_PREFIX` are container-local environment variables. Never
+put both prefix assignments in the same environment file or Quadlet:
+
+```text
+# Demo API container only
+B2_BUCKET=bridge-ph
+B2_PREFIX=padang/demo/
+
+# Production API container only
+B2_BUCKET=bridge-ph
+B2_PREFIX=padang/
+```
+
+The assignments do not overlap because demo and production are separate
+containers with separate Podman networks, databases, secrets, and data roots.
+Backblaze B2 uses a flat object store; these are object-key prefixes (virtual
+folders), not separate buckets. App keys must be restricted to the matching
+bucket and prefix.
+
 ---
 
 ## Container Architecture

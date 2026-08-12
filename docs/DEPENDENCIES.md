@@ -120,6 +120,10 @@ runtime, or deployment is part of this system.
 | Endpoint | `s3.us-west-001.backblazeb2.com` |
 | Key name | `bridge-ph-key` |
 | Key permissions | Read + Write on `padang/` object-key prefix |
+
+The demo and production API containers each set their own `B2_PREFIX`; these
+are not combined into one environment file. Both use the `bridge-ph` bucket,
+with demo restricted to `padang/demo/` and production restricted to `padang/`.
 | S3 API compatibility | B2 S3-compatible API |
 
 ---
