@@ -1,0 +1,23 @@
+[Unit]
+Description=Padang ERP Production Next.js Frontend
+After=bridge-ph-padang-api.service
+
+[Container]
+Image=ghcr.io/itsadventuretime/padang-erp-frontend:latest
+ContainerName=bridge-ph-padang-frontend
+Network=bridge-ph-padang-proxy.network
+Environment=NODE_ENV=production
+Environment=NEXT_PUBLIC_BASE_PATH=/padang
+Environment=NEXT_PUBLIC_APP_ENV=production
+Environment=API_INTERNAL_URL=http://bridge-ph-padang-api:8080
+HealthCmd=wget -q -O- http://localhost:3000/padang || exit 1
+HealthInterval=20s
+HealthTimeout=10s
+HealthRetries=3
+AutoUpdate=registry
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

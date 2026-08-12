@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: Padang ERP Lite API
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /api/v1/health:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: Health response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/auth/request-otp:
+    post:
+      operationId: requestOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '202': { description: OTP request accepted }
+        '429': { description: Rate limited }
+  /api/v1/auth/verify-otp:
+    post:
+      operationId: verifyOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+      responses:
+        '200': { description: Authenticated }
+        '401': { description: Invalid OTP }
+  /api/v1/auth/refresh:
+    post:
+      operationId: refresh
+      responses:
+        '200': { description: Refreshed }
+        '401': { description: Invalid refresh token }
+  /api/v1/dashboard/summary:
+    get:
+      operationId: dashboardSummary
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Dashboard summary }
+        '401': { description: Authentication required }
+  /api/v1/projects:
+    get:
+      operationId: listProjects
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Project list }
+    post:
+      operationId: createProject
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Project created }
+        '400': { description: Invalid project }
+  /api/v1/projects/{id}:
+    get:
+      operationId: getProject
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Project detail }
+        '404': { description: Project not found }
+    put:
+      operationId: updateProject
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Project updated }
+  /api/v1/fabrication:
+    get:
+      operationId: listFabricationJobs
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Fabrication job list }
+    post:
+      operationId: createFabricationJob
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Fabrication job created }
+  /api/v1/fabrication/{id}/status:
+    patch:
+      operationId: updateFabricationStatus
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Fabrication status updated }
+  /api/v1/procurement/purchase-requests:
+    get:
+      operationId: listPurchaseRequests
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Purchase request list }
+    post:
+      operationId: createPurchaseRequest
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Purchase request created }
+  /api/v1/procurement/purchase-orders:
+    get:
+      operationId: listPurchaseOrders
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Purchase order list }
+  /api/v1/procurement/fund-requests:
+    get:
+      operationId: listFundRequests
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Fund request list }
+    post:
+      operationId: createFundRequest
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Fund request created }
+  /api/v1/inventory/items:
+    get:
+      operationId: listInventoryItems
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Inventory item list }
+    post:
+      operationId: createInventoryItem
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Inventory item created }
+  /api/v1/inventory/stock-in:
+    post:
+      operationId: stockIn
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Stock received }
+  /api/v1/inventory/stock-out:
+    post:
+      operationId: stockOut
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Stock issued }
+  /api/v1/billing/progress:
+    get:
+      operationId: listProgressBillings
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Progress billing list }
+    post:
+      operationId: createProgressBilling
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Progress billing created }
+  /api/v1/finance/reimbursements:
+    get:
+      operationId: listReimbursements
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Reimbursement list }
+  /api/v1/finance/liquidations:
+    get:
+      operationId: listLiquidations
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Liquidation list }
+  /api/v1/attachments/presign:
+    post:
+      operationId: presignAttachment
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: B2 upload URL }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, environment]
+      properties:
+        status: { type: string }
+        environment: { type: string, enum: [demo, production] }
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    VerifyOTPRequest:
+      type: object
+      required: [challenge_id, code]
+      properties:
+        challenge_id: { type: string, format: uuid }
+        code: { type: string, pattern: '^[0-9]{6}$' }

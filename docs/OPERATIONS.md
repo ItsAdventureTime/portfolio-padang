@@ -146,8 +146,14 @@ See `scripts/secrets-setup.sh` for interactive management.
 podman secret ls
 
 # Rotate a secret (interactive — script handles this safely)
-bash ~/padang-erp/scripts/secrets-setup.sh
+bash /home/jk/bridge-ph/lemans-demo/source/scripts/secrets-setup.sh lemans-demo
 ```
+
+For the Le Mans demo, the database username is generated and persisted at
+`/home/jk/bridge-ph/lemans-demo/config/db-user`; the database password is
+generated directly into the Podman secret. The script prompts only for the
+Backblaze B2 key ID and application key. Use a bucket- and prefix-restricted
+application key for `bridge-ph` and `lemans/demo/`.
 
 ---
 

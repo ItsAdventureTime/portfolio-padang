@@ -27,7 +27,7 @@ No passwords. Users authenticate by entering their registered email address and 
 **OTP Security Controls:**
 - Code: 6 digits; cryptographically random (crypto/rand); bcrypt hash stored (not plaintext)
 - TTL: 10 minutes from generation
-- Single-use: deleted immediately on first successful verification
+- Single-use: marked used immediately on first successful verification
 - Rate limiting: 3 OTP requests per email per 15 minutes; 5 verify attempts per OTP before auto-invalidation
 - Account enumeration prevention: identical response for unknown vs known email ("if your email is registered, a code has been sent")
 - Email delivery: Resend with proper SPF/DKIM/DMARC records (avoids spam classification)
@@ -45,7 +45,8 @@ No passwords. Users authenticate by entering their registered email address and 
 - Refresh token: stored server-side as bcrypt hash in `refresh_tokens` table
 - Access token: stored in memory only (never localStorage, never sessionStorage)
 - Refresh token delivery: HttpOnly, Secure, SameSite=Strict cookie (production)
-- Token revocation: refresh token revoked on logout; all tokens invalidated on OTP re-verification
+- Token revocation: refresh token revoked on logout; explicit security reset
+  revokes active refresh tokens
 
 ### Demo Mode
 - No authentication enforced
@@ -59,8 +60,8 @@ No passwords. Users authenticate by entering their registered email address and 
 ### Rate Limiting (OTP-specific)
 - `/auth/request-otp`: 3 requests per email per 15 minutes per IP
 - `/auth/verify-otp`: 5 failed attempts per OTP before the code is auto-invalidated; 10 attempts/min per IP
-- Lockout notification: email to registered address after 5 consecutive failed verifications
-- All rate-limit events logged in `audit_log`
+- OTP lockout notifications and rate-limit audit events are production-hardening
+  follow-ups; failed attempts are bounded and persisted in the OTP record.
 
 ---
 
@@ -107,15 +108,15 @@ projects).
 | Podman Secret Name | Content | Shared Between |
 |---|---|---|
 | `bridge-ph-padang-demo-db-password` | Demo PostgreSQL app user password | API container (demo) |
-| `bridge-ph-padang-demo-jwt-private-key` | RS256 private key (demo) | API container (demo) |
-| `bridge-ph-padang-demo-resend-key` | Resend API key (demo) | API container (demo) |
 | `bridge-ph-padang-demo-b2-key-id` | B2 application key ID (demo) | API container (demo) |
-| `bridge-ph-padang-demo-b2-app-key` | B2 application key secret (demo) | API container (demo) |
+| `bridge-ph-padang-demo-b2-application-key` | B2 application key secret (demo) | API container (demo) |
 | `bridge-ph-padang-prod-db-password` | Prod PostgreSQL app user password | API container (prod) |
 | `bridge-ph-padang-prod-jwt-private-key` | RS256 private key (prod) | API container (prod) |
-| `bridge-ph-padang-prod-resend-key` | Resend API key (prod) | API container (prod) |
+| `bridge-ph-padang-prod-jwt-public-key` | RS256 public key (prod) | API container (prod) |
+| `bridge-ph-padang-prod-resend-api-key` | Resend API key (prod) | API container (prod) |
 | `bridge-ph-padang-prod-b2-key-id` | B2 application key ID | API container, backup container (prod) |
-| `bridge-ph-padang-prod-b2-app-key` | B2 application key secret | API container, backup container (prod) |
+| `bridge-ph-padang-prod-b2-application-key` | B2 application key secret | API container, backup container (prod) |
+| `bridge-ph-padang-prod-backup-encryption-key` | Backup encryption passphrase | Backup container (prod) |
 
 The backup utility image also receives these Backblaze application-key secrets
 as mounted files. It creates only an ephemeral rclone configuration under
@@ -123,10 +124,12 @@ as mounted files. It creates only an ephemeral rclone configuration under
 persisted or logged.
 
 ### Generation
-- Database passwords: `openssl rand -base64 32`
-- JWT private key: `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096`
-- All piped directly into `podman secret create ... -`
-- No intermediate file; no shell history exposure
+- Human-provided values are entered through the no-echo interactive script.
+- JWT keys are generated with OpenSSL in a mode-0700 temporary directory, then
+  imported into Podman secrets; values are never printed.
+- Generated internal credentials should be piped directly to
+  `podman secret create ... -` when automation is required.
+- No `.env` files, secret values in repository files, or shell-history values.
 
 See `scripts/secrets-setup.sh` for the interactive management script.
 
@@ -134,10 +137,12 @@ See `scripts/secrets-setup.sh` for the interactive management script.
 
 ## Input Validation
 
-- All request bodies validated in handler layer using go-playground/validator v10
+- Request bodies are decoded with unknown-field rejection and explicit handler
+  validation; module-specific schemas are added with each endpoint.
 - SQL: all queries via sqlc (parameterized; no string concatenation)
-- File uploads: MIME type validated server-side (not by Content-Type header alone); file header inspected
-- File size enforced at API layer (50 MB max) before B2 upload
+- File presigning validates the object key, declared content type, and 50 MB
+  maximum size before a B2 URL is issued; upload-content inspection remains a
+  required follow-up before production file workflows.
 - Amounts: validated as non-negative where required; precision enforced
 - UUIDs: validated format before any database lookup
 - Enum fields: validated against allowed value sets
@@ -202,8 +207,9 @@ never derived from a client-supplied role.
 ## Rate Limiting
 
 See `docs/API.md` for rate limit values.
-Implemented in Go middleware using token bucket algorithm.
-Per-IP for auth endpoints; per-user for all others.
+Implemented in Go middleware using a process-local sliding window for OTP
+request/verify and refresh endpoints. Application-wide per-user throttling is
+still a production-readiness follow-up.
 
 ---
 

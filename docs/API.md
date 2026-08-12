@@ -5,7 +5,7 @@
 - **Base URL:** `https://delegateops.business/padang/api/v1/` (production)
 - **Base URL:** `https://delegateops.business/padang/demo/api/v1/` (demo)
 - **Format:** JSON (Content-Type: application/json)
-- **Auth:** Production uses `Authorization: Bearer <access-token>`; demo has no authentication.
+- **Auth:** Production protected endpoints use `Authorization: Bearer <access-token>`; demo has no authentication.
 - **Spec:** OpenAPI 3.1 at `/api/v1/openapi.json`
 - **Versioning:** URL path (`/v1/`); breaking changes increment version
 
@@ -310,7 +310,7 @@ reference metadata used by billing and collection workflows.
 | `/auth/request-otp` | 3 req per email per 15 min; 10 req/min per IP |
 | `/auth/verify-otp`  | 5 failed attempts per OTP before code invalidated; 10 req/min per IP |
 | `/auth/refresh`     | 20 req/min per IP |
-| All other endpoints | 300 req/min per user |
+| All other endpoints | No global limiter in C1; add before multi-replica production |
 
 ---
 

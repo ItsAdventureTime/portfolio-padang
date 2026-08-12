@@ -3,14 +3,14 @@
 ---
 
 CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
-CURRENT PHASE: Planning clarification addendum — documentation only
-STATUS: Documentation updated from owner answers; implementation remains paused
-until an explicit `GO: CODEX C1` instruction.
-BRANCH: docs/phase-0
-BASE COMMIT: (initial commit)
-LATEST COMMIT: See git log — latest includes Phase A1 specification package
+CURRENT PHASE: C1 — implementation and containerized validation
+STATUS: `GO: CODEX C1` received. Foundation implementation and containerized
+validation are complete; demo/production deployment is not authorized in C1.
+BRANCH: feat/c1-foundation
+BASE COMMIT: bbdd803
+LATEST COMMIT: pending C1 implementation commit
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Will be synchronized after this documentation commit
+REMOTE PUSH STATUS: Push after final diff and credential review
 
 ---
 
@@ -25,8 +25,8 @@ planning and supersede older contradictory wording in this document.
    - Backend: latest supported Go release (`golang:alpine`) + Chi. sqlc + pgx for type-safe database queries. golang-migrate for SQL migrations.
    - Frontend: latest supported Next.js App Router release + TypeScript + Tailwind CSS + shadcn/ui + TanStack Query/Table, built with the official floating `node:lts-alpine` image.
    - RDBMS: latest supported PostgreSQL release via floating `postgres:alpine`.
-   - File Storage: Backblaze B2 (`bridge-ph` bucket, prefix `padang/demo/` for demo, `padang/` for prod). Shared keys stored in separate Podman secrets per environment (`bridge-ph-padang-{env}-b2-key-id`, `bridge-ph-padang-{env}-b2-app-key`).
-   - Email: Resend Go SDK with swappable adapter pattern (`EMAIL_PROVIDER=resend`).
+   - File Storage: Backblaze B2 (`bridge-ph` bucket, prefix `padang/demo/` for demo, `padang/` for prod). Shared keys stored in separate Podman secrets per environment (`bridge-ph-padang-{env}-b2-key-id`, `bridge-ph-padang-{env}-b2-application-key`).
+   - Email: Resend Go SDK with swappable adapter pattern (`EMAIL_PROVIDER=resend`) in production; demo uses the log adapter and does not send email.
    - Auth: Production uses passwordless Email OTP (6-digit, 10-min TTL, bcrypt hash in DB, rate-limited) + RS256 JWT (15-min access, 7-day rotating refresh cookie). Demo has no authentication and uses a guarded synthetic identity with validated header-based role switching (`X-Demo-Role`).
 3. **Philippine Regulatory Compliance**:
    - VAT: 12% on gross billings.
@@ -270,8 +270,45 @@ an undocumented placeholder table.
 ## Authorization & Handoff State
 
 - **Phase A1 Status:** COMPLETE, with planning clarification addendum applied.
-- **Current instruction:** Documentation-only planning work is complete for
-  this pass. Do not implement application code, execute runtime/build/test
-  commands, or deploy until the owner sends **GO: CODEX C1**. The documentation
-  commit and GitHub synchronization for this clarification pass are permitted.
-  After **GO: CODEX C1**, follow the full containerized implementation protocol.
+- **Current instruction:** **GO: CODEX C1** is active. Implement sequentially,
+  validate runtime/build/test work only in disposable Podman containers, and do
+  not deploy to the VPS during C1. Update this handoff with exact results before
+  committing and pushing the feature branch.
+
+## C1 Implementation and Validation Log
+
+- Branch: `feat/c1-foundation`; base: `bbdd803`.
+- Database: foundation migration up/down and `sqlc generate` validated in
+  disposable containers; seed/reset restored the exact `10|3|2` baseline for
+  users/projects/progress billings after create/update/delete changes.
+- Backend: `go test ./...`, `go vet ./...`, and the API Containerfile build pass.
+  Demo health, guarded dashboard access, security headers, and disabled auth
+  smoke checks pass in a disposable container.
+- Frontend: npm lockfile install, typecheck, lint, demo build
+  (`/padang/demo`), production build (`/padang`), and demo standalone runtime
+  smoke check pass in disposable Node containers.
+- Operations: backup utility image build and production fail-closed guard pass;
+  reset/backup/secrets shell syntax passes; Quadlet dry-run generation passes
+  on the Podman Linux machine. No VPS deployment performed.
+- Remaining release work: push this branch, then hand the implementation to
+  Antigravity for independent A2 review. Production backup upload/restore and
+  Caddy changes remain C2/C4 deployment activities and were not performed.
+
+## Automated Le Mans Demo Deployment Workflow
+
+- macOS performs only the synchronized-source upload and remote handoff;
+  compilation, tests, package installation, and runtime startup occur on the
+  VPS in disposable `podman run --rm` containers.
+- Le Mans Quadlets install under
+  `/home/jk/.config/containers/systemd/bridge-ph/lemans-demo/`; persistent
+  state installs under `/home/jk/bridge-ph/lemans-demo/`.
+- The VPS generates and persists the database username in
+  `config/db-user`, generates the database password directly into a Podman
+  secret, and prompts interactively only for the two Backblaze B2 values.
+- Caddy uses `/home/jk/caddy/conf/Caddyfile` and
+  `/home/jk/.config/containers/systemd/caddy/caddy.container`; the staged
+  Caddyfile is formatted and validated in disposable Caddy containers before
+  replacement and graceful reload.
+- Current local validation: shell syntax, ShellCheck, Caddy format/validate,
+  and demo/production Quadlet generator checks pass. No VPS deployment was
+  performed.

@@ -1,0 +1,6 @@
+[Unit]
+Description=Padang ERP Demo internal network
+
+[Network]
+NetworkName=bridge-ph-padang-demo
+Internal=true

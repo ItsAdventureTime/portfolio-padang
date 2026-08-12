@@ -1,0 +1,34 @@
+[Unit]
+Description=Padang ERP Demo Go API
+After=bridge-ph-padang-demo-migrate.service
+Requires=bridge-ph-padang-demo-migrate.service
+
+[Container]
+Image=ghcr.io/itsadventuretime/padang-erp-api:demo-latest
+ContainerName=bridge-ph-padang-demo-api
+Network=bridge-ph-padang-demo.network
+Network=bridge-ph-padang-demo-proxy.network
+Environment=APP_ENV=demo
+Environment=RUN_MODE=api
+Environment=DB_HOST=bridge-ph-padang-demo-db
+Environment=DB_PORT=5432
+Environment=DB_NAME=padang_demo
+Environment=DB_USER=padang_demo_user
+Environment=EMAIL_PROVIDER=log
+Environment=B2_ENDPOINT=https://s3.us-west-001.backblazeb2.com
+Environment=B2_BUCKET=bridge-ph
+Environment=B2_PREFIX=padang/demo/
+Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
+Secret=bridge-ph-padang-demo-b2-key-id,type=mount,target=/run/secrets/b2-key-id
+Secret=bridge-ph-padang-demo-b2-application-key,type=mount,target=/run/secrets/b2-application-key
+HealthCmd=wget -q -O- http://localhost:8080/api/v1/health || exit 1
+HealthInterval=15s
+HealthTimeout=5s
+HealthRetries=3
+AutoUpdate=registry
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

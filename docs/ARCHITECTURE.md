@@ -33,11 +33,11 @@ External services (reached from API container via outbound HTTPS):
 | Database driver | pgx | v5 — high-performance native PostgreSQL driver |
 | Query generation | sqlc | Latest — type-safe SQL; compile-time safety; no ORM magic |
 | Migrations | golang-migrate | v4 — CLI + library; up/down migrations; PostgreSQL dialect |
-| Validation | go-playground/validator | v10 — struct-tag validation |
+| Validation | Go standard-library decoding + domain validation | Unknown fields rejected; business rules remain in domain code |
 | Auth | Email OTP (production) / no auth (demo) | 6-digit code in production; 10-min TTL; single-use; rate-limited; demo uses guarded synthetic identity |
 | File upload | S3-compatible Go client | Backblaze B2 S3-compatible API; endpoint is explicitly configured |
 | Email | Resend Go SDK | Adapter pattern; swappable to Azure |
-| OpenAPI | swaggo/swag or huma | Generate OpenAPI 3.1 spec from Go annotations |
+| OpenAPI | Hand-authored OpenAPI 3.1 YAML + JSON endpoint document | Shared source for generated frontend types and API discovery |
 | Config | Env vars via Quadlet `Environment=` | No config files for secrets; see SECURITY.md |
 
 ### Frontend

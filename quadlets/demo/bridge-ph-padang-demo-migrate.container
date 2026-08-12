@@ -1,0 +1,20 @@
+[Unit]
+Description=Padang ERP Demo database migrations
+After=bridge-ph-padang-demo-db.service
+Requires=bridge-ph-padang-demo-db.service
+
+[Container]
+Image=docker.io/migrate/migrate:latest
+ContainerName=bridge-ph-padang-demo-migrate
+Network=bridge-ph-padang-demo.network
+Volume=/home/jk/bridge-ph/padang-demo/migrations:/migrations:ro
+Environment=DB_HOST=bridge-ph-padang-demo-db
+Environment=DB_NAME=padang_demo
+Environment=DB_USER=padang_demo_user
+Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
+Entrypoint=/bin/sh
+Exec=-ec 'export PGPASSWORD="$(cat /run/secrets/db-password)"; exec migrate -path /migrations -database "postgres://padang_demo_user@bridge-ph-padang-demo-db:5432/padang_demo?sslmode=disable" up'
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes

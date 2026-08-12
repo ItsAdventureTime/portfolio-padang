@@ -123,7 +123,7 @@ Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql/data:Z
 
 Environment=POSTGRES_DB=padang_demo
 Environment=POSTGRES_USER=padang_demo_user
-Secret=bridge-ph-padang-demo-db-password,type=env,target=POSTGRES_PASSWORD
+Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 
 HealthCmd=pg_isready -U padang_demo_user -d padang_demo
 HealthInterval=10s
@@ -158,16 +158,14 @@ Environment=DB_HOST=bridge-ph-padang-demo-db
 Environment=DB_PORT=5432
 Environment=DB_NAME=padang_demo
 Environment=DB_USER=padang_demo_user
-Environment=EMAIL_PROVIDER=resend
-Environment=STORAGE_BUCKET=bridge-ph
-Environment=STORAGE_ENDPOINT=https://s3.us-west-001.backblazeb2.com
-Environment=STORAGE_PREFIX=padang/demo/
+Environment=EMAIL_PROVIDER=log
+Environment=B2_BUCKET=bridge-ph
+Environment=B2_ENDPOINT=https://s3.us-west-001.backblazeb2.com
+Environment=B2_PREFIX=padang/demo/
 
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
-Secret=bridge-ph-padang-demo-jwt-private-key,type=mount,target=/run/secrets/jwt-private-key
-Secret=bridge-ph-padang-demo-resend-key,type=mount,target=/run/secrets/resend-key
 Secret=bridge-ph-padang-demo-b2-key-id,type=mount,target=/run/secrets/b2-key-id
-Secret=bridge-ph-padang-demo-b2-app-key,type=mount,target=/run/secrets/b2-app-key
+Secret=bridge-ph-padang-demo-b2-application-key,type=mount,target=/run/secrets/b2-application-key
 
 HealthCmd=wget -q -O- http://localhost:8080/api/v1/health || exit 1
 HealthInterval=15s
@@ -227,7 +225,7 @@ WantedBy=default.target
 Description=Padang ERP Demo - Reset (one-shot)
 
 [Container]
-Image=ghcr.io/itsadventuretime/padang-erp-api:demo-latest
+Image=docker.io/library/postgres:alpine
 ContainerName=bridge-ph-padang-demo-reset
 Network=bridge-ph-padang-demo.network
 
@@ -237,6 +235,10 @@ Environment=DB_HOST=bridge-ph-padang-demo-db
 Environment=DB_NAME=padang_demo
 Environment=DB_USER=padang_demo_user
 Environment=RESET_GUARD=demo-only
+Environment=SEED_FILE=/app/seed/demo_seed.sql
+
+Volume=/home/jk/bridge-ph/padang-demo/seed:/app/seed:ro
+Volume=/home/jk/bridge-ph/padang-demo/scripts:/app/scripts:ro
 
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 
@@ -318,7 +320,7 @@ A new snippet is required.
 
 ### 2. caddy.container — Add Proxy Networks
 
-Add to `/home/jk/.config/containers/systemd/caddy.container` `[Container]` section:
+Add to `/home/jk/.config/containers/systemd/caddy/caddy.container` `[Container]` section:
 
 ```ini
 # Padang ERP proxy networks (add alongside existing pimascor network lines)
@@ -413,6 +415,12 @@ import /etc/caddy/padang-production.handlers.Caddyfile
 
 > **Order:** Both imports must appear BEFORE the `handle { }` static-site fallback block,
 > identical to how `pimascor-production.handlers.Caddyfile` is currently imported.
+
+The canonical Padang routes above use imported handler files. The separate Le
+Mans demo deployment does not modify those Padang handler imports: its remote
+deployment script manages a small inline Le Mans route block in the supplied
+main Caddyfile, validates the assembled Caddyfile, and preserves timestamped
+backups before changing it.
 
 ---
 
@@ -525,3 +533,73 @@ systemctl --user is-enabled podman-auto-update.timer
 ```
 
 Updates are manual only. See update procedure above.
+
+## Automated Le Mans Demo Deployment
+
+The repository includes a two-stage deployment flow for the separate demo
+route requested at `/lemans/demo/`:
+
+```bash
+# macOS, from the repository root
+scripts/deploy-lemans-demo.sh --host VPS_HOST
+```
+
+The macOS side performs no compilation, package installation, or application
+execution. It uses `rsync` to upload the source tree to
+`/home/jk/bridge-ph/lemans-demo/source/`, excluding Git metadata, dependency
+directories, build output, `.env` files, and credential-looking files, then
+hands control to `scripts/deploy-lemans-demo-remote.sh` on the VPS.
+
+The remote script:
+
+- validates rootless Podman, cgroup v2, and the user systemd bus;
+- automatically generates a random database username, persists only that
+  non-secret username at
+  `/home/jk/bridge-ph/lemans-demo/config/db-user`, and generates the database
+  password inside a disposable Alpine container directly into a Podman secret;
+- prompts interactively only for the Backblaze B2 S3 key ID and application key
+  through `scripts/secrets-setup.sh lemans-demo`; the database credentials are
+  never requested from the operator;
+- expects a least-privilege Backblaze application key restricted to bucket
+  `bridge-ph`, prefix `lemans/demo/`, and the required `readFiles`, `writeFiles`,
+  and `deleteFiles` capabilities. Never use the Backblaze master key;
+- runs Go tests/vet/compilation in `podman run --rm golang:alpine`;
+- runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
+  with `NEXT_PUBLIC_BASE_PATH=/lemans/demo`;
+- installs runtime Quadlets in
+  `/home/jk/.config/containers/systemd/bridge-ph/lemans-demo/` and persistent
+  state in `/home/jk/bridge-ph/lemans-demo/`. These `lemans-demo-*` names are
+  intentionally separate from the canonical `bridge-ph-padang-demo-*`
+  environment and `/padang/demo` route;
+- runs migrations, performs the guarded synthetic demo seed, and starts the
+  30-minute reset timer; and
+- makes only the required Caddy network and `/lemans/demo/api/*` route changes,
+  stages the Caddyfile, formats it with `caddy fmt --overwrite`, validates it
+  with `caddy validate`, then atomically replaces it after a timestamped backup;
+  Caddyfile-only changes use a graceful `caddy reload` through disposable
+  `podman run --rm`, with a systemd restart fallback. The database Quadlet reports
+  readiness only after its healthcheck passes, so migrations do not race a
+  PostgreSQL process that is still starting.
+
+Caddy reaches the app and API through the dedicated
+`bridge-ph-lemans-demo-proxy` network. The API also joins the private
+`bridge-ph-lemans-demo` network so it can reach PostgreSQL; PostgreSQL and the
+reset container never join any Caddy-facing network. The API route is required
+because the browser calls the same-origin `/lemans/demo/api/*` path, while the
+existing supplied Caddy route otherwise forwards all `/lemans/demo/*` traffic
+to the Next.js app.
+
+Runtime Quadlets use floating official `postgres:alpine`, `node:lts-alpine`,
+`alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts
+are bind-mounted from the deployment data directory; no persistent build image
+or host compiler is required. `--dry-run` uploads and compiles the source and
+may create or replace only the remote build directory and its artifacts. It
+does not create secrets, create Quadlets, change runtime data, or change Caddy.
+An apply run records resolved image references in
+`/home/jk/bridge-ph/lemans-demo/config/image-digests.txt`.
+
+The first deployment requires an existing `/home/jk/caddy/conf/Caddyfile` and
+`/home/jk/.config/containers/systemd/caddy/caddy.container`. The remote script
+fails closed if either is absent, if the Caddy insertion marker is missing, or
+if the user/systemd/Podman prerequisites are unavailable. Set `CADDY_QUADLET`
+explicitly only when the VPS uses a different caddy Quadlet path.

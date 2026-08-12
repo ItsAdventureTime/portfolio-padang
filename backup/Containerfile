@@ -1,0 +1,13 @@
+FROM docker.io/library/alpine:latest
+
+RUN apk add --no-cache \
+    ca-certificates \
+    gnupg \
+    postgresql-client \
+    rclone
+
+COPY scripts/backupctl.sh /usr/local/bin/backupctl
+RUN chmod 0755 /usr/local/bin/backupctl
+
+USER nobody
+ENTRYPOINT ["/usr/local/bin/backupctl"]

@@ -87,13 +87,14 @@ Environment=DB_NAME=padang_prod
 Environment=DB_USER=padang_prod_user
 Environment=B2_ENDPOINT=https://s3.us-west-001.backblazeb2.com
 Environment=B2_BUCKET=bridge-ph
-Environment=B2_PREFIX=bridge-ph/padang/backups/
+Environment=B2_PREFIX=padang/backups/
 
 Secret=bridge-ph-padang-prod-db-password,type=mount,target=/run/secrets/db-password
 Secret=bridge-ph-padang-prod-b2-key-id,type=mount,target=/run/secrets/b2-key-id
-Secret=bridge-ph-padang-prod-b2-app-key,type=mount,target=/run/secrets/b2-app-key
+Secret=bridge-ph-padang-prod-b2-application-key,type=mount,target=/run/secrets/b2-application-key
+Secret=bridge-ph-padang-prod-backup-encryption-key,type=mount,target=/run/secrets/backup-encryption-key
 
-Exec=/usr/local/bin/backup.sh
+Exec=/usr/local/bin/backupctl
 
 [Service]
 Type=oneshot
@@ -126,7 +127,8 @@ bind-mount an executable from the host.
 
 Logic:
 1. Read DB password from `/run/secrets/db-password`
-2. Read B2 credentials from `/run/secrets/b2-key-id` and `/run/secrets/b2-app-key`
+2. Read B2 credentials from `/run/secrets/b2-key-id` and
+   `/run/secrets/b2-application-key`
 3. Run `pg_dump -Fc -h $DB_HOST -U $DB_USER $DB_NAME` → stdout
 4. Pipe stdout to `rclone rcat` and upload directly to the dated Backblaze B2
    database key; no plaintext dump is persisted on the VPS
@@ -163,7 +165,7 @@ systemctl --user stop bridge-ph-padang-api.service
 # List available backups
 podman run --rm \
   --secret bridge-ph-padang-prod-b2-key-id \
-  --secret bridge-ph-padang-prod-b2-app-key \
+  --secret bridge-ph-padang-prod-b2-application-key \
   ghcr.io/itsadventuretime/padang-erp-backup:latest \
   /usr/local/bin/backupctl list-database-backups
 
@@ -172,7 +174,7 @@ BACKUP_FILE=padang_prod_2025-08-11.dump
 podman run --rm \
   -v /tmp/restore:/restore:Z \
   --secret bridge-ph-padang-prod-b2-key-id \
-  --secret bridge-ph-padang-prod-b2-app-key \
+  --secret bridge-ph-padang-prod-b2-application-key \
   ghcr.io/itsadventuretime/padang-erp-backup:latest \
   /usr/local/bin/backupctl download-database "$BACKUP_FILE" /restore/$BACKUP_FILE
 

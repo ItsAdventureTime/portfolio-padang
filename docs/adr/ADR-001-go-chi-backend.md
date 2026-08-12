@@ -14,7 +14,9 @@ The ERP requires a stable, long-lived backend API. Key considerations:
 
 ## Decision
 
-**Go (latest stable, 1.24+) with Chi router (v5).**
+**Go (latest stable from the floating official `golang:alpine` channel) with
+Chi router (v5).** Go has no LTS channel; supported-release validation happens
+when the container channel is resolved.
 
 ## Rationale
 

@@ -1,0 +1,39 @@
+[Unit]
+Description=Padang ERP Production Go API
+After=bridge-ph-padang-migrate.service
+Requires=bridge-ph-padang-migrate.service
+
+[Container]
+Image=ghcr.io/itsadventuretime/padang-erp-api:latest
+ContainerName=bridge-ph-padang-api
+Network=bridge-ph-padang.network
+Network=bridge-ph-padang-proxy.network
+Environment=APP_ENV=production
+Environment=RUN_MODE=api
+Environment=DB_HOST=bridge-ph-padang-db
+Environment=DB_PORT=5432
+Environment=DB_NAME=padang_prod
+Environment=DB_USER=padang_prod_user
+Environment=EMAIL_PROVIDER=resend
+Environment="EMAIL_FROM=Padang ERP <noreply@delegateops.business>"
+Environment=JWT_ISSUER=padang-erp
+Environment=B2_ENDPOINT=https://s3.us-west-001.backblazeb2.com
+Environment=B2_BUCKET=bridge-ph
+Environment=B2_PREFIX=padang/
+Secret=bridge-ph-padang-prod-db-password,type=mount,target=/run/secrets/db-password
+Secret=bridge-ph-padang-prod-jwt-private-key,type=mount,target=/run/secrets/jwt-private-key
+Secret=bridge-ph-padang-prod-jwt-public-key,type=mount,target=/run/secrets/jwt-public-key
+Secret=bridge-ph-padang-prod-resend-api-key,type=mount,target=/run/secrets/resend-api-key
+Secret=bridge-ph-padang-prod-b2-key-id,type=mount,target=/run/secrets/b2-key-id
+Secret=bridge-ph-padang-prod-b2-application-key,type=mount,target=/run/secrets/b2-application-key
+HealthCmd=wget -q -O- http://localhost:8080/api/v1/health || exit 1
+HealthInterval=15s
+HealthTimeout=5s
+HealthRetries=3
+AutoUpdate=registry
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

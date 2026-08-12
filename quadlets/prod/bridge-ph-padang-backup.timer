@@ -1,0 +1,10 @@
+[Unit]
+Description=Padang ERP Production daily backup timer
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 UTC
+Persistent=true
+Unit=bridge-ph-padang-backup.service
+
+[Install]
+WantedBy=timers.target

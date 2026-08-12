@@ -21,14 +21,14 @@
 
 | Dependency | Version policy | Purpose | Status |
 |---|---|---|---|
-| Go | Latest stable — `golang:alpine` (no version pin) | Runtime | Active (1.26.x as of 2026-08) |
+| Go | Latest stable — `golang:alpine` (no version pin; Go has no LTS channel) | Runtime | Active |
 | go-chi/chi | v5.x latest within v5 | HTTP router | Active, no LTS scheme |
 | jackc/pgx | v5.x latest within v5 | PostgreSQL driver | Active |
 | sqlc-dev/sqlc | Latest | Type-safe SQL gen | Active |
 | golang-migrate/migrate | v4.x latest within v4 | DB migrations | Active |
-| go-playground/validator | v10.x latest within v10 | Struct validation | Active |
+| Request validation | Standard-library decoding plus explicit handler/domain validation | Input safety | Active |
 | golang-jwt/jwt | v5.x latest within v5 | JWT (RS256) | Active |
-| S3-compatible Go client | Latest supported release selected during C1 | Backblaze B2 S3 storage | Planned |
+| S3-compatible Go client | Latest supported release selected during C1 | Backblaze B2 S3 storage | Active |
 | resend/resend-go | Latest | Email (Resend) | Active |
 | testcontainers/testcontainers-go | Latest | Integration tests | Active |
 
@@ -89,15 +89,21 @@
 # Update this section after each approved pull or manual update
 # Format: image:tag@sha256:digest | date | notes
 
-docker.io/library/postgres:alpine@sha256:TBD       | pending | Floating PostgreSQL Alpine channel
-docker.io/library/golang:alpine@sha256:TBD         | pending | Floating Go build image
-docker.io/library/node:lts-alpine@sha256:TBD       | pending | Floating Node LTS build/runtime image
-ghcr.io/itsadventuretime/padang-erp-backup:latest@sha256:TBD | pending | Dedicated backup utility
+docker.io/library/postgres:alpine@sha256:122c9942437efcbbb8d595fc578dee7d26ee1543c2a8634d183adfa4a1e55b4d | 2026-08-12 | C1 validation pull
+docker.io/library/golang:alpine@sha256:787328cefd7937073af18fc4b3a725f47e011ffdde9c2908239a25cae6b2f02b | 2026-08-12 | C1 validation pull
+docker.io/library/node:lts-alpine@sha256:0e6f1567e269207c28295276928277a030139cbc5a0fb7d5bd2674f0401a9082 | 2026-08-12 | C1 validation pull
+docker.io/library/alpine:latest@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18 | 2026-08-12 | C1 runtime/backup validation pull
+docker.io/migrate/migrate:latest@sha256:0925c4b49497fa212e18c35df5f49c07ad12337a650b5e992d34807d02ffe6cd | 2026-08-12 | C1 migration validation pull
+ghcr.io/itsadventuretime/padang-erp-backup:latest@sha256:TBD | pending | Dedicated backup utility release image
 ```
 
 ---
 
 ## Backblaze B2
+
+The Go adapter uses the AWS SDK for its S3 protocol implementation only; it
+connects to Backblaze's B2 endpoint and credentials. No AWS account, bucket,
+runtime, or deployment is part of this system.
 
 | Setting | Value |
 |---|---|

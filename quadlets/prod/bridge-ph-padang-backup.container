@@ -1,0 +1,26 @@
+[Unit]
+Description=Padang ERP Production backup one-shot
+After=bridge-ph-padang-db.service
+Requires=bridge-ph-padang-db.service
+
+[Container]
+Image=ghcr.io/itsadventuretime/padang-erp-backup:latest
+ContainerName=bridge-ph-padang-backup
+Network=bridge-ph-padang.network
+Environment=APP_ENV=production
+Environment=RUN_MODE=backup
+Environment=DB_HOST=bridge-ph-padang-db
+Environment=DB_NAME=padang_prod
+Environment=DB_USER=padang_prod_user
+Environment=B2_ENDPOINT=https://s3.us-west-001.backblazeb2.com
+Environment=B2_BUCKET=bridge-ph
+Environment=B2_PREFIX=padang/backups/
+Secret=bridge-ph-padang-prod-db-password,type=mount,target=/run/secrets/db-password
+Secret=bridge-ph-padang-prod-b2-key-id,type=mount,target=/run/secrets/b2-key-id
+Secret=bridge-ph-padang-prod-b2-application-key,type=mount,target=/run/secrets/b2-application-key
+Secret=bridge-ph-padang-prod-backup-encryption-key,type=mount,target=/run/secrets/backup-encryption-key
+Exec=/usr/local/bin/backupctl
+
+[Service]
+Type=oneshot
+RemainAfterExit=no

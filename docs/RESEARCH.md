@@ -39,6 +39,64 @@ Primary references:
 - [Expo New Architecture](https://docs.expo.dev/guides/new-architecture/)
 - [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
 
+### C1 Implementation Refresh: Current Maintainer Guidance
+
+The implementation uses Backblaze B2 as the storage provider. The S3 client
+library is a protocol client: its module name contains `aws`, but its endpoint
+and credentials are Backblaze-specific and no AWS service is used.
+
+The implementation refresh confirmed the following before code changes:
+
+- Go's supported-release policy is rolling rather than LTS; the build image
+  therefore remains the floating official `golang:alpine` channel.
+- `sqlc` current configuration uses version 2 with the `pgx/v5` engine; query
+  generation remains a disposable build step.
+- `golang-migrate` remains the selected v4 migration tool and uses the
+  timestamped `.up.sql` / `.down.sql` convention.
+- Next.js self-hosting recommends a reverse proxy and supports standalone
+  output; the frontend container will use that output and preserve the
+  configured build-time base path.
+- Tailwind CSS's current CLI setup uses the CSS-first `@import
+  "tailwindcss"` entry point; shadcn/ui components remain owned source files.
+- Podman registry auto-update requires fully-qualified registry image names;
+  Quadlets may declare `AutoUpdate=registry`, while the system timer remains
+  disabled for manual release control.
+- Resend's official Go SDK is an adapter dependency only. Business logic uses
+  the provider-neutral email interface and supplies an idempotency key for
+  duplicate-sensitive sends.
+
+Primary C1 references:
+
+- [Go release policy](https://go.dev/doc/devel/release)
+- [sqlc generation](https://docs.sqlc.dev/en/latest/howto/generate.html)
+- [sqlc configuration](https://docs.sqlc.dev/en/latest/reference/config.html)
+- [golang-migrate](https://github.com/golang-migrate/migrate)
+- [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting)
+- [Next.js standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
+- [Tailwind CSS installation](https://tailwindcss.com/docs/installation/tailwind-cli)
+- [Podman auto-update](https://docs.podman.io/en/v5.5.0/markdown/podman-auto-update.1.html)
+- [Resend Go SDK](https://resend.com/docs/send-with-go)
+
+### Le Mans Deployment Refresh: Current Maintainer Guidance (2026-08-13)
+
+- Rootless Quadlet files belong under the user's `.config/containers/systemd`
+  search path; `.network` references are translated by the generator into
+  dependencies on generated `*-network.service` units.
+- Caddy's supported operational flow is `caddy fmt`, `caddy validate`, then
+  `caddy reload`; the deployment script runs these in disposable Caddy
+  containers and replaces the live file only after validation.
+- Backblaze S3-compatible application keys should be scoped to the required
+  bucket and prefix. The Le Mans demo uses `bridge-ph` + `lemans/demo/` and
+  requires only read/write/delete file capabilities for its presigned-object
+  operations.
+
+Primary deployment references:
+
+- [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
+- [Podman network Quadlets](https://docs.podman.io/en/stable/markdown/podman-network.unit.5.html)
+- [Caddy command line](https://caddyserver.com/docs/command-line)
+- [Backblaze S3-compatible application keys](https://www.backblaze.com/docs/cloud-storage-s3-compatible-app-keys)
+
 ---
 
 ## 1. Philippine Construction Industry — Billing, Retention, Variation Orders
