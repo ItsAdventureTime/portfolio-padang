@@ -399,7 +399,7 @@ Export includes: QBO mapping fields, sync status flag, export timestamp.
 | Configurable approval levels | Deferred Phase 2 | GM-only approval at launch |
 | iOS / Android | Deferred Phase 3+ | Backend API designed for mobile compatibility |
 | BIM / DWG viewer | Deferred | DWG attachments stored; no in-browser viewer at launch |
-| Light mode | Deferred Phase 2 | Dark mode only at launch |
+| Light mode | Primary Launch | Clean corporate light enterprise UI primary theme |
 | AI/predictive analytics | Not scoped | Future consideration |
 | Exact user count | Open | To be confirmed by client; designed for ≤ 20 concurrent |
 | GHCR org name | Open | Awaiting confirmation; placeholder in deployment docs |

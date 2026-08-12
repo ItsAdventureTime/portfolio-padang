@@ -35,9 +35,10 @@
 └─────────────────────────────┘
 ```
 
-- Glassmorphic surface; `backdrop-filter: blur(12px)`
-- Active item: gold `2px` left border + gold text
-- Hover: subtle gold tint background
+- Light corporate theme; subtle border and clean background (`#F8FAFC`)
+- Logo asset: `frontend/public/assets/padang-logo.svg` (clean vector generated from official logo photos)
+- Active item: gold `2px` left border + gold text (`#C8A84B`)
+- Hover: subtle gold tint background (`#FEF9C3`)
 - Collapse to 64px icon-only mode on `md` breakpoint
 
 ### Top Bar

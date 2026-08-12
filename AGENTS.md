@@ -74,12 +74,12 @@ padang-bridge-dashboard/
 |---|---|
 | Backend | Go (latest stable) + Chi router |
 | API | REST/JSON + OpenAPI 3.1 |
-| Frontend | Next.js 15 App Router + TypeScript |
+| Frontend | Next.js App Router (LTS) + TypeScript |
 | UI library | shadcn/ui + Tailwind CSS |
 | Database | PostgreSQL 17 |
 | File storage | Backblaze B2 (`bridge-ph` bucket) |
 | Email | Resend (adapter pattern; future Azure) |
-| Auth | Email + password (bcrypt) + JWT |
+| Auth | Passwordless Email OTP + RS256 JWT |
 | Containers | Rootless Podman Quadlets |
 | Ingress | Existing Caddy (path-based routing) |
 | OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp`) |

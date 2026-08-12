@@ -164,6 +164,8 @@ Environment=STORAGE_PREFIX=padang/demo/
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 Secret=bridge-ph-padang-demo-jwt-private-key,type=mount,target=/run/secrets/jwt-private-key
 Secret=bridge-ph-padang-demo-resend-key,type=mount,target=/run/secrets/resend-key
+Secret=bridge-ph-padang-demo-b2-key-id,type=mount,target=/run/secrets/b2-key-id
+Secret=bridge-ph-padang-demo-b2-app-key,type=mount,target=/run/secrets/b2-app-key
 
 HealthCmd=wget -q -O- http://localhost:8080/api/v1/health || exit 1
 HealthInterval=15s

@@ -14,11 +14,11 @@ a gold ribbon banner, and clean bold typography.
 
 ## Design Philosophy
 
-**Dark-first. Premium. Data-dense but breathable.**
+**Light-first Enterprise Corporate. Crisp, Professional, Data-dense.**
 
-- Glassmorphic navigation chrome (sidebar, top bar) — creates layered depth
-- Opaque card surfaces for all data tables and financial figures — ensures legibility
-- Gold accents signal authority, trustworthiness, and the brand's AAA status
+- Clean white and subtle slate navigation chrome & surfaces — professional corporate aesthetic
+- Crisp, high-contrast table surfaces for financial data legibility
+- Rich gold accents (`#C8A84B`, `#D4A843`) derived from logo signal PCAB AAA accreditation
 - Micro-animations enhance perceived responsiveness; never distract from data
 - WCAG 2.2 AA minimum contrast on all text
 
@@ -30,50 +30,49 @@ a gold ribbon banner, and clean bold typography.
 
 | Token | HSL | Hex | Usage |
 |---|---|---|---|
-| `--color-gold-300` | hsl(44, 65%, 72%) | `#E8C97A` | Subtle highlights |
-| `--color-gold-400` | hsl(44, 62%, 55%) | `#D4A843` | Primary CTA, active state indicator |
+| `--color-gold-100` | hsl(44, 100%, 95%) | `#FEF9C3` | Light gold table/badge highlight |
+| `--color-gold-300` | hsl(44, 65%, 72%) | `#E8C97A` | Subtle gold borders/accents |
+| `--color-gold-400` | hsl(44, 62%, 55%) | `#D4A843` | Active state indicator, highlights |
 | `--color-gold-500` | hsl(44, 58%, 48%) | `#C8A84B` | Primary brand gold |
 | `--color-gold-600` | hsl(40, 68%, 38%) | `#A8841E` | Hover state |
-| `--color-gold-700` | hsl(38, 72%, 30%) | `#8B6914` | Dark gold, badge backgrounds |
-| `--color-gold-800` | hsl(36, 70%, 22%) | `#6B4E0F` | Deep gold, pressed state |
+| `--color-gold-700` | hsl(38, 72%, 30%) | `#8B6914` | Deep gold text/icons |
 
-### Surface Colors (Dark)
+### Surface Colors (Light Corporate)
 
 | Token | HSL | Hex | Usage |
 |---|---|---|---|
-| `--color-surface-950` | hsl(0, 0%, 5%) | `#0D0D0D` | App background |
-| `--color-surface-900` | hsl(0, 0%, 10%) | `#1A1A1A` | Sidebar, primary navigation |
-| `--color-surface-800` | hsl(0, 0%, 14%) | `#242424` | Card backgrounds, panels |
-| `--color-surface-750` | hsl(0, 0%, 17%) | `#2B2B2B` | Elevated cards |
-| `--color-surface-700` | hsl(0, 0%, 18%) | `#2E2E2E` | Borders, dividers |
-| `--color-surface-600` | hsl(0, 0%, 24%) | `#3D3D3D` | Input backgrounds |
-| `--color-surface-500` | hsl(0, 0%, 32%) | `#525252` | Disabled backgrounds |
+| `--color-surface-50` | hsl(210, 40%, 98%) | `#F8FAFC` | Main app background |
+| `--color-surface-100` | hsl(210, 40%, 96%) | `#F1F5F9` | Sidebar, topbar background |
+| `--color-surface-0` | hsl(0, 0%, 100%) | `#FFFFFF` | Card backgrounds, table rows |
+| `--color-surface-200` | hsl(214, 32%, 91%) | `#E2E8F0` | Subtitle/card borders |
+| `--color-surface-300` | hsl(213, 27%, 84%) | `#CBD5E1` | Input borders |
+| `--color-surface-400` | hsl(215, 20%, 65%) | `#94A3B8` | Disabled borders / muted text |
 
 ### Text Colors
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--color-text-primary` | `#F5F5F5` | Body text, headings |
-| `--color-text-secondary` | `#A0A0A0` | Labels, metadata, timestamps |
-| `--color-text-tertiary` | `#6B6B6B` | Placeholder text, disabled |
-| `--color-text-inverse` | `#0D0D0D` | Text on gold backgrounds |
+| `--color-text-primary` | `#0F172A` | Primary body text, headings |
+| `--color-text-secondary` | `#475569` | Subheaders, table headers, labels |
+| `--color-text-tertiary` | `#94A3B8` | Placeholders, secondary metadata |
+| `--color-text-inverse` | `#FFFFFF` | Text on dark/gold buttons |
 
 ### Semantic Colors
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--color-success-400` | `#4ADE80` | Completed, paid, on-budget |
-| `--color-success-500` | `#22C55E` | Success badges |
-| `--color-success-900` | `#14532D` | Success badge background |
-| `--color-warning-400` | `#FBBF24` | Pending approval, at-risk |
-| `--color-warning-500` | `#F59E0B` | Warning badges |
-| `--color-warning-900` | `#451A03` | Warning badge background |
-| `--color-error-400` | `#F87171` | Overdue, rejected, over-budget |
-| `--color-error-500` | `#EF4444` | Error badges, alerts |
-| `--color-error-900` | `#450A0A` | Error badge background |
-| `--color-info-400` | `#60A5FA` | Informational, in-progress |
-| `--color-info-500` | `#3B82F6` | Info badges |
-| `--color-info-900` | `#1E3A5F` | Info badge background |
+| `--color-success-50` | `#F0FDF4` | Success badge background |
+| `--color-success-600` | `#16A34A` | Completed, paid, on-budget text |
+| `--color-success-700` | `#15803D` | Success badge border/text |
+| `--color-warning-50` | `#FFFBEB` | Warning badge background |
+| `--color-warning-600` | `#D97706` | Pending approval, at-risk text |
+| `--color-warning-700` | `#B45309` | Warning badge border/text |
+| `--color-error-50` | `#FEF2F2` | Error badge background |
+| `--color-error-600` | `#DC2626` | Overdue, rejected text |
+| `--color-error-700` | `#B91C1C` | Error badge border/text |
+| `--color-info-50` | `#EFF6FF` | Info badge background |
+| `--color-info-600` | `#2563EB` | In-progress, issued text |
+| `--color-info-700` | `#1D4ED8` | Info badge border/text |
 
 ---
 

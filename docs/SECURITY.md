@@ -103,6 +103,8 @@ Partial = filtered to relevant scope (e.g., PM sees only their projects).
 | `bridge-ph-padang-demo-db-password` | Demo PostgreSQL app user password | API container (demo) |
 | `bridge-ph-padang-demo-jwt-private-key` | RS256 private key (demo) | API container (demo) |
 | `bridge-ph-padang-demo-resend-key` | Resend API key (demo) | API container (demo) |
+| `bridge-ph-padang-demo-b2-key-id` | B2 application key ID (demo) | API container (demo) |
+| `bridge-ph-padang-demo-b2-app-key` | B2 application key secret (demo) | API container (demo) |
 | `bridge-ph-padang-prod-db-password` | Prod PostgreSQL app user password | API container (prod) |
 | `bridge-ph-padang-prod-jwt-private-key` | RS256 private key (prod) | API container (prod) |
 | `bridge-ph-padang-prod-resend-key` | Resend API key (prod) | API container (prod) |

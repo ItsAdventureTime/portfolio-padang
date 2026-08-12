@@ -32,8 +32,8 @@
 
 | Dependency | Version policy | Purpose | Status |
 |---|---|---|---|
-| Next.js | 16.x active LTS — `node:lts-alpine` image (no version pin) | Framework | Active (16.x as of 2026-08) |
-| React | Latest with Next.js 16 | UI runtime | Active |
+| Next.js | Active LTS — `node:lts-alpine` image (no version pin) | Framework | Active (tracks active LTS) |
+| React | Latest compatible with Next.js LTS | UI runtime | Active |
 | TypeScript | Latest | Type safety | Active |
 | Tailwind CSS | v4.x latest | Styling | Active |
 | shadcn/ui | Latest | UI component library | Active |
