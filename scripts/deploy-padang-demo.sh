@@ -151,6 +151,9 @@ RSYNC=(
   --human-readable
   --itemize-changes
   --exclude='.git/'
+  --exclude='.DS_Store'
+  --exclude='.serena/'
+  --exclude='.agents/'
   --exclude='.hg/'
   --exclude='.svn/'
   --exclude='node_modules/'

@@ -660,6 +660,8 @@ scripts/deploy-padang-demo.sh --host VPS_HOST --user jk --port 22 --dry-run
 
 The apply command prompts on the VPS for the Backblaze demo key ID and
 application key if the corresponding Podman secrets do not already exist. It
+The key ID is visibly entered and confirmed; the application key is entered
+without echo and confirmed. Press Return after each value. The command
 generates the database username and password automatically. Do not place any
 of these values in a command line, `.env` file, Quadlet `Environment=`, or Git.
 

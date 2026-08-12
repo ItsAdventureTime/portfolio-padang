@@ -78,7 +78,8 @@ ensure_external_secret() {
   [[ -f "$SOURCE_ROOT/scripts/secrets-setup.sh" ]] ||
     die "secret-management script is missing from the synchronized source"
   [[ -t 0 ]] || die "Backblaze secrets are missing and an interactive terminal is required"
-  log "prompting for the Padang demo Backblaze key ID and application key"
+  log "waiting for two Backblaze inputs; type each value and press Return"
+  log "the key ID is visible while typing; the application key is hidden"
   bash "$SOURCE_ROOT/scripts/secrets-setup.sh" padang-demo
   podman secret inspect "$B2_KEY_ID_SECRET" >/dev/null 2>&1 ||
     die "Backblaze key ID secret was not created"

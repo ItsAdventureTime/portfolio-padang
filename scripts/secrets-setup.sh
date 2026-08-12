@@ -25,6 +25,20 @@ prompt_secret() {
   printf '%s' "$value" | create_secret_from_stdin "$name"
   unset value confirm
 }
+prompt_value() {
+  local name="$1" prompt="$2" value confirm
+  if secret_exists "$name"; then echo "keeping existing secret: $name"; return; fi
+  while :; do
+    read -r -p "$prompt (type the value, then press Return): " value
+    printf '\n'
+    read -r -p "Confirm $prompt: " confirm
+    printf '\n'
+    [ "$value" = "$confirm" ] && [ -n "$value" ] && break
+    echo "values did not match; try again" >&2
+  done
+  printf '%s' "$value" | create_secret_from_stdin "$name"
+  unset value confirm
+}
 generate_secret() {
   local name="$1"
   if secret_exists "$name"; then
@@ -67,7 +81,7 @@ case "$environment" in
   padang-demo|padang)
     prefix=bridge-ph-padang-demo
     generate_secret "$prefix-db-password"
-    prompt_secret "$prefix-b2-key-id" "Padang demo Backblaze B2 key ID"
+    prompt_value "$prefix-b2-key-id" "Padang demo Backblaze B2 key ID"
     prompt_secret "$prefix-b2-application-key" "Padang demo Backblaze B2 application key"
     ;;
   demo)
