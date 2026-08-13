@@ -5,14 +5,17 @@
 CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
 CURRENT PHASE: C1 — implementation and containerized validation
 STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
-remediation, documentation updates, and containerized validation are complete;
-demo/production deployment is not authorized in C1.
+remediation, documentation updates, deployment-update workflow, and
+containerized validation are complete; demo/production deployment is not
+authorized in C1.
 BRANCH: feat/c1-foundation
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 3797093 (`fix(security): close C1 review findings`)
+LATEST IMPLEMENTATION COMMIT: b213155 (`fix(deploy): simplify Padang demo VPS updates`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Pushed 3797093 to `origin/feat/c1-foundation` via the
+REMOTE PUSH STATUS: Pushed b213155 to `origin/feat/c1-foundation` via the
 authenticated HTTPS GitHub CLI path
+DEMO VPS SSH TARGET: `jk@216.75.75.136:22`
+DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
 
 ## C1 Review and Remediation Record
 
@@ -303,8 +306,8 @@ an undocumented placeholder table.
 - Operations: backup utility image build and production fail-closed guard pass;
   reset/backup/secrets shell syntax passes; Quadlet dry-run generation passes
   on the Podman Linux machine. No VPS deployment performed.
-- Remaining release work: push this branch, then hand the implementation to
-  Antigravity for independent A2 review. Production backup upload/restore and
+- Remaining release work: hand the implementation to Antigravity for
+  independent A2 review. Production backup upload/restore and
   Caddy changes remain C2/C4 deployment activities and were not performed.
 
 ## Automated Padang Demo Deployment Workflow
@@ -312,6 +315,10 @@ an undocumented placeholder table.
 - macOS performs only the synchronized-source upload and remote handoff;
   compilation, tests, package installation, and runtime startup occur on the
   VPS in disposable `podman run --rm` containers.
+- The default deployment endpoint is `jk@216.75.75.136:22`; the public demo
+  route remains `https://delegateops.business/padang/demo/`.
+- Routine updates use `scripts/update-padang-demo.sh` and preserve demo data;
+  `--seed-demo` is reserved for an intentional synthetic-data reset.
 - Padang demo Quadlets install under
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/`; persistent
   state installs under `/home/jk/bridge-ph/padang-demo/`.
