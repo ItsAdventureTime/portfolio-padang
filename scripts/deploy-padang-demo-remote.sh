@@ -191,14 +191,19 @@ build_frontend() {
   mkdir -p "$FRONTEND_BUILD"
   log "installing dependencies and building frontend in disposable node:lts-alpine"
   podman run --rm --userns=keep-id \
+    --tmpfs /tmp:rw,nosuid,size=2g \
+    -e HOME=/tmp/npm-home \
+    -e NPM_CONFIG_CACHE=/tmp/npm-cache \
+    -e NPM_CONFIG_USERCONFIG=/tmp/npm-config/npmrc \
     -v "$SOURCE_ROOT/frontend:/src:ro,Z" \
     -v "$FRONTEND_BUILD:/out:Z" \
     -w /src docker.io/library/node:lts-alpine sh -ec '
-      rm -rf /tmp/padang-frontend
-      mkdir -p /tmp/padang-frontend
+      rm -rf /tmp/npm-home /tmp/npm-cache /tmp/npm-config /tmp/padang-frontend
+      mkdir -p /tmp/npm-home /tmp/npm-cache /tmp/npm-config /tmp/padang-frontend
       cp -a /src/. /tmp/padang-frontend/
       cd /tmp/padang-frontend
-      npm ci --ignore-scripts --no-audit --no-fund
+      npm ci --ignore-scripts --no-audit --no-fund \
+        --cache /tmp/npm-cache --userconfig /tmp/npm-config/npmrc
       NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run typecheck
       NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run lint
       NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run build -- --webpack

@@ -205,6 +205,27 @@ Record significant operational events below.
 
 ## Troubleshooting
 
+### Frontend build reports `mkdir '/src/.npm'`
+
+This means npm tried to write its user state under the read-only `/src` source
+mount. The remote builder configures `HOME=/tmp/npm-home`,
+`NPM_CONFIG_CACHE=/tmp/npm-cache`, and `NPM_CONFIG_USERCONFIG=/tmp/npm-config/npmrc`;
+its `/tmp` filesystem and npm directories are disposable, so no host cache
+cleanup is required.
+
+Re-sync the current checkout and verify the fix without applying runtime
+changes, then rerun the normal command if the preflight succeeds:
+
+```bash
+scripts/update-padang-demo.sh --dry-run
+scripts/update-padang-demo.sh
+```
+
+For an initial deployment, use the corresponding `scripts/deploy-padang-demo.sh`
+command. If the log still names `/src/.npm`, the updated remote script was not
+synchronized; rerun from the current repository checkout. Do not make `/src`
+writable or delete source files to recover.
+
 ### API container not starting
 
 1. Check logs: `journalctl --user -u bridge-ph-padang-api.service -n 50`

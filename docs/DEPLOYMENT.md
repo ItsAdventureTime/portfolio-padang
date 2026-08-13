@@ -620,7 +620,9 @@ The remote script:
   source mounted read-only and Go's build/module/workspace caches on a
   disposable `/tmp` tmpfs;
 - runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
-  with `NEXT_PUBLIC_BASE_PATH=/padang/demo`;
+  with the source mounted read-only, a disposable `/tmp` tmpfs, and npm's
+  `HOME`, cache, and user config all under `/tmp`; it sets
+  `NEXT_PUBLIC_BASE_PATH=/padang/demo`;
 - installs runtime Quadlets in
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
