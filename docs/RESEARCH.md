@@ -20,7 +20,7 @@ that the application has been built or validated.
 | Next.js | `basePath` is build-time configuration; demo and production therefore require separate artifacts from the same source revision. Standalone output and a reverse proxy are the planned self-hosting pattern. |
 | Fonts/CSP | Self-host fonts with `next/font`; keep the CSP policy same-origin and document any Next.js nonce work as implementation follow-up. |
 | Caddy | Preserve the frontend prefix with `handle`; strip only the external API prefix before proxying to the path-neutral API. Route order is explicit. |
-| Podman | Keep `AutoUpdate=registry` as an eligible image policy, while the automatic timer remains disabled so updates are manually applied. |
+| Podman | Keep image channels floating, omit `AutoUpdate` from application Quadlets, and use the reviewed operator update wrapper while the automatic timer remains disabled. |
 | Future mobile | TypeScript is supported by React Native; Expo/React Native is the future client direction behind the shared API/OpenAPI boundary. |
 | Security baseline | OWASP ASVS 5.0.0 is the verification baseline for implementation and review. |
 
@@ -58,9 +58,10 @@ The implementation refresh confirmed the following before code changes:
   configured build-time base path.
 - Tailwind CSS's current CLI setup uses the CSS-first `@import
   "tailwindcss"` entry point; shadcn/ui components remain owned source files.
-- Podman registry auto-update requires fully-qualified registry image names;
-  Quadlets may declare `AutoUpdate=registry`, while the system timer remains
-  disabled for manual release control.
+- Podman registry auto-update requires fully-qualified registry image names and
+  an active systemd timer or manual `podman auto-update` invocation. This
+  project intentionally omits the `AutoUpdate` field from application Quadlets
+  so mutable channels cannot restart services outside the reviewed wrapper.
 - Resend's official Go SDK is an adapter dependency only. Business logic uses
   the provider-neutral email interface and supplies an idempotency key for
   duplicate-sensitive sends.
@@ -90,7 +91,7 @@ Primary C1 references:
   containers and replaces the live file only after validation.
 - Backblaze S3-compatible application keys should be scoped to the required
   bucket and prefix. The Padang filesystem deployment uses the isolated
-  `padang-demo` state root and the official `/padang/demo/` route; it uses
+  `padang-demo` state root and the official `/padang/demo` route; it uses
   `bridge-ph` + `padang/demo/` and
   requires only read/write/delete file capabilities for its presigned-object
   operations. `listAllBucketNames` is conditional and should be added only if

@@ -82,7 +82,10 @@ All image tags are **mutable — no version numbers pinned**:
   no Node-style LTS channel, so major-version upgrade validation is mandatory
   before accepting a changed floating digest
 
-`AutoUpdate=registry` is set in all Quadlet `.container` files. Podman auto-update detects digest changes and restarts the service when a new image digest is available.
+Quadlet `.container` files intentionally omit `AutoUpdate=registry`. Image tags
+remain floating, but the application update wrapper performs reviewed builds,
+manual image refreshes, and controlled service restarts. The
+`podman-auto-update.timer` must remain disabled.
 
 ## Benefits
 

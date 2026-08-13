@@ -16,7 +16,6 @@ HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
 Notify=healthy
-AutoUpdate=registry
 
 [Service]
 Restart=always

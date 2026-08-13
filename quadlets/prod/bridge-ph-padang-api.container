@@ -30,7 +30,6 @@ HealthCmd=wget -q -O- http://localhost:8080/api/v1/health || exit 1
 HealthInterval=15s
 HealthTimeout=5s
 HealthRetries=3
-AutoUpdate=registry
 
 [Service]
 Restart=always

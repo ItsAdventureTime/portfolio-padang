@@ -69,6 +69,20 @@ fi
 die() { printf 'padang-demo-remote: %s\n' "$*" >&2; exit 1; }
 log() { printf 'padang-demo-remote: %s\n' "$*"; }
 
+check_auto_update_timer() {
+  local active_state enabled_state
+  active_state=$(systemctl --user is-active podman-auto-update.timer 2>/dev/null || true)
+  enabled_state=$(systemctl --user is-enabled podman-auto-update.timer 2>/dev/null || true)
+  if [[ "$active_state" == active || "$active_state" == activating ||
+    "$enabled_state" == enabled || "$enabled_state" == enabled-runtime ]]; then
+    if [[ "$MODE" == --dry-run ]]; then
+      log "dry-run: auto-update timer is active or enabled; apply would be refused"
+    else
+      die "podman-auto-update.timer must be inactive and disabled before apply"
+    fi
+  fi
+}
+
 [[ "$MODE" == --apply || "$MODE" == --dry-run ]] || die "use --apply or --dry-run"
 [[ "$(id -un)" == jk ]] || die "this script must run as user jk"
 [[ "$APP_ROOT" == /home/jk/bridge-ph/padang-demo ]] || die "demo root guard failed"
@@ -80,6 +94,7 @@ done
 
 podman info --format '{{.Host.CgroupsVersion}}' | grep -qx 'v2' || die "rootless Podman requires cgroup v2"
 systemctl --user show-environment >/dev/null 2>&1 || die "user systemd bus is unavailable"
+check_auto_update_timer
 [[ -d "$SOURCE_ROOT/backend" && -d "$SOURCE_ROOT/frontend" ]] || die "source tree is incomplete"
 [[ "$DB_USER" =~ ^[a-z_][a-z0-9_]{2,30}$ ]] || die "stored database username is invalid"
 
@@ -236,8 +251,6 @@ HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
 Notify=healthy
-AutoUpdate=registry
-
 [Service]
 Restart=always
 TimeoutStartSec=900
@@ -298,8 +311,6 @@ HealthCmd=wget -q -O- http://127.0.0.1:8080/api/v1/health || exit 1
 HealthInterval=15s
 HealthTimeout=5s
 HealthRetries=3
-AutoUpdate=registry
-
 [Service]
 Restart=always
 TimeoutStartSec=900
@@ -330,8 +341,6 @@ HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo/ || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3
-AutoUpdate=registry
-
 [Service]
 Restart=always
 TimeoutStartSec=900
@@ -602,4 +611,4 @@ write_quadlets
 install_caddy_route
 start_stack
 record_image_digests
-log "Padang demo is running at https://delegateops.business/padang/demo/"
+log "Padang demo is running at https://delegateops.business/padang/demo"

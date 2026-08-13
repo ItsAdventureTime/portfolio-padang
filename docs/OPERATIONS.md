@@ -8,6 +8,9 @@ The repository currently automates the demo route (`/padang/demo`) only. Do
 not use this command for production (`/padang`); production needs its own
 approved promotion runbook and secrets.
 
+Public URLs: demo `https://delegateops.business/padang/demo`; production
+`https://delegateops.business/padang`.
+
 From the repository root on macOS, run:
 
 ```bash
@@ -20,6 +23,9 @@ applies pending migrations, restarts the demo API/frontend Quadlet services,
 and verifies `https://delegateops.business/padang/demo/api/v1/health`.
 It defaults to `jk@216.75.75.136:22`, so no environment variables are needed.
 Use `--host`, `--user`, or `--port` only if the SSH endpoint differs.
+For a non-default endpoint, also pass `--health-url` for the matching public
+demo API health URL, or use `--skip-health-check` during intentional DNS/TLS
+maintenance.
 
 Use `scripts/update-padang-demo.sh --dry-run` to synchronize and build without
 changing Quadlets, secrets, Caddy, or runtime data. Normal updates preserve the
@@ -28,8 +34,10 @@ be used when refreshing synthetic demo data is intended.
 
 The workflow follows the current Podman model: Quadlet files are systemd
 generated units, so the script reloads the user systemd manager and restarts
-the changed services after the artifact build. Runtime auto-update remains
-manual; the update command is the controlled release boundary.
+the changed services after the artifact build. Application Quadlets do not
+declare an auto-update policy; the update command is the controlled release
+boundary and refuses to apply while `podman-auto-update.timer` is active or
+enabled.
 
 ### Health Check
 
@@ -143,12 +151,11 @@ podman run --rm -it \
 See `docs/DEPLOYMENT.md` for the full update procedure.
 
 ```bash
-# Check what would be updated
-podman auto-update --dry-run
-
-# Confirm podman-auto-update.timer is disabled
+# Confirm the unattended timer is disabled and inactive
 systemctl --user is-enabled podman-auto-update.timer
-# Expected: disabled
+# Expected: disabled, masked, or not-found
+systemctl --user is-active podman-auto-update.timer
+# Expected: inactive, failed, or unknown
 ```
 
 ---

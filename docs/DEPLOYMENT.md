@@ -5,6 +5,8 @@
 - **OS:** Fedora CoreOS (latest stable), rootless Podman, SELinux enforcing
 - **User:** `jk` (rootless; `systemctl --user`)
 - **VPS SSH target:** `jk@216.75.75.136:22` (deployment transport only)
+- **Public demo URL:** `https://delegateops.business/padang/demo`
+- **Public production URL:** `https://delegateops.business/padang`
 - **Ingress:** Existing Caddy container joined to the dedicated Padang proxy
   networks; app containers do not join the existing `caddy.network`
 - **URL routing:** Path-based (`/padang` prod, `/padang/demo` demo)
@@ -16,9 +18,11 @@ This runbook follows the current upstream model for the selected stack:
 - Podman Quadlet files are systemd-generated units. The updater runs
   `systemctl --user daemon-reload` before starting/restarting them and manages
   health through the generated service/container lifecycle.
-- Podman auto-update remains disabled for this application. Updates are
-  reviewed, built, migrated, restarted, and health-checked as one operator
-  action; this avoids an unattended image change bypassing application checks.
+- Podman auto-update is disabled for this application. Its Quadlets omit the
+  `AutoUpdate` field, the user timer must remain inactive/disabled, and the
+  updater fails closed before apply if that timer is active or enabled.
+  Updates are reviewed, built, migrated, restarted, and health-checked as one
+  operator action.
 - The local wrapper keeps connection settings as command-line defaults rather
   than requiring manually exported environment variables. Secrets remain
   Podman secrets and are never written to the wrapper configuration.
@@ -195,8 +199,6 @@ HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
 
-AutoUpdate=registry
-
 [Service]
 Restart=always
 
@@ -237,8 +239,6 @@ HealthInterval=15s
 HealthTimeout=5s
 HealthRetries=3
 
-AutoUpdate=registry
-
 [Service]
 Restart=always
 
@@ -272,8 +272,6 @@ HealthCmd=wget -q -O- http://localhost:3000/padang/demo || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3
-
-AutoUpdate=registry
 
 [Service]
 Restart=always
@@ -406,6 +404,8 @@ Create: `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile`
 @padang_demo_root path /padang/demo
 redir @padang_demo_root /padang/demo/ 308
 
+# Canonical public URL: https://delegateops.business/padang/demo
+# Caddy redirects the exact path to the slash form for the frontend.
 # API: strip /padang/demo prefix; Go API receives /api/v1/...
 handle /padang/demo/api/* {
 	uri strip_prefix /padang/demo
@@ -444,6 +444,8 @@ Create: `/home/jk/caddy/conf/padang-production.handlers.Caddyfile`
 @padang_root path /padang
 redir @padang_root /padang/ 308
 
+# Canonical public URL: https://delegateops.business/padang
+# Caddy redirects the exact path to the slash form for the frontend.
 # API: strip /padang prefix; Go API receives /api/v1/...
 handle /padang/api/* {
 	uri strip_prefix /padang
@@ -561,19 +563,22 @@ idempotent operator path: source sync → disposable-container validation/build
 and start the demo API/frontend for a normal source update, because `start`
 does not replace an already-running process.
 
-The updater deliberately does not enable `podman-auto-update.timer`; image
-updates remain an explicit operator action. Production promotion is separate,
-requires its approved environment/secrets, and remains governed by
-`docs/HANDOFF.md` and the production runbook.
+The updater does not enable `podman-auto-update.timer`; application Quadlets do
+not declare `AutoUpdate=registry`, so image refreshes remain an explicit
+operator action. Production promotion is separate, requires its approved
+environment/secrets, and remains governed by `docs/HANDOFF.md` and the
+production runbook.
 
 ---
 
 ## Auto-Update Timer
 
-Ensure `podman-auto-update.timer` is NOT enabled:
+Ensure `podman-auto-update.timer` is inactive and disabled before an apply:
 ```bash
 systemctl --user is-enabled podman-auto-update.timer
-# Should return: disabled
+# Should return: disabled, masked, or not-found
+systemctl --user is-active podman-auto-update.timer
+# Should return: inactive, failed, or unknown
 ```
 
 Updates are manual only. See update procedure above.
@@ -581,7 +586,7 @@ Updates are manual only. See update procedure above.
 ## Automated Padang Demo Deployment
 
 The repository includes a two-stage deployment flow for the Padang demo route
-at `/padang/demo/`:
+at `/padang/demo`:
 
 ```bash
 # macOS, from the repository root; defaults to jk@216.75.75.136:22
@@ -664,7 +669,7 @@ explicitly only when the VPS uses a different caddy Quadlet path.
 
 ### Operator commands
 
-These commands update the deployed demo route at `/padang/demo/`. Do not use
+These commands update the deployed demo route at `/padang/demo`. Do not use
 the demo updater for the production route at `/padang`; production promotion
 requires a separate approved runbook and production-specific secrets.
 
@@ -691,6 +696,17 @@ scripts/update-padang-demo.sh --host 216.75.75.136 --user jk --port 22
 scripts/update-padang-demo.sh --seed-demo
 ```
 
+If the deployment is intentionally pointed at a different SSH endpoint, pass
+the matching public health URL or explicitly skip the public check:
+
+```bash
+scripts/update-padang-demo.sh --host OTHER_HOST --user jk --port 22 \
+  --health-url https://delegateops.business/padang/demo/api/v1/health
+# Or, only when the public route is intentionally unavailable:
+scripts/update-padang-demo.sh --host OTHER_HOST --user jk --port 22 \
+  --skip-health-check
+```
+
 The apply command prompts on the VPS for the Backblaze demo key ID and
 application key if the corresponding Podman secrets do not already exist.
 The key ID is visibly entered once; the application key is entered once
@@ -711,7 +727,7 @@ After an update, inspect the demo from the VPS if the public health check fails:
 ```bash
 ssh -p 22 jk@216.75.75.136 'systemctl --user status padang-demo-db.service padang-demo-migrate.service padang-demo-api.service padang-demo-app.service padang-demo-reset.timer --no-pager'
 ssh -p 22 jk@216.75.75.136 'podman ps --format "table {{.Names}}\\t{{.Status}}" | grep padang-demo'
-curl --fail-with-body https://delegateops.business/padang/demo/
+curl --fail-with-body https://delegateops.business/padang/demo
 curl --fail-with-body https://delegateops.business/padang/demo/api/v1/health
 ```
 
@@ -744,7 +760,7 @@ systemctl --user start bridge-ph-padang-api.service
 systemctl --user start bridge-ph-padang-frontend.service
 systemctl --user start bridge-ph-padang-backup.timer
 
-curl --fail-with-body https://delegateops.business/padang/
+curl --fail-with-body https://delegateops.business/padang
 curl --fail-with-body https://delegateops.business/padang/api/v1/health
 ```
 

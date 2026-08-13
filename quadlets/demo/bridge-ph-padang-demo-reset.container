@@ -18,7 +18,6 @@ Volume=/home/jk/bridge-ph/padang-demo/seed:/app/seed:ro
 Volume=/home/jk/bridge-ph/padang-demo/scripts:/app/scripts:ro
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 Exec=/bin/sh /app/scripts/reset-demo.sh
-AutoUpdate=registry
 
 [Service]
 Type=oneshot

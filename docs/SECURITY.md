@@ -263,7 +263,8 @@ still a production-readiness follow-up.
   `golang.org/x/text` to v0.39.0; it still reported unreachable module findings
   for review during future dependency updates.
 - Container base images: use official images; specify digest in `docs/DEPENDENCIES.md`
-- Podman auto-update managed manually per constitution §13
+- Podman auto-update is disabled for application Quadlets and the deployment
+  wrapper fails closed if `podman-auto-update.timer` is active or enabled.
 
 ---
 
@@ -289,6 +290,6 @@ still a production-readiness follow-up.
 | A05: Security Misconfiguration | Security headers; no debug endpoints in prod; no exposed ports |
 | A06: Vulnerable Components | `go mod verify`; `npm audit`; manual image update review |
 | A07: Auth Failures | Email OTP (no passwords); single-use codes; rate limiting; JWT rotation; no secret in logs |
-| A08: Software Integrity | go.sum; package-lock.json; image auto-update via podman (digest-based) |
+| A08: Software Integrity | go.sum; package-lock.json; reviewed image pulls and recorded digests |
 | A09: Logging Failures | Transactional state-change audit log; structured logging; no secret in logs; login/export events remain a pre-production gap |
 | A10: SSRF | No user-supplied URL fetching; no internal service exposure |

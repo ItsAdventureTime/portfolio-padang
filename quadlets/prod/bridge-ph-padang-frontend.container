@@ -14,7 +14,6 @@ HealthCmd=wget -q -O- http://localhost:3000/padang || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3
-AutoUpdate=registry
 
 [Service]
 Restart=always

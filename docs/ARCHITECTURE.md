@@ -65,7 +65,7 @@ External services (reached from API container via outbound HTTPS):
 
 | Component | Technology |
 |---|---|
-| Containerization | Rootless Podman + Podman Quadlets (`AutoUpdate=registry`) |
+| Containerization | Rootless Podman + Podman Quadlets (operator-triggered updates) |
 | Build strategy | All builds via `podman run --rm`; multi-stage Containerfiles; no host toolchain required |
 | Image tags | Official floating channels; resolved digests recorded for audit; updates remain manually applied |
 | Ingress | Existing Caddy (path-based routing; proxy-network pattern) |

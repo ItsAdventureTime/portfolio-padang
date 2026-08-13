@@ -16,6 +16,8 @@ REMOTE PUSH STATUS: Pushed b213155 to `origin/feat/c1-foundation` via the
 authenticated HTTPS GitHub CLI path
 DEMO VPS SSH TARGET: `jk@216.75.75.136:22`
 DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
+DEMO PUBLIC URL: `https://delegateops.business/padang/demo`
+PRODUCTION PUBLIC URL: `https://delegateops.business/padang`
 
 ## C1 Review and Remediation Record
 
@@ -49,7 +51,8 @@ planning and supersede older contradictory wording in this document.
    - Retention: 10% standard deduction per progress billing; running total retained payable tracking.
    - Variation Orders: Cumulative cap at 10% of contract amount (8% warning alert, 10% hard stop alert).
 4. **Container & Infrastructure Design**:
-   - Rootless Podman Quadlets with floating channel tags and `AutoUpdate=registry`; updates remain manually applied.
+   - Rootless Podman Quadlets with floating channel tags and no auto-update
+     policy; the timer stays disabled and updates remain operator-triggered.
    - Proxy-Network isolation pattern: Caddy + Frontend + API on `proxy.network`; API + DB on internal `network`. DB is non-routable from host or edge.
    - Ingress: Path-based routing via existing Caddy (`/padang` prod, `/padang/demo` demo). Frontend is built twice from one source revision because Next.js `basePath` is build-time.
    - Production target: Quadlets at `/home/jk/.config/containers/systemd/bridge-ph/padang/`, persistent state at `/home/jk/bridge-ph/padang/`, and release identity `padang-bridge-ph:prod`.
@@ -256,7 +259,8 @@ an undocumented placeholder table.
 - **DEPENDENCIES:** TASK-008
 - **CONSTRAINTS:**
   - All container builds executed via `podman run --rm`; multi-stage Containerfiles; no host build tools.
-  - Quadlet `AutoUpdate=registry` enabled; no pinned version numbers in Quadlets.
+  - Quadlet image tags remain floating, but no `AutoUpdate` policy is declared;
+    the deployment wrapper is the controlled update boundary.
   - Caddy CSP snippet includes `padang_nextjs_csp`.
   - Secrets setup script (`scripts/secrets-setup.sh`) manages all required Podman secrets.
   - Dedicated backup utility image runs the database and attachment backup;
@@ -316,7 +320,7 @@ an undocumented placeholder table.
   compilation, tests, package installation, and runtime startup occur on the
   VPS in disposable `podman run --rm` containers.
 - The default deployment endpoint is `jk@216.75.75.136:22`; the public demo
-  route remains `https://delegateops.business/padang/demo/`.
+  route remains `https://delegateops.business/padang/demo`.
 - Routine updates use `scripts/update-padang-demo.sh` and preserve demo data;
   `--seed-demo` is reserved for an intentional synthetic-data reset.
 - Padang demo Quadlets install under

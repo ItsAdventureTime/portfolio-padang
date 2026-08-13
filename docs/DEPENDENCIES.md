@@ -8,11 +8,12 @@
 - **Application lockfiles remain committed.** They pin the resolved package
   graph required by the constitution; this is separate from floating base
   image channels.
-- `AutoUpdate=registry` is set on all Quadlet containers. Podman auto-update tracks digest changes.
+- Application Quadlets intentionally omit `AutoUpdate=registry`. Mutable image
+  channels are refreshed only by the reviewed operator update wrapper.
 - OCI image digests recorded below for auditability and rollback reference.
 - Digests: verification pending containerized implementation validation; record
   the resolved digest after each approved pull or release.
-- Update digests after each `podman auto-update` or manual pull.
+- Update digests after each approved manual pull or deployment.
 - All builds happen inside `podman run --rm`; no compiler or Node.js installed on the VPS host.
 
 ---
@@ -68,7 +69,9 @@ Next.js artifacts can carry different build-time `basePath` values.
 ### Policy: No Pinned Version Numbers
 
 > Image tags are mutable. Version numbers MUST NOT be pinned in Quadlet files.
-> `podman auto-update` monitors digest changes and restarts containers when a new digest is available.
+> The application does not use unattended Podman auto-update. Keep
+> `podman-auto-update.timer` disabled and record the resolved digest after each
+> approved manual pull or deployment.
 > Record current digests below for rollback reference; update after each pull.
 
 ### Runtime Images (Quadlets)
