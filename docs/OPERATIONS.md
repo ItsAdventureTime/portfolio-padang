@@ -2,6 +2,35 @@
 
 ## Daily Operations
 
+### Update the deployed demo
+
+The repository currently automates the demo route (`/padang/demo`) only. Do
+not use this command for production (`/padang`); production needs its own
+approved promotion runbook and secrets.
+
+From the repository root on macOS, run:
+
+```bash
+scripts/update-padang-demo.sh
+```
+
+This is the normal update path. It synchronizes the current source to the VPS,
+runs the Go and Next.js checks/builds inside disposable Podman containers,
+applies pending migrations, restarts the demo API/frontend Quadlet services,
+and verifies `https://delegateops.business/padang/demo/api/v1/health`.
+It defaults to `jk@216.75.75.136:22`, so no environment variables are needed.
+Use `--host`, `--user`, or `--port` only if the SSH endpoint differs.
+
+Use `scripts/update-padang-demo.sh --dry-run` to synchronize and build without
+changing Quadlets, secrets, Caddy, or runtime data. Normal updates preserve the
+demo database. `--seed-demo` is an explicit destructive reset and should only
+be used when refreshing synthetic demo data is intended.
+
+The workflow follows the current Podman model: Quadlet files are systemd
+generated units, so the script reloads the user systemd manager and restarts
+the changed services after the artifact build. Runtime auto-update remains
+manual; the update command is the controlled release boundary.
+
 ### Health Check
 
 ```bash
@@ -15,9 +44,9 @@ curl https://delegateops.business/padang/demo/api/v1/health
 systemctl --user status bridge-ph-padang-frontend.service
 systemctl --user status bridge-ph-padang-api.service
 systemctl --user status bridge-ph-padang-db.service
-systemctl --user status bridge-ph-padang-demo-frontend.service
-systemctl --user status bridge-ph-padang-demo-api.service
-systemctl --user status bridge-ph-padang-demo-db.service
+systemctl --user status padang-demo-app.service
+systemctl --user status padang-demo-api.service
+systemctl --user status padang-demo-db.service
 ```
 
 ### Backup Status
@@ -39,10 +68,10 @@ successful restore test in the operations log.
 
 ```bash
 # Check reset timer
-systemctl --user list-timers bridge-ph-padang-demo-reset.timer
+systemctl --user list-timers padang-demo-reset.timer
 
 # Manual demo reset
-systemctl --user start bridge-ph-padang-demo-reset.service
+systemctl --user start padang-demo-reset.service
 ```
 
 ---
@@ -178,9 +207,9 @@ Record significant operational events below.
 
 ### Demo not resetting
 
-1. Check timer: `systemctl --user list-timers bridge-ph-padang-demo-reset.timer`
-2. Check last run: `journalctl --user -u bridge-ph-padang-demo-reset.service -n 20`
-3. Manual trigger: `systemctl --user start bridge-ph-padang-demo-reset.service`
+1. Check timer: `systemctl --user list-timers padang-demo-reset.timer`
+2. Check last run: `journalctl --user -u padang-demo-reset.service -n 20`
+3. Manual trigger: `systemctl --user start padang-demo-reset.service`
 
 ### Backup failure
 

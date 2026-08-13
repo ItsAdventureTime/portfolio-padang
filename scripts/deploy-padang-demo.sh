@@ -4,26 +4,37 @@ set -Eeuo pipefail
 readonly REMOTE_ROOT="/home/jk/bridge-ph/padang-demo"
 readonly REMOTE_SOURCE="${REMOTE_ROOT}/source"
 readonly REMOTE_SCRIPT="${REMOTE_SOURCE}/scripts/deploy-padang-demo-remote.sh"
+readonly DEFAULT_VPS_HOST="216.75.75.136"
+readonly PUBLIC_HEALTH_URL="https://delegateops.business/padang/demo/api/v1/health"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "${SCRIPT_DIR}/.." && pwd -P)
 readonly REPO_ROOT
 
-VPS_HOST="${VPS_HOST:-${REMOTE_HOST:-}}"
+VPS_HOST="${VPS_HOST:-${REMOTE_HOST:-$DEFAULT_VPS_HOST}}"
 VPS_USER="${VPS_USER:-${REMOTE_USER:-jk}}"
 VPS_PORT="${VPS_PORT:-${SSH_PORT:-22}}"
 DEPLOY_MODE="--apply"
+SEED_DEMO=0
+HEALTH_CHECK=1
 
 usage() {
   cat <<'USAGE'
-Usage: deploy-padang-demo.sh --host HOST [--user USER] [--port PORT]
-                              [--apply|--dry-run]
+Usage: deploy-padang-demo.sh [--apply|--dry-run] [--seed-demo]
+                              [--host HOST] [--user USER] [--port PORT]
+                              [--skip-health-check]
 
+Defaults: jk@216.75.75.136:22 and the public demo health URL.
+Use --host/--user/--port only when your SSH endpoint differs.
 Options may also be supplied as VPS_HOST, VPS_USER, and VPS_PORT.
 REMOTE_HOST, REMOTE_USER, and SSH_PORT remain accepted for compatibility.
 The Padang demo repository is synchronized to /home/jk/bridge-ph/padang-demo/source,
 then the source-side remote deployment script is invoked. The official URL is
 https://delegateops.business/padang/demo/.
+
+Normal apply updates preserve demo data. --seed-demo is an explicit destructive
+operation that reseeds the demo database and must not be used for routine code
+updates.
 USAGE
 }
 
@@ -123,6 +134,14 @@ while (($#)); do
       DEPLOY_MODE='--dry-run'
       shift
       ;;
+    --seed-demo)
+      SEED_DEMO=1
+      shift
+      ;;
+    --skip-health-check)
+      HEALTH_CHECK=0
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -193,6 +212,17 @@ printf 'Synchronizing repository to %s:%s/ ...\n' "$SSH_TARGET" \
   "${SSH_TARGET}:${REMOTE_SOURCE}/"
 
 printf 'Invoking VPS-side deployment (%s) ...\n' "$DEPLOY_MODE"
-"${REMOTE_SSH[@]}" "bash -- '$REMOTE_SCRIPT' '$DEPLOY_MODE'"
+remote_command=(bash -- "$REMOTE_SCRIPT" "$DEPLOY_MODE")
+((SEED_DEMO)) && remote_command+=(--seed-demo)
+printf -v remote_command_line '%q ' "${remote_command[@]}"
+"${REMOTE_SSH[@]}" "$remote_command_line"
+
+if [[ "$DEPLOY_MODE" == --apply && "$HEALTH_CHECK" == 1 ]]; then
+  printf 'Checking public demo health: %s\n' "$PUBLIC_HEALTH_URL"
+  command -v curl >/dev/null 2>&1 || die 'curl is required for the public health check'
+  curl --fail-with-body --silent --show-error --max-time 30 \
+    "$PUBLIC_HEALTH_URL" >/dev/null ||
+    die "public demo health check failed; inspect the VPS service status and logs"
+fi
 
 printf 'Padang demo deployment command completed.\n'

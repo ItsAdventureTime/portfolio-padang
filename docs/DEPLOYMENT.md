@@ -4,9 +4,34 @@
 
 - **OS:** Fedora CoreOS (latest stable), rootless Podman, SELinux enforcing
 - **User:** `jk` (rootless; `systemctl --user`)
+- **VPS SSH target:** `jk@216.75.75.136:22` (deployment transport only)
 - **Ingress:** Existing Caddy container joined to the dedicated Padang proxy
   networks; app containers do not join the existing `caddy.network`
 - **URL routing:** Path-based (`/padang` prod, `/padang/demo` demo)
+
+## Current Deployment Guidance
+
+This runbook follows the current upstream model for the selected stack:
+
+- Podman Quadlet files are systemd-generated units. The updater runs
+  `systemctl --user daemon-reload` before starting/restarting them and manages
+  health through the generated service/container lifecycle.
+- Podman auto-update remains disabled for this application. Updates are
+  reviewed, built, migrated, restarted, and health-checked as one operator
+  action; this avoids an unattended image change bypassing application checks.
+- The local wrapper keeps connection settings as command-line defaults rather
+  than requiring manually exported environment variables. Secrets remain
+  Podman secrets and are never written to the wrapper configuration.
+- Quadlet `[Install]` relationships describe boot-time activation, but the
+  updater explicitly starts generated units after `daemon-reload`; routine
+  updates do not run `systemctl enable` on generated container services.
+- If deployment is later moved into GitHub Actions, use a protected GitHub
+  environment, restricted deployment branches, required approval, and a
+  concurrency group so production deployments cannot overlap.
+
+References: [Podman Quadlet documentation](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html),
+[Podman auto-update](https://docs.podman.io/en/stable/markdown/podman-auto-update.1.html),
+and [GitHub deployment environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments).
 
 ---
 
@@ -20,10 +45,10 @@ Slug format: `{client}-{app}-{env}-{component}`
 | App data directory | `/home/jk/bridge-ph/padang-demo/` | `/home/jk/bridge-ph/padang/` |
 | Internal network | `bridge-ph-padang-demo.network` | `bridge-ph-padang.network` |
 | Proxy network | `bridge-ph-padang-demo-proxy.network` | `bridge-ph-padang-proxy.network` |
-| Frontend container | `bridge-ph-padang-demo-frontend` | `bridge-ph-padang-frontend` |
-| API container | `bridge-ph-padang-demo-api` | `bridge-ph-padang-api` |
-| DB container | `bridge-ph-padang-demo-db` | `bridge-ph-padang-db` |
-| Reset container | `bridge-ph-padang-demo-reset` | N/A |
+| Frontend container | `padang-demo-app` | `bridge-ph-padang-frontend` |
+| API container | `padang-demo-api` | `bridge-ph-padang-api` |
+| DB container | `padang-demo-db` | `bridge-ph-padang-db` |
+| Reset container | `padang-demo-reset` | N/A |
 | Backup container | N/A | `bridge-ph-padang-backup` |
 | DB name | `padang_demo` | `padang_prod` |
 | DB user | `padang_demo_user` | `padang_prod_user` |
@@ -68,6 +93,11 @@ bucket and prefix.
 Follows the same proxy-network pattern as PIMASCOR (existing project on this VPS).
 Caddy is NOT on the internal app network — it reaches containers only via proxy networks.
 
+The supported demo updater renders the live demo units as `padang-demo-*` and
+keeps the checked-in `quadlets/demo/` files as reference templates only. Use
+`scripts/update-padang-demo.sh` for the deployed demo; do not mix the legacy
+template names below with the live updater unit names.
+
 ```
 Internet (port 443)
   └─ caddy.container
@@ -78,15 +108,15 @@ Internet (port 443)
 Demo stack:
   caddy
     → (bridge-ph-padang-demo-proxy.network)
-      → bridge-ph-padang-demo-frontend  (Next.js; reverse proxy)
-      → bridge-ph-padang-demo-api       (Go API; reverse proxy for /padang/demo/api/*)
+      → padang-demo-app  (Next.js; reverse proxy)
+      → padang-demo-api  (Go API; reverse proxy for /padang/demo/api/*)
 
-  bridge-ph-padang-demo-api
+  padang-demo-api
     → (bridge-ph-padang-demo.network — internal only)
-      → bridge-ph-padang-demo-db       (PostgreSQL; not reachable from Caddy)
+      → padang-demo-db  (PostgreSQL; not reachable from Caddy)
 
 Additional (demo):
-  bridge-ph-padang-demo-reset  (one-shot; joins bridge-ph-padang-demo.network → DB)
+  padang-demo-reset  (one-shot; joins bridge-ph-padang-demo.network → DB)
 
 Production stack (identical pattern, different network names and containers):
   caddy → bridge-ph-padang-proxy.network → frontend + api
@@ -106,6 +136,13 @@ Production stack (identical pattern, different network names and containers):
 ---
 
 ## Quadlet Files
+
+The examples in this section describe the checked-in static templates under
+`quadlets/demo/` and `quadlets/prod/`. The current demo deployment script
+renders its own `padang-demo-*` files under the VPS Quadlet directory so it can
+pin the locally built artifacts and manage migrations safely. For the live
+demo, follow the updater procedure below instead of copying these demo
+templates directly.
 
 ### Networks
 
@@ -470,85 +507,64 @@ backups before changing it.
         │   ├── bridge-ph-padang-frontend.container
         │   ├── bridge-ph-padang-backup.container
         │   └── bridge-ph-padang-backup.timer
-        └── padang-demo/      ← Demo Quadlets
+        └── padang-demo/      ← Demo Quadlets rendered by the updater
             ├── bridge-ph-padang-demo.network
-            ├── bridge-ph-padang-demo-db.container
-            ├── bridge-ph-padang-demo-api.container
-            ├── bridge-ph-padang-demo-frontend.container
-            ├── bridge-ph-padang-demo-reset.container
-            └── bridge-ph-padang-demo-reset.timer
+            ├── bridge-ph-padang-demo-proxy.network
+            ├── padang-demo-db.container
+            ├── padang-demo-migrate.container
+            ├── padang-demo-api.container
+            ├── padang-demo-app.container
+            ├── padang-demo-reset.container
+            └── padang-demo-reset.timer
 ```
 
 ---
 
 ## Deployment Procedure (initial)
 
+The supported demo bootstrap/update path is the local wrapper. It synchronizes
+the source to the VPS, builds and validates it in disposable Podman
+containers, renders the current Quadlets, and starts the demo stack:
+
 ```bash
-# 1. Create directories
-mkdir -p /home/jk/bridge-ph/padang/postgres-data
-mkdir -p /home/jk/bridge-ph/padang-demo/postgres-data
-mkdir -p /home/jk/.config/containers/systemd/bridge-ph/padang
-mkdir -p /home/jk/.config/containers/systemd/bridge-ph/padang-demo
+# macOS, from the repository root; defaults to jk@216.75.75.136:22
+scripts/deploy-padang-demo.sh
+```
 
-# 2. Set up secrets (run secrets-setup.sh)
-bash ~/padang-erp/scripts/secrets-setup.sh
+For an already provisioned VPS, use the shorter alias:
 
-# 3. Copy Quadlet files
-cp quadlets/demo/* /home/jk/.config/containers/systemd/bridge-ph/padang-demo/
-cp quadlets/prod/* /home/jk/.config/containers/systemd/bridge-ph/padang/
+```bash
+scripts/update-padang-demo.sh
+```
 
-# 4. Reload systemd
-systemctl --user daemon-reload
+Production bootstrap remains a separately approved operation. If it is being
+performed manually, the production-only service start sequence is:
 
-# 5. Start demo environment
-systemctl --user start bridge-ph-padang-demo-db.service
-systemctl --user start bridge-ph-padang-demo-api.service
-systemctl --user start bridge-ph-padang-demo-frontend.service
-systemctl --user enable --now bridge-ph-padang-demo-reset.timer
-
-# 6. Start production environment
+```bash
+# Start production environment
 systemctl --user start bridge-ph-padang-db.service
 systemctl --user start bridge-ph-padang-api.service
 systemctl --user start bridge-ph-padang-frontend.service
-systemctl --user enable --now bridge-ph-padang-backup.timer
+systemctl --user start bridge-ph-padang-backup.timer
 
-# 7. Update Caddy configuration
+# Update Caddy configuration
 # (Inspect existing config first per Section 10 of Project Constitution)
 ```
 
 ---
 
-## Update Procedure (manual)
+## Update Procedure
 
-```bash
-# 1. Review release notes for breaking changes
+Use `scripts/update-padang-demo.sh` for the deployed demo. It is the
+idempotent operator path: source sync → disposable-container validation/build
+→ migration run → API/frontend restart → health check. Do not manually stop
+and start the demo API/frontend for a normal source update, because `start`
+does not replace an already-running process.
 
-# 2. Dry run
-podman auto-update --dry-run
-
-# 3. Update DEMO first
-systemctl --user stop bridge-ph-padang-demo-frontend.service
-systemctl --user stop bridge-ph-padang-demo-api.service
-podman pull ghcr.io/itsadventuretime/padang-erp-api:demo-latest
-podman pull ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
-systemctl --user start bridge-ph-padang-demo-api.service
-systemctl --user start bridge-ph-padang-demo-frontend.service
-
-# 4. Verify demo health
-# Run E2E smoke tests against demo
-
-# 5. Update PRODUCTION (after approval)
-systemctl --user stop bridge-ph-padang-frontend.service
-systemctl --user stop bridge-ph-padang-api.service
-# (API runs migrations on startup)
-systemctl --user start bridge-ph-padang-api.service
-systemctl --user start bridge-ph-padang-frontend.service
-
-# 6. Verify production health
-# Run health check script
-
-# 7. Record old and new resolved image digests in docs/DEPENDENCIES.md
-```
+The updater deliberately does not enable `podman-auto-update.timer`; image
+updates remain an explicit operator action. Production promotion is separate,
+requires its approved environment/secrets, and remains governed by
+`docs/HANDOFF.md` and the production runbook.
 
 ---
 
@@ -568,8 +584,8 @@ The repository includes a two-stage deployment flow for the Padang demo route
 at `/padang/demo/`:
 
 ```bash
-# macOS, from the repository root
-scripts/deploy-padang-demo.sh --host VPS_HOST
+# macOS, from the repository root; defaults to jk@216.75.75.136:22
+scripts/deploy-padang-demo.sh --host 216.75.75.136 --user jk --port 22
 ```
 
 The macOS side performs no compilation, package installation, or application
@@ -605,8 +621,9 @@ The remote script:
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
   and container names use the `padang-demo` deployment identity and remain
   separate from production;
-- runs migrations, performs the guarded synthetic demo seed, and starts the
-  30-minute reset timer; and
+- runs migrations, preserves the existing demo database by default, and starts
+  the 30-minute reset timer; `--seed-demo` is required for an intentional
+  destructive reseed; and
 - makes only the required Caddy network and `/padang/demo/api/*` route changes,
   stages the Caddyfile, formats it with `caddy fmt --overwrite`, validates it
   with `caddy validate`, then atomically replaces it after a timestamped backup;
@@ -647,31 +664,53 @@ explicitly only when the VPS uses a different caddy Quadlet path.
 
 ### Operator commands
 
-Run these commands from the repository root on macOS. Replace `VPS_HOST` with
-the VPS hostname or address. The macOS wrapper only performs the source sync
-and remote handoff; compilation and application startup occur on the VPS.
+These commands update the deployed demo route at `/padang/demo/`. Do not use
+the demo updater for the production route at `/padang`; production promotion
+requires a separate approved runbook and production-specific secrets.
+
+Run these commands from the repository root on macOS. The macOS wrapper only
+performs the source sync and remote handoff; compilation and application
+startup occur on the VPS.
 
 ```bash
-# 1. Compile, test, configure, and start the demo on the VPS.
-scripts/deploy-padang-demo.sh --host VPS_HOST --user jk --port 22 --apply
+# 1. Normal update: sync current source, test/build on the VPS, apply
+#    migrations, restart API/frontend, and verify the public health endpoint.
+#    Defaults to jk@216.75.75.136:22; no environment variables needed.
+scripts/update-padang-demo.sh
 
 # 2. Optional preflight: synchronize and build/test without changing
 #    Quadlets, runtime data, Caddy, or secrets.
-scripts/deploy-padang-demo.sh --host VPS_HOST --user jk --port 22 --dry-run
+scripts/update-padang-demo.sh --dry-run
+
+# 3. Explicitly use the default SSH endpoint (the same values are used when
+#    these flags are omitted).
+scripts/update-padang-demo.sh --host 216.75.75.136 --user jk --port 22
+
+# 4. Intentional demo reset only; this runs TRUNCATE ... CASCADE via the
+#    guarded seed service. Never use for a routine code update.
+scripts/update-padang-demo.sh --seed-demo
 ```
 
 The apply command prompts on the VPS for the Backblaze demo key ID and
 application key if the corresponding Podman secrets do not already exist.
 The key ID is visibly entered once; the application key is entered once
 without echo. Press Return after each value. The command generates the
-database username and password automatically. Do not place any
-of these values in a command line, `.env` file, Quadlet `Environment=`, or Git.
+database username and password automatically. Do not place any of these values
+in a command line, `.env` file, Quadlet `Environment=`, or Git.
 
-After deployment, inspect the demo from the VPS:
+Routine updates do not reseed data. The VPS-side script restarts the migration,
+API, and frontend units so bind-mounted build artifacts are actually loaded;
+`systemctl start` alone would leave an already-running API/frontend on its old
+process. It also reloads and starts the generated reset timer explicitly; it
+does not enable generated units during a routine update. It performs a public
+health check after apply. Use `--skip-health-check` only when DNS/TLS is
+intentionally unavailable during maintenance.
+
+After an update, inspect the demo from the VPS if the public health check fails:
 
 ```bash
-ssh -p 22 jk@VPS_HOST 'systemctl --user status padang-demo-db.service padang-demo-migrate.service padang-demo-api.service padang-demo-app.service padang-demo-reset.timer --no-pager'
-ssh -p 22 jk@VPS_HOST 'podman ps --format "table {{.Names}}\\t{{.Status}}" | grep padang-demo'
+ssh -p 22 jk@216.75.75.136 'systemctl --user status padang-demo-db.service padang-demo-migrate.service padang-demo-api.service padang-demo-app.service padang-demo-reset.timer --no-pager'
+ssh -p 22 jk@216.75.75.136 'podman ps --format "table {{.Names}}\\t{{.Status}}" | grep padang-demo'
 curl --fail-with-body https://delegateops.business/padang/demo/
 curl --fail-with-body https://delegateops.business/padang/demo/api/v1/health
 ```
@@ -679,8 +718,8 @@ curl --fail-with-body https://delegateops.business/padang/demo/api/v1/health
 For remote logs:
 
 ```bash
-ssh -p 22 jk@VPS_HOST 'journalctl --user -u padang-demo-api.service -u padang-demo-app.service -n 100 --no-pager'
-ssh -p 22 jk@VPS_HOST 'journalctl --user -u caddy.service -n 100 --no-pager'
+ssh -p 22 jk@216.75.75.136 'journalctl --user -u padang-demo-api.service -u padang-demo-app.service -n 100 --no-pager'
+ssh -p 22 jk@216.75.75.136 'journalctl --user -u caddy.service -n 100 --no-pager'
 ```
 
 The remote script validates and formats the assembled Caddyfile in a
@@ -700,10 +739,10 @@ mkdir -p /home/jk/.config/containers/systemd/bridge-ph/padang
 
 cp quadlets/prod/* /home/jk/.config/containers/systemd/bridge-ph/padang/
 systemctl --user daemon-reload
-systemctl --user enable --now bridge-ph-padang-db.service
-systemctl --user enable --now bridge-ph-padang-api.service
-systemctl --user enable --now bridge-ph-padang-frontend.service
-systemctl --user enable --now bridge-ph-padang-backup.timer
+systemctl --user start bridge-ph-padang-db.service
+systemctl --user start bridge-ph-padang-api.service
+systemctl --user start bridge-ph-padang-frontend.service
+systemctl --user start bridge-ph-padang-backup.timer
 
 curl --fail-with-body https://delegateops.business/padang/
 curl --fail-with-body https://delegateops.business/padang/api/v1/health

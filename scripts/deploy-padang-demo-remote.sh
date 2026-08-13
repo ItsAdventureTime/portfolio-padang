@@ -24,7 +24,47 @@ CADDY_QUADLET="${CADDY_QUADLET:-/home/jk/.config/containers/systemd/caddy/caddy.
 if [[ -d "$CADDY_QUADLET" ]]; then
   CADDY_QUADLET="$CADDY_QUADLET/caddy.container"
 fi
-MODE="${1:---apply}"
+MODE="--apply"
+SEED_DEMO=0
+
+usage() {
+  cat <<'USAGE'
+Usage: deploy-padang-demo-remote.sh [--apply|--dry-run] [--seed-demo]
+
+Normal apply updates preserve the existing demo database. --seed-demo is an
+explicit destructive operation that truncates and reseeds demo data.
+USAGE
+}
+
+while (($#)); do
+  case "$1" in
+    --apply)
+      MODE='--apply'
+      shift
+      ;;
+    --dry-run)
+      MODE='--dry-run'
+      shift
+      ;;
+    --seed-demo)
+      SEED_DEMO=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'padang-demo-remote: unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if ((SEED_DEMO)) && [[ "$MODE" != --apply ]]; then
+  printf 'padang-demo-remote: --seed-demo requires --apply\n' >&2
+  exit 2
+fi
 
 die() { printf 'padang-demo-remote: %s\n' "$*" >&2; exit 1; }
 log() { printf 'padang-demo-remote: %s\n' "$*"; }
@@ -123,8 +163,9 @@ build_backend() {
     -v "$BACKEND_BUILD:/out:Z" \
     -w /src docker.io/library/golang:alpine sh -ec '
       go mod download
-      go test ./...
-      go vet ./...
+      go test -p 1 ./...
+      go vet -p 1 ./...
+      go mod verify
       CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/padang-api ./cmd/api
     '
   test -x "$BACKEND_BUILD/padang-api" || die "backend compilation did not produce an executable"
@@ -142,10 +183,10 @@ build_frontend() {
       mkdir -p /tmp/padang-frontend
       cp -a /src/. /tmp/padang-frontend/
       cd /tmp/padang-frontend
-      npm ci --ignore-scripts
-      NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run typecheck
-      NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run lint
-      NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run build
+      npm ci --ignore-scripts --no-audit --no-fund
+      NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run typecheck
+      NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run lint
+      NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run build -- --webpack
       cp -a public .next/standalone/public
       cp -a .next/static .next/standalone/.next/static
       cp -a .next/standalone/. /out/
@@ -512,11 +553,16 @@ start_stack() {
     "${PROXY_NETWORK}-network.service"
   systemctl --user start padang-demo-db.service
   wait_healthy padang-demo-db
-  systemctl --user start padang-demo-migrate.service
-  systemctl --user start padang-demo-reset.service
-  systemctl --user start padang-demo-api.service
+  systemctl --user restart padang-demo-migrate.service
+  if ((SEED_DEMO)); then
+    log "explicit --seed-demo requested; reseeding demo database"
+    systemctl --user start padang-demo-reset.service
+  else
+    log "preserving demo database; use --seed-demo only for an intentional reset"
+  fi
+  systemctl --user restart padang-demo-api.service
   wait_healthy padang-demo-api
-  systemctl --user start padang-demo-app.service
+  systemctl --user restart padang-demo-app.service
   wait_healthy padang-demo-app
   systemctl --user start padang-demo-reset.timer
 }

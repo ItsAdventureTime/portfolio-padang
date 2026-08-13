@@ -47,6 +47,20 @@ podman machine start
 # See docs/DEPLOYMENT.md for full dev container setup
 ```
 
+## Update the Deployed Demo
+
+From the repository root on macOS, run:
+
+```sh
+scripts/update-padang-demo.sh
+```
+
+The command uses `jk@216.75.75.136:22` by default, preserves demo data, and
+checks `https://delegateops.business/padang/demo/api/v1/health` after an
+apply. Use `--dry-run` to validate without changing Quadlets, secrets, Caddy,
+or runtime data. Use `--seed-demo` only when an intentional synthetic-data
+reset is required. See `docs/DEPLOYMENT.md` for the full runbook.
+
 ---
 
 ## Documentation Index

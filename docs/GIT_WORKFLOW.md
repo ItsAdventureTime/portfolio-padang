@@ -13,6 +13,8 @@ The source repository is authoritative. C1 work stays on `feat/*` branches;
   Git credential helper
 - SSH URLs, SSH keys, and passkey-based Git operations are not part of this
   workflow
+- VPS deployment SSH is separate from GitHub: the demo updater connects to
+  `jk@216.75.75.136:22`; GitHub updates still use the HTTPS `origin` above.
 
 GitHub supports HTTPS and SSH remote URLs. This project selects HTTPS, and
 GitHub CLI's `gh auth setup-git --hostname github.com` configures Git to use

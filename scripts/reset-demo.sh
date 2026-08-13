@@ -12,7 +12,7 @@ set -eu
 [ "$RUN_MODE" = seed ] || { echo "refusing reset: RUN_MODE is not seed" >&2; exit 1; }
 [ "$DB_NAME" = padang_demo ] || { echo "refusing reset: DB_NAME is not padang_demo" >&2; exit 1; }
 case "$DB_HOST" in
-  bridge-ph-padang-demo-db) ;;
+  bridge-ph-padang-demo-db|padang-demo-db) ;;
   *) echo "refusing reset: DB_HOST is not an approved demo database" >&2; exit 1 ;;
 esac
 [ "$RESET_GUARD" = demo-only ] || { echo "refusing reset: reset guard mismatch" >&2; exit 1; }
