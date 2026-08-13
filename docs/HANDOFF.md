@@ -10,9 +10,9 @@ containerized validation are complete; demo/production deployment is not
 authorized in C1.
 BRANCH: feat/c1-foundation
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: b213155 (`fix(deploy): simplify Padang demo VPS updates`)
+LATEST IMPLEMENTATION COMMIT: 294aacb (`fix(deploy): align canonical demo routes and update policy`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Pushed b213155 to `origin/feat/c1-foundation` via the
+REMOTE PUSH STATUS: Pushed 294aacb to `origin/feat/c1-foundation` via the
 authenticated HTTPS GitHub CLI path
 DEMO VPS SSH TARGET: `jk@216.75.75.136:22`
 DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
@@ -323,6 +323,8 @@ an undocumented placeholder table.
   route remains `https://delegateops.business/padang/demo`.
 - Routine updates use `scripts/update-padang-demo.sh` and preserve demo data;
   `--seed-demo` is reserved for an intentional synthetic-data reset.
+- Application Quadlets omit `AutoUpdate=registry`; the remote updater refuses
+  apply while `podman-auto-update.timer` is active or enabled.
 - Padang demo Quadlets install under
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/`; persistent
   state installs under `/home/jk/bridge-ph/padang-demo/`.
