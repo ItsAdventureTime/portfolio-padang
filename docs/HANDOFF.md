@@ -5,14 +5,14 @@
 CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
 CURRENT PHASE: C1 — implementation and containerized validation
 STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
-remediation, documentation updates, deployment-update workflow, and
-containerized validation are complete; demo/production deployment is not
-authorized in C1.
+remediation, documentation updates, deployment-update workflow, containerized
+validation, and frontend npm cache remediation are complete; demo/production
+deployment is not authorized in C1.
 BRANCH: feat/c1-foundation
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 294aacb (`fix(deploy): align canonical demo routes and update policy`)
+LATEST IMPLEMENTATION COMMIT: 7e2771a (`fix(deploy): isolate frontend npm cache`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Pushed 294aacb to `origin/feat/c1-foundation` via the
+REMOTE PUSH STATUS: Fix and documentation updates are pushed through the
 authenticated HTTPS GitHub CLI path
 DEMO VPS SSH TARGET: `jk@216.75.75.136:22`
 DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
@@ -28,6 +28,17 @@ transactional audit coverage, secret-input confirmation, OpenAPI drift, and
 request-ID response metadata. The executor remediation and integration pass
 address those C1 findings. Remaining hardening work is explicitly tracked in
 `docs/SECURITY.md` and is not a deployment authorization.
+
+## Deployment Update Remediation (2026-08-14)
+
+The attached macOS CLI log showed SSH synchronization and backend validation
+passing, followed by frontend `npm ci` failing with `ENOENT: mkdir '/src/.npm'`.
+The source mount is intentionally read-only, so the remote frontend builder now
+uses a disposable `/tmp` tmpfs and fresh writable npm `HOME`, cache, and user
+config paths. A container-level `npm ci --ignore-scripts` probe against the
+read-only source mount passes with this configuration. Recovery guidance is in
+`docs/OPERATIONS.md`; the normal update command remains
+`scripts/update-padang-demo.sh`.
 
 ---
 
