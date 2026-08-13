@@ -318,6 +318,7 @@ build_frontend() {
       cd /tmp/padang-frontend
       npm ci --ignore-scripts --no-audit --no-fund \
         --cache /tmp/npm-cache --userconfig /tmp/npm-config/npmrc
+      npm run check:offline-fonts
       NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run typecheck
       NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run lint
       NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run build -- --webpack

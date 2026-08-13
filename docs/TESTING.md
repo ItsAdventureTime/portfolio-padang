@@ -142,7 +142,8 @@ The minimum implementation gate for the current C1 foundation is:
 
 - backend `go test -p 1 ./...`, `go vet -p 1 ./...`, `CGO_ENABLED=0 go build`,
   and `go mod verify`;
-- frontend `npm ci`, `npm run typecheck`, and `npm run lint`;
+- frontend `npm ci`, `npm run check:offline-fonts`, `npm run typecheck`, and
+  `npm run lint`;
 - both demo and production frontend builds, with `--webpack` when the local
   Podman VM cannot sustain Turbopack;
 - clean PostgreSQL migration up and down against `postgres:alpine`;
@@ -168,9 +169,10 @@ storage prevents `node_modules` and `.next` from being written to the host):
 podman run --rm \
   -v "$PWD/frontend:/src:ro" -v "$PWD/frontend/types:/export:rw" \
   -w /src docker.io/library/node:lts-alpine sh -c \
-  'cp -a /src /tmp/frontend && cd /tmp/frontend && \
-   npm ci --ignore-scripts --no-audit --no-fund && \
-   npm run typecheck && npm run lint'
+   'cp -a /src /tmp/frontend && cd /tmp/frontend && \
+    npm ci --ignore-scripts --no-audit --no-fund && \
+    npm run check:offline-fonts && \
+    npm run typecheck && npm run lint'
 ```
 
 For each base path, run the build in the same container-local copy:

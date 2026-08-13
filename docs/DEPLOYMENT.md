@@ -624,6 +624,13 @@ The remote script:
   with the source mounted read-only, a disposable `/tmp` tmpfs, and npm's
   `HOME`, cache, and user config all under `/tmp`; it sets
   `NEXT_PUBLIC_BASE_PATH=/padang/demo`;
+- installs the frontend's Fontsource variable packages with `npm ci`, so the
+  Next.js build gets Outfit, Inter, and JetBrains Mono from local package files
+  and does not require access to Google Fonts; it runs
+  `npm run check:offline-fonts` before the typecheck/lint/build gate. The
+  frontend build still needs
+  npm registry access unless the disposable builder is supplied a populated
+  npm cache;
 - installs runtime Quadlets in
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,

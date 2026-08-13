@@ -180,10 +180,10 @@ The launch UI is light-only. Dark-mode tokens and dark glassmorphism examples
 are removed from the design contract.
 
 All surfaces, status badges, cards, tables, and navigation use the defined
-light token set. Fonts are loaded through Next.js `next/font` or local assets,
-which self-hosts them at build time. The browser therefore does not need
-`fonts.googleapis.com` or `fonts.gstatic.com` in `connect-src`, `style-src`, or
-`font-src`.
+light token set. Fonts are loaded from local self-hosted assets (currently the
+Fontsource variable packages) and bundled during the build. The browser
+therefore does not need `fonts.googleapis.com` or `fonts.gstatic.com` in
+`connect-src`, `style-src`, or `font-src`.
 
 The CSP remains same-origin for scripts, styles, images, fonts, and API calls.
 The current temporary Next.js hydration allowance is documented as a launch

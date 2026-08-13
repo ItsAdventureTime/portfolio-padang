@@ -78,7 +78,7 @@ a gold ribbon banner, and clean bold typography.
 
 ## Typography
 
-### Fonts (Google Fonts)
+### Fonts (Self-Hosted and Build-Offline)
 
 | Role | Family | Weights | Usage |
 |---|---|---|---|
@@ -86,10 +86,20 @@ a gold ribbon banner, and clean bold typography.
 | **Body / UI** | Inter | 400, 500, 600 | All body text, labels, buttons, navigation |
 | **Monospace / Numbers** | JetBrains Mono | 400, 500 | Financial figures, reference numbers, codes |
 
-Load fonts through Next.js `next/font/google` or `next/font/local`, not a
-runtime CSS `@import`. Next.js downloads and self-hosts the selected font
-files at build time, so browsers make no request to Google and the CSP can
-remain same-origin.
+Load the fonts from the Fontsource variable packages listed in
+`frontend/package.json`: `@fontsource-variable/outfit`,
+`@fontsource-variable/inter`, and `@fontsource-variable/jetbrains-mono`.
+The root layout imports their package CSS, and `globals.css` maps the existing
+`--font-outfit`, `--font-inter`, and `--font-mono` variables to the packaged
+families. The variable `@font-face` declarations provide the full weight
+ranges used by the UI.
+
+Font files are therefore supplied by `npm ci` and bundled from local
+dependencies during `next build`. The build must not import `next/font/google`
+or use a runtime CSS `@import` from Google; browsers make no request to Google
+and the CSP can remain same-origin. A VPS still needs npm registry access (or
+an equivalent populated npm cache) to install dependencies, but the Next.js
+build itself does not need `fonts.googleapis.com` or `fonts.gstatic.com`.
 
 ### Type Scale
 

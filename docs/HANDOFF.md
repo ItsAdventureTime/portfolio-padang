@@ -58,6 +58,16 @@ the assembled Caddyfile with disposable Caddy tooling before changing the
 timestamped backups or reloading Caddy. Local insertion fixtures cover legacy,
 generic, and unsafe layouts.
 
+## Offline Font Build Remediation (2026-08-14)
+
+The frontend no longer imports fonts through `next/font/google`, which caused
+VPS `next build` failures when Google Fonts was unreachable. Outfit, Inter, and
+JetBrains Mono now come from Fontsource variable packages installed by
+`npm ci`; the existing CSS font-role variables remain unchanged. The focused
+`frontend` check `npm run check:offline-fonts` verifies the layout import and
+package/lockfile metadata. The VPS build still needs npm registry access (or a
+configured npm cache) to install dependencies, but no Google Fonts access.
+
 ---
 
 ## Specification Overview & Architectural Decisions
@@ -98,8 +108,8 @@ planning and supersede older contradictory wording in this document.
   rclone configured for Backblaze B2's S3-compatible API; the previous
   PostgreSQL-only backup example was invalid.
 - The API is the shared boundary for web and future Expo/React Native clients.
-- The launch design is light-only, with self-hosted fonts through `next/font`
-  and light CSP-compatible tokens.
+- The launch design is light-only, with self-hosted Fontsource fonts and light
+  CSP-compatible tokens.
 - Demo reset is operator/systemd-only and fails closed on environment/database
   identity checks.
 

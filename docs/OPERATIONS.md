@@ -226,6 +226,22 @@ command. If the log still names `/src/.npm`, the updated remote script was not
 synchronized; rerun from the current repository checkout. Do not make `/src`
 writable or delete source files to recover.
 
+### Frontend build reports Google Fonts fetch timeouts
+
+The frontend uses local Fontsource variable packages, so `next build` must not
+contact `fonts.googleapis.com` or `fonts.gstatic.com`. If a build log still
+reports `next/font/google` or Google Fonts retries, the VPS is building stale
+source or the source synchronization is incomplete. From the repository root,
+run the focused check before retrying the update:
+
+```bash
+cd frontend
+npm run check:offline-fonts
+```
+
+This check verifies that `layout.tsx` has no `next/font/google` import and that
+both package metadata and the lockfile contain all three local font packages.
+
 ### API container not starting
 
 1. Check logs: `journalctl --user -u bridge-ph-padang-api.service -n 50`

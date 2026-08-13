@@ -18,7 +18,7 @@ that the application has been built or validated.
 |---|---|
 | Node.js | Use Active or Maintenance LTS for production; the container policy therefore uses the floating official `node:lts-alpine` tag. |
 | Next.js | `basePath` is build-time configuration; demo and production therefore require separate artifacts from the same source revision. Standalone output and a reverse proxy are the planned self-hosting pattern. |
-| Fonts/CSP | Self-host fonts with `next/font`; keep the CSP policy same-origin and document any Next.js nonce work as implementation follow-up. |
+| Fonts/CSP | Self-host fonts with local Fontsource variable packages; keep the CSP policy same-origin and document any Next.js nonce work as implementation follow-up. |
 | Caddy | Preserve the frontend prefix with `handle`; strip only the external API prefix before proxying to the path-neutral API. Route order is explicit. |
 | Podman | Keep image channels floating, omit `AutoUpdate` from application Quadlets, and use the reviewed operator update wrapper while the automatic timer remains disabled. |
 | Future mobile | TypeScript is supported by React Native; Expo/React Native is the future client direction behind the shared API/OpenAPI boundary. |
@@ -31,6 +31,7 @@ Primary references:
 - [Next.js standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
 - [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting)
 - [Next.js fonts](https://nextjs.org/docs/app/getting-started/fonts)
+- [Fontsource variable fonts](https://fontsource.org/docs/getting-started/variable)
 - [Next.js CSP guidance](https://nextjs.org/docs/pages/guides/content-security-policy)
 - [Caddy `reverse_proxy`](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
 - [Caddy `route`](https://caddyserver.com/docs/caddyfile/directives/route)
