@@ -6,11 +6,11 @@ CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
 CURRENT PHASE: C1 — implementation and containerized validation
 STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
 remediation, documentation updates, deployment-update workflow, containerized
-validation, and frontend npm cache remediation are complete; demo/production
-deployment is not authorized in C1.
+validation, frontend npm cache remediation, and Caddy route insertion
+remediation are complete; demo/production deployment is not authorized in C1.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 7e2771a (`fix(deploy): isolate frontend npm cache`)
+LATEST IMPLEMENTATION COMMIT: ee1bfc2 (`fix(deploy): make caddy route installation layout safe`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
@@ -44,6 +44,19 @@ read-only source mount passes with this configuration. Recovery guidance is in
 The previous `docs/phase-0` and `feat/c1-foundation` branches remain as
 historical references. Both are ancestors of `main` and contain no divergent
 work requiring a separate merge or repair.
+
+## Caddy Deployment Remediation (2026-08-14)
+
+The next demo update completed backend and frontend validation but stopped when
+the remote script could not find the literal `# DelegateOps static-site
+fallback` comment in the existing Caddyfile. The updater now manages the
+documented `padang-demo.handlers.Caddyfile` import inside the
+`delegateops.business` site block, supports the older marker and generic
+`handle { ... }` fallback, preserves an existing inline managed route, and
+fails closed when no unambiguous site/fallback exists. It stages and validates
+the assembled Caddyfile with disposable Caddy tooling before changing the
+timestamped backups or reloading Caddy. Local insertion fixtures cover legacy,
+generic, and unsafe layouts.
 
 ---
 
