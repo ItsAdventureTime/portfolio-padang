@@ -93,6 +93,22 @@ export interface paths {
         };
         get: operations["listProjects"];
         put?: never;
+        post: operations["createProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProject"];
+        put: operations["updateProject"];
         post?: never;
         delete?: never;
         options?: never;
@@ -109,11 +125,27 @@ export interface paths {
         };
         get: operations["listFabricationJobs"];
         put?: never;
-        post?: never;
+        post: operations["createFabricationJob"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fabrication/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateFabricationStatus"];
         trace?: never;
     };
     "/api/v1/procurement/purchase-requests": {
@@ -125,7 +157,7 @@ export interface paths {
         };
         get: operations["listPurchaseRequests"];
         put?: never;
-        post?: never;
+        post: operations["createPurchaseRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -157,7 +189,7 @@ export interface paths {
         };
         get: operations["listFundRequests"];
         put?: never;
-        post?: never;
+        post: operations["createFundRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -173,7 +205,39 @@ export interface paths {
         };
         get: operations["listInventoryItems"];
         put?: never;
-        post?: never;
+        post: operations["createInventoryItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/stock-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["stockIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/stock-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["stockOut"];
         delete?: never;
         options?: never;
         head?: never;
@@ -189,7 +253,7 @@ export interface paths {
         };
         get: operations["listProgressBillings"];
         put?: never;
-        post?: never;
+        post: operations["createProgressBilling"];
         delete?: never;
         options?: never;
         head?: never;
@@ -261,6 +325,33 @@ export interface components {
             /** Format: uuid */
             challenge_id: string;
             code: string;
+        };
+        AttachmentPresignRequest: {
+            /** @enum {string} */
+            entity_type: "project" | "fabrication_job" | "purchase_request" | "purchase_order" | "fund_request" | "progress_billing" | "fabrication_billing" | "collection" | "client" | "supplier" | "reimbursement" | "liquidation";
+            /** Format: uuid */
+            entity_id: string;
+            file_name: string;
+            /** @enum {string} */
+            content_type: "application/pdf" | "application/acad" | "application/vnd.autocad.dwg" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "image/jpeg" | "image/png" | "image/webp" | "text/plain" | "text/csv" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            /** Format: int64 */
+            size: number;
+            /** @enum {string} */
+            category?: "contract" | "drawing" | "permit" | "photo" | "report" | "receipt" | "other";
+        };
+        AttachmentPresignResponse: {
+            data: {
+                /** Format: uuid */
+                attachment_id: string;
+                storage_key: string;
+                /** Format: uri */
+                upload_url: string;
+                /** @enum {string} */
+                method: "PUT";
+            };
+            meta?: {
+                request_id?: string;
+            };
         };
     };
     responses: never;
@@ -417,6 +508,78 @@ export interface operations {
             };
         };
     };
+    createProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid project */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listFabricationJobs: {
         parameters: {
             query?: never;
@@ -427,6 +590,42 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Fabrication job list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createFabricationJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fabrication job created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateFabricationStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fabrication status updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -446,6 +645,24 @@ export interface operations {
         responses: {
             /** @description Purchase request list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createPurchaseRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Purchase request created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -489,6 +706,24 @@ export interface operations {
             };
         };
     };
+    createFundRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fund request created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listInventoryItems: {
         parameters: {
             query?: never;
@@ -507,6 +742,60 @@ export interface operations {
             };
         };
     };
+    createInventoryItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Inventory item created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stockIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock received */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stockOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock issued */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listProgressBillings: {
         parameters: {
             query?: never;
@@ -518,6 +807,24 @@ export interface operations {
         responses: {
             /** @description Progress billing list */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createProgressBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Progress billing created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -568,10 +875,44 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachmentPresignRequest"];
+            };
+        };
         responses: {
-            /** @description B2 upload URL */
+            /** @description B2 upload URL and persisted attachment metadata */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPresignResponse"];
+                };
+            };
+            /** @description Invalid attachment metadata */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient role or ownership */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entity not found or not owned */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Attachment storage unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

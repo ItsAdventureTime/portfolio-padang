@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"path"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 )
 
 var ErrNotConfigured = errors.New("B2 storage is not configured")
+var ErrInvalidObject = errors.New("invalid storage object")
 
 type Object struct {
 	Key, ContentType string
@@ -50,12 +52,19 @@ func (s B2S3Service) PresignUpload(ctx context.Context, object Object) (string, 
 	if !s.Configured || s.presigner == nil {
 		return "", ErrNotConfigured
 	}
+	if object.Size <= 0 || object.Size > 50*1024*1024 || strings.TrimSpace(object.ContentType) == "" || !validKey(object.Key) {
+		return "", ErrInvalidObject
+	}
 	key := strings.TrimPrefix(s.Prefix+object.Key, "/")
-	result, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.Bucket), Key: aws.String(key), ContentType: aws.String(object.ContentType)}, s3.WithPresignExpires(time.Hour))
+	result, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.Bucket), Key: aws.String(key), ContentType: aws.String(object.ContentType), ContentLength: aws.Int64(object.Size)}, s3.WithPresignExpires(time.Hour))
 	if err != nil {
 		return "", err
 	}
 	return result.URL, nil
+}
+
+func validKey(key string) bool {
+	return key != "" && !strings.HasPrefix(key, "/") && !strings.Contains(key, "\\") && path.Clean(key) == key && !strings.Contains(key, "..")
 }
 
 func (s B2S3Service) PresignDownload(ctx context.Context, key string) (string, error) {

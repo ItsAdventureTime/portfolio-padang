@@ -14,4 +14,8 @@ func TestVariationCap(t *testing.T) {
 	if !blocked.Blocked {
 		t.Fatalf("variation above 10%% should block")
 	}
+	exact := CheckVariation(big.NewRat(100, 1), big.NewRat(10, 1))
+	if !exact.Warning || !exact.Blocked {
+		t.Fatalf("variation at exactly 10%% should warn and block")
+	}
 }

@@ -22,6 +22,7 @@ QuickBooks Online (QBO) remains the official accounting system of record. This E
 3. Read `docs/HANDOFF.md` for current phase and next action.
 4. Read `docs/PLANNING_CLARIFICATIONS.md` for resolved intake decisions.
 5. Read the relevant `docs/` file for your work area.
+6. Read `docs/GIT_WORKFLOW.md` before committing or updating GitHub.
 
 ## Local Development
 
@@ -62,6 +63,7 @@ podman machine start
 | `docs/DATABASE.md` | Schema design and migration strategy |
 | `docs/SECURITY.md` | Auth, RBAC, OWASP controls |
 | `docs/TESTING.md` | Test strategy and commands |
+| `docs/GIT_WORKFLOW.md` | Branch, Conventional Commit, and HTTPS-only GitHub workflow |
 | `docs/DEPLOYMENT.md` | Quadlet naming, Caddy, VPS layout |
 | `docs/OPERATIONS.md` | Health checks, updates, monitoring |
 | `docs/BACKUP_RESTORE.md` | Backup schedule and restore procedure |

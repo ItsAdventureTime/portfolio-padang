@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,8 @@ type RefreshToken struct {
 
 type AuthStore struct{ Pool *pgxpool.Pool }
 
+var ErrConditionalUpdate = errors.New("conditional update affected no rows")
+
 func (s AuthStore) UserByEmail(ctx context.Context, email string) (AuthUser, error) {
 	var user AuthUser
 	err := s.Pool.QueryRow(ctx, `SELECT id,email,full_name,role,is_active FROM users WHERE lower(email)=lower($1) AND deleted_at IS NULL`, email).Scan(&user.ID, &user.Email, &user.FullName, &user.Role, &user.Active)
@@ -55,13 +58,25 @@ func (s AuthStore) OTP(ctx context.Context, id uuid.UUID) (OTP, error) {
 }
 
 func (s AuthStore) IncrementOTPAttempts(ctx context.Context, id uuid.UUID) error {
-	_, err := s.Pool.Exec(ctx, `UPDATE otp_codes SET attempts=attempts+1 WHERE id=$1 AND used_at IS NULL AND attempts<5`, id)
-	return err
+	command, err := s.Pool.Exec(ctx, `UPDATE otp_codes SET attempts=attempts+1 WHERE id=$1 AND used_at IS NULL AND attempts<5 AND expires_at > now()`, id)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return ErrConditionalUpdate
+	}
+	return nil
 }
 
 func (s AuthStore) MarkOTPUsed(ctx context.Context, id uuid.UUID) error {
-	_, err := s.Pool.Exec(ctx, `UPDATE otp_codes SET used_at=now() WHERE id=$1 AND used_at IS NULL`, id)
-	return err
+	command, err := s.Pool.Exec(ctx, `UPDATE otp_codes SET used_at=now() WHERE id=$1 AND used_at IS NULL AND expires_at > now()`, id)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return ErrConditionalUpdate
+	}
+	return nil
 }
 
 func (s AuthStore) CreateRefreshToken(ctx context.Context, token RefreshToken) error {
@@ -76,8 +91,14 @@ func (s AuthStore) RefreshToken(ctx context.Context, id uuid.UUID) (RefreshToken
 }
 
 func (s AuthStore) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
-	_, err := s.Pool.Exec(ctx, `UPDATE refresh_tokens SET revoked_at=now() WHERE id=$1 AND revoked_at IS NULL`, id)
-	return err
+	command, err := s.Pool.Exec(ctx, `UPDATE refresh_tokens SET revoked_at=now() WHERE id=$1 AND revoked_at IS NULL AND expires_at > now()`, id)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return ErrConditionalUpdate
+	}
+	return nil
 }
 
 func IsNotFound(err error) bool { return err == pgx.ErrNoRows }

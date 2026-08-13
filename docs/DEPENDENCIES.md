@@ -31,6 +31,7 @@
 | S3-compatible Go client | Latest supported release selected during C1 | Backblaze B2 S3 storage | Active |
 | resend/resend-go | Latest | Email (Resend) | Active |
 | testcontainers/testcontainers-go | Latest | Integration tests | Active |
+| govulncheck | `golang.org/x/vuln/cmd/govulncheck@latest` | Reachable Go vulnerability scan | C1 verified 2026-08-14 |
 
 ---
 

@@ -2,10 +2,15 @@
 
 ## Standards Applied
 
-- OWASP ASVS 5.0.0 (Application Security Verification Standard)
-- OWASP Top 10:2025
+- [OWASP ASVS 5.0.0](https://owasp.org/www-project-application-security-verification-standard/) (released May 2025)
+- [OWASP Top 10:2025](https://owasp.org/Top10/2025/)
 - OWASP Secrets Management Cheat Sheet
-- WCAG 2.2 (UI accessibility, covered in UI_UX.md)
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/) (UI accessibility, covered in UI_UX.md)
+- [Go vulnerability management and govulncheck](https://go.dev/doc/security/vuln/)
+
+These references were checked on 2026-08-14. The project applies the stable
+published versions above; a later standard revision requires an explicit
+architecture or security review before changing this baseline.
 
 ---
 
@@ -22,12 +27,15 @@ No passwords. Users authenticate by entering their registered email address and 
 4. Email sent via Resend with the 6-digit code
 5. User enters code → `POST /api/v1/auth/verify-otp`
 6. Server validates: code matches hash, not expired (10 min TTL), not already used, user is active
-7. On success: OTP record deleted (single-use); access token + refresh token issued
+7. On success: OTP record marked used (single-use); access token + refresh token issued
 
 **OTP Security Controls:**
 - Code: 6 digits; cryptographically random (crypto/rand); bcrypt hash stored (not plaintext)
 - TTL: 10 minutes from generation
 - Single-use: marked used immediately on first successful verification
+- Race safety: the `used_at IS NULL` conditional update makes concurrent
+  verification attempts single-winner; a losing request receives the same
+  invalid/expired response
 - Rate limiting: 3 OTP requests per email per 15 minutes; 5 verify attempts per OTP before auto-invalidation
 - Account enumeration prevention: identical response for unknown vs known email ("if your email is registered, a code has been sent")
 - Email delivery: Resend with proper SPF/DKIM/DMARC records (avoids spam classification)
@@ -39,7 +47,8 @@ No passwords. Users authenticate by entering their registered email address and 
 - Trade-off: slightly more friction (copy/paste) vs. magic link (one-click) — acceptable for an internal tool
 
 ### JWT Tokens (issued after OTP verification)
-- Algorithm: RS256 (asymmetric) — backend signs with private key; frontend verifies with public key
+- Algorithm: RS256 (asymmetric) — backend signs with the private key and
+  validates tokens; clients treat access tokens as opaque credentials
 - Access token lifetime: 15 minutes
 - Refresh token lifetime: 7 days, rotating on each use
 - Refresh token: stored server-side as bcrypt hash in `refresh_tokens` table
@@ -53,6 +62,8 @@ No passwords. Users authenticate by entering their registered email address and 
 - Requests receive a synthetic demo identity only when `APP_ENV=demo`
 - `X-Demo-Role` is accepted only in demo and must match the canonical role enum;
   it is ignored in production
+- The demo role selector stores only the selected canonical role in browser
+  session storage; the API validates the header independently on every request.
 - No OTP codes generated or emails sent in demo environment
 - Demo reset is operator/systemd-only and fails closed unless `APP_ENV=demo`,
   `RUN_MODE=seed`, and `DB_NAME=padang_demo` all match
@@ -146,9 +157,11 @@ See `scripts/secrets-setup.sh` for the interactive management script.
 - Request bodies are decoded with unknown-field rejection and explicit handler
   validation; module-specific schemas are added with each endpoint.
 - SQL: all queries via sqlc (parameterized; no string concatenation)
-- File presigning validates the object key, declared content type, and 50 MB
-  maximum size before a B2 URL is issued; upload-content inspection remains a
-  required follow-up before production file workflows.
+- Attachment presigning validates filename/path, MIME/extension pairing, file
+  size (1–50 MiB), category, entity ownership, and role before a B2 URL is
+  issued. The server derives the storage key and signs the expected content
+  type and length; upload-content inspection remains a required follow-up
+  before unrestricted production file workflows.
 - Amounts: validated as non-negative where required; precision enforced
 - UUIDs: validated format before any database lookup
 - Enum fields: validated against allowed value sets
@@ -178,6 +191,8 @@ See `scripts/secrets-setup.sh` for the interactive management script.
 
 - Stateless API; no server-side session state
 - Refresh token invalidated on logout
+- Refresh rotation is single-use under concurrent requests: the old row is
+  conditionally revoked before a replacement token is issued
 - All refresh tokens invalidated on OTP re-verification or explicit account
   security reset
 - `refresh_tokens` table pruned of expired tokens periodically (scheduled job or on login)
@@ -221,12 +236,16 @@ still a production-readiness follow-up.
 
 ## Audit Logging
 
-- All state changes append to `audit_log` table
-- All approval actions (approve/reject) logged with actor, timestamp, before/after status
-- All login attempts logged (success and failure)
-- Account lockouts logged
-- File uploads logged (who, what file, when, to which entity)
-- Export actions logged (who exported what, when)
+- Implemented state-changing C1 routes append to `audit_log` in the same
+  transaction as the mutation, including workflow transitions, approvals,
+  project/fabrication/procurement/billing/inventory writes, and attachment
+  presign metadata.
+- Approval actions log actor, timestamp, and before/after state.
+- Attachment audit records include entity, filename, derived storage key,
+  content type, size, actor, IP address, and user agent.
+- Login-attempt, account-lockout, and export-event audit coverage remains a
+  pre-production follow-up; this document does not claim those events are
+  currently wired.
 - `audit_log` is append-only; no UPDATE or DELETE in application code
 - Log retention: indefinite (table-based; B2 backup covers it)
 
@@ -235,7 +254,14 @@ still a production-readiness follow-up.
 ## Dependency Security
 
 - Go modules: `go mod verify` in CI
-- npm: `npm audit` in CI; no known high/critical vulnerabilities at release
+- Go dependencies: run `govulncheck ./...` from the containerized Go toolchain
+  when the scanner is available; review findings by reachable symbols
+- npm: `npm audit --audit-level=high` in CI; no known high/critical
+  vulnerabilities at release
+- C1 scan on 2026-08-14: `govulncheck` reported zero reachable
+  vulnerabilities after updating `github.com/jackc/pgx/v5` to v5.9.2 and
+  `golang.org/x/text` to v0.39.0; it still reported unreachable module findings
+  for review during future dependency updates.
 - Container base images: use official images; specify digest in `docs/DEPENDENCIES.md`
 - Podman auto-update managed manually per constitution §13
 
@@ -264,5 +290,5 @@ still a production-readiness follow-up.
 | A06: Vulnerable Components | `go mod verify`; `npm audit`; manual image update review |
 | A07: Auth Failures | Email OTP (no passwords); single-use codes; rate limiting; JWT rotation; no secret in logs |
 | A08: Software Integrity | go.sum; package-lock.json; image auto-update via podman (digest-based) |
-| A09: Logging Failures | Audit log; OTP request/verify events; structured logging; no secret in logs |
+| A09: Logging Failures | Transactional state-change audit log; structured logging; no secret in logs; login/export events remain a pre-production gap |
 | A10: SSRF | No user-supplied URL fetching; no internal service exposure |

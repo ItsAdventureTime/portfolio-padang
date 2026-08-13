@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, ChevronRight, Plus, Search } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
+import { useDemoRole } from '@/lib/demo-role-context';
 
 export type ModuleKey = 'projects' | 'fabrication' | 'procurement' | 'inventory' | 'billing' | 'finance' | 'reports' | 'settings';
 type Row = Record<string, string | number | null | undefined>;
@@ -63,6 +64,7 @@ function displayValue(value: Row[string]) {
 
 export function ModuleWorkspace({ module }: { module: ModuleKey }) {
   const config = modules[module];
+  const { role } = useDemoRole();
   const [rows, setRows] = useState<Row[]>(config.fallback);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(Boolean(config.endpoint));
@@ -74,7 +76,7 @@ export function ModuleWorkspace({ module }: { module: ModuleKey }) {
       if (active && payload.data.length > 0) setRows(payload.data);
     }).catch(() => undefined).finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [config.endpoint]);
+  }, [config.endpoint, role]);
 
   const filtered = useMemo(() => {
     const normalized = query.toLowerCase().trim();

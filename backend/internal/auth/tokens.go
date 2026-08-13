@@ -18,6 +18,10 @@ type Principal struct {
 	Demo              bool
 }
 
+func (p Principal) Active() bool {
+	return p.Subject != uuid.Nil && p.Role != ""
+}
+
 type TokenManager struct {
 	private               *rsa.PrivateKey
 	public                *rsa.PublicKey

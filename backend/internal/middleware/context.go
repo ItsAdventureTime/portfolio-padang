@@ -56,5 +56,9 @@ func RequireRoles(roles ...string) func(http.Handler) http.Handler {
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message}})
+	payload := map[string]any{"error": map[string]string{"code": code, "message": message}}
+	if provider, ok := w.(interface{ RequestID() string }); ok && provider.RequestID() != "" {
+		payload["meta"] = map[string]string{"request_id": provider.RequestID()}
+	}
+	_ = json.NewEncoder(w).Encode(payload)
 }

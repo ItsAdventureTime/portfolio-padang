@@ -4,13 +4,24 @@
 
 CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
 CURRENT PHASE: C1 — implementation and containerized validation
-STATUS: `GO: CODEX C1` received. Foundation implementation and containerized
-validation are complete; demo/production deployment is not authorized in C1.
+STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
+remediation, documentation updates, and containerized validation are complete;
+demo/production deployment is not authorized in C1.
 BRANCH: feat/c1-foundation
 BASE COMMIT: bbdd803
-LATEST COMMIT: pending C1 implementation commit
+LATEST IMPLEMENTATION COMMIT: pending local C1 remediation commit
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Push after final diff and credential review
+REMOTE PUSH STATUS: Pending final HTTPS push verification
+
+## C1 Review and Remediation Record
+
+The Luna reviewer identified authentication race conditions, stale production
+role claims, demo-role UI drift, incomplete OTP login, attachment validation
+gaps, workflow-transition bypasses, variation-order boundary behavior,
+transactional audit coverage, secret-input confirmation, OpenAPI drift, and
+request-ID response metadata. The executor remediation and integration pass
+address those C1 findings. Remaining hardening work is explicitly tracked in
+`docs/SECURITY.md` and is not a deployment authorization.
 
 ---
 

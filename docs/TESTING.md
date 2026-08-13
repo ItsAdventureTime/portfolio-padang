@@ -2,6 +2,18 @@
 
 ## Test Strategy
 
+## Execution Boundary
+
+All project runtimes, package managers, compilers, tests, vulnerability
+scanners, and build tools run inside Podman. The macOS host is limited to
+control-plane work such as Git, `gh`, Podman, and ordinary text utilities.
+Use an ephemeral container with a read-only source mount; keep dependency
+trees and disposable build output inside the container. Export only
+intentional generated artifacts.
+
+The local Podman VM currently has 2 GiB available. Use `-p 1` for Go checks
+and the Webpack build fallback for Next.js when Turbopack exceeds that limit.
+
 ### Pyramid
 
 ```
@@ -124,6 +136,62 @@ the two builds.
 
 ---
 
+## C1 Containerized Validation Profile
+
+The minimum implementation gate for the current C1 foundation is:
+
+- backend `go test -p 1 ./...`, `go vet -p 1 ./...`, `CGO_ENABLED=0 go build`,
+  and `go mod verify`;
+- frontend `npm ci`, `npm run typecheck`, and `npm run lint`;
+- both demo and production frontend builds, with `--webpack` when the local
+  Podman VM cannot sustain Turbopack;
+- clean PostgreSQL migration up and down against `postgres:alpine`;
+- `bash -n scripts/secrets-setup.sh` and `git diff --check`;
+- `govulncheck ./...` when the scanner is installed in the Go container.
+
+Example backend check:
+
+```sh
+podman run --rm \
+  -v "$PWD/backend:/src:ro" -w /src \
+  -e GOMAXPROCS=2 -e GOMEMLIMIT=1GiB \
+  docker.io/library/golang:alpine sh -c \
+  'go test -p 1 ./... && go vet -p 1 ./... && \
+   CGO_ENABLED=0 go build -trimpath -o /tmp/padang-api ./cmd/api && \
+   go mod verify'
+```
+
+Example frontend check (copying the read-only source into container-local
+storage prevents `node_modules` and `.next` from being written to the host):
+
+```sh
+podman run --rm \
+  -v "$PWD/frontend:/src:ro" -v "$PWD/frontend/types:/export:rw" \
+  -w /src docker.io/library/node:lts-alpine sh -c \
+  'cp -a /src /tmp/frontend && cd /tmp/frontend && \
+   npm ci --ignore-scripts --no-audit --no-fund && \
+   npm run typecheck && npm run lint'
+```
+
+For each base path, run the build in the same container-local copy:
+
+```sh
+NEXT_TELEMETRY_DISABLED=1 NEXT_PRIVATE_BUILD_WORKER=1 \
+NEXT_PUBLIC_APP_ENV=demo NEXT_PUBLIC_BASE_PATH=/padang/demo \
+NODE_OPTIONS=--max-old-space-size=384 npm run build -- --webpack
+```
+
+Repeat with `NEXT_PUBLIC_APP_ENV=production` and
+`NEXT_PUBLIC_BASE_PATH=/padang`. Run `npm run generate:types` after changing
+`backend/openapi/openapi.yaml`, then review the generated diff.
+
+The current C1 repository does not yet contain the Playwright, Vitest,
+`golangci-lint`, or testcontainers suites described below. Those are planned
+quality gates, not commands to report as passed until their files and scripts
+exist.
+
+---
+
 ## End-to-End Tests (Playwright)
 
 Location: `frontend/e2e/`
@@ -189,54 +257,54 @@ Steps:
 ## Commands Reference
 
 ```bash
-# Go: all tests
-go test ./...
+# Host control-plane checks
+/opt/homebrew/bin/podman machine list
+git diff --check
+bash -n scripts/secrets-setup.sh
 
-# Go: unit only (fast)
-go test ./internal/... -short
+# Backend: run inside the containerized Go toolchain
+podman run --rm -v "$PWD/backend:/src:ro" -w /src \
+  docker.io/library/golang:alpine sh -c 'go test -p 1 ./...'
+podman run --rm -v "$PWD/backend:/src:ro" -w /src \
+  docker.io/library/golang:alpine sh -c 'go vet -p 1 ./... && go mod verify'
 
-# Go: integration (requires Podman/Docker)
-go test ./... -tags=integration
+# Go vulnerability scan (when govulncheck is installed in the image)
+podman run --rm -v "$PWD/backend:/src:ro" -w /src \
+  docker.io/library/golang:alpine sh -c 'govulncheck ./...'
 
-# Go: race detector
-go test ./... -race
-
-# Go: coverage report
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-
-# Frontend: type check
+# Inside the copied frontend directory in node:lts-alpine; see the C1 profile
+# above for the complete read-only mount and container-local copy pattern.
+npm run generate:types
 npm run typecheck
-
-# Frontend: component tests
-npm run test
-
-# Frontend: E2E (requires demo running)
-npx playwright test
-
-# Frontend: accessibility audit
-npx playwright test --project=a11y
-
-# Lint (Go)
-golangci-lint run
-
-# Lint (Frontend)
 npm run lint
+npm run build -- --webpack
+
+# Inside the same container for dependency auditing
+npm audit --audit-level=high
+
+# Planned suites, only after their dependencies/scripts are added
+npx playwright test
+npx playwright test --project=a11y
 ```
 
 ---
 
 ## CI Quality Gates
 
-All of the following must pass before merging to `main`:
+All implemented checks must pass before merging to `main`:
 
-- [ ] `go build ./...` — compiles without error
-- [ ] `go vet ./...` — no vet errors
-- [ ] `golangci-lint run` — no lint errors
-- [ ] `go test ./...` — all unit tests pass
-- [ ] `go test ./... -tags=integration` — all integration tests pass
+- [ ] `go test -p 1 ./...` in Podman — all current Go tests pass
+- [ ] `go vet -p 1 ./...` in Podman — no vet errors
+- [ ] `CGO_ENABLED=0 go build ./cmd/api` in Podman — compiles without error
+- [ ] `go mod verify` in Podman — module checksums verify
 - [ ] `npm run typecheck` — no TypeScript errors
 - [ ] `npm run lint` — no lint errors
-- [ ] `npm run test` — all component tests pass
-- [ ] `npx playwright test` — all E2E tests pass (including a11y)
-- [ ] No secrets in Git (pre-commit hook via `gitleaks` or `truffleHog`)
+- [ ] Demo and production `npm run build -- --webpack` — both base paths compile
+- [ ] PostgreSQL migration up and down checks pass
+- [ ] `npm audit --audit-level=high` — no high/critical vulnerabilities
+- [ ] `govulncheck ./...` — review reachable vulnerability findings
+- [ ] No secrets in Git — use a repository-approved secret scanner when wired
+
+The integration, component, Playwright, accessibility, and Go lint gates
+remain required additions before the corresponding checkbox can be marked
+implemented.

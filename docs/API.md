@@ -4,9 +4,10 @@
 
 - **Base URL:** `https://delegateops.business/padang/api/v1/` (production)
 - **Base URL:** `https://delegateops.business/padang/demo/api/v1/` (demo)
-- **Format:** JSON (Content-Type: application/json)
+- **Format:** JSON (`Content-Type: application/json; charset=utf-8`)
 - **Auth:** Production protected endpoints use `Authorization: Bearer <access-token>`; demo has no authentication.
-- **Spec:** OpenAPI 3.1 at `/api/v1/openapi.json`
+- **Spec:** OpenAPI 3.1 at `/api/v1/openapi.json`; source of truth is
+  `backend/openapi/openapi.yaml`, embedded and served by the API
 - **Versioning:** URL path (`/v1/`); breaking changes increment version
 
 ---
@@ -49,6 +50,11 @@ Mobile clients use the same refresh endpoint and rotation rules, but store the
 refresh token in iOS Keychain or Android Keystore-backed secure storage. No
 client-supplied role is trusted by the API.
 
+Every production request revalidates the token subject against the active user
+row; role changes and deactivation take effect without waiting for JWT expiry.
+OTP consumption and refresh-token rotation use conditional database updates;
+a code or refresh token can succeed only once under concurrent requests.
+
 ---
 
 ## Response Envelope
@@ -60,6 +66,10 @@ client-supplied role is trusted by the API.
   "meta": { "request_id": "..." }
 }
 ```
+
+`meta.request_id` is included when the request has a Chi request ID. Clients
+should retain it with their local error or support logs. Error responses use
+the same envelope and `Content-Type` as successful responses.
 
 ### Success (list/paginated)
 ```json
@@ -278,11 +288,57 @@ All report endpoints support:
 
 ### File Attachments
 
-| Method | Path | Description |
-|---|---|---|
-| POST | `/attachments/upload` | Upload file; returns `storage_key` + presigned URL |
-| GET | `/attachments/{id}/url` | Get fresh presigned download URL (1h) |
-| DELETE | `/attachments/{id}` | Soft-delete attachment |
+The C1 API exposes a server-authorized presign flow. It does not accept a
+client-supplied storage key or arbitrary upload URL.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/attachments/presign` | entity-scoped writer | Validate metadata, authorize the entity, persist attachment metadata and audit event, and return a B2 PUT URL |
+
+Request body:
+
+```json
+{
+  "entity_type": "project",
+  "entity_id": "00000000-0000-0000-0000-000000000000",
+  "file_name": "signed-contract.pdf",
+  "content_type": "application/pdf",
+  "size": 24576,
+  "category": "contract"
+}
+```
+
+Allowed entity types are `project`, `fabrication_job`, `purchase_request`,
+`purchase_order`, `fund_request`, `progress_billing`,
+`fabrication_billing`, `collection`, `client`, `supplier`, `reimbursement`,
+and `liquidation`. Categories are `contract`, `drawing`, `permit`, `photo`,
+`report`, `receipt`, and `other`.
+
+The declared MIME type and filename extension must match an allowlist (PDF,
+DWG, DOCX, XLSX, JPEG, PNG, WebP, TXT, or CSV), the file must be 1–50 MiB,
+and the acting role must both be allowed for the entity and own or manage the
+referenced record. The server derives the object key as
+`{entity_type}/{entity_id}/{attachment_uuid}.{extension}`. The client must
+upload with `PUT` using the returned URL and the same content type and size
+supplied in the metadata request.
+
+Success response:
+
+```json
+{
+  "data": {
+    "attachment_id": "00000000-0000-0000-0000-000000000000",
+    "storage_key": "project/00000000-0000-0000-0000-000000000000/attachment.pdf",
+    "upload_url": "https://signed.example/…",
+    "method": "PUT"
+  },
+  "meta": { "request_id": "…" }
+}
+```
+
+The C1 presign step validates declared metadata, but does not inspect file
+bytes after upload. Content inspection and download URL endpoints remain
+production-hardening work before arbitrary external uploads are enabled.
 
 ### QBO Export
 
@@ -346,3 +402,7 @@ Available at:
 
 TypeScript types generated from spec using `openapi-typescript`.
 Run: `npm run generate:types` in `frontend/`.
+The generated `frontend/types/api.ts` is a checked-in build artifact and must
+be regenerated whenever `backend/openapi/openapi.yaml` changes. Runtime JSON
+is produced from that same embedded YAML so the served contract and generated
+types cannot silently use different source documents.

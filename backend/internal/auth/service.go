@@ -18,11 +18,23 @@ import (
 var ErrInvalidOTP = errors.New("invalid or expired one-time code")
 
 type Service struct {
-	Store  repository.AuthStore
+	Store  Store
 	Tokens *TokenManager
 	Email  email.Sender
 	From   string
 	Now    func() time.Time
+}
+
+type Store interface {
+	UserByEmail(context.Context, string) (repository.AuthUser, error)
+	UserByID(context.Context, uuid.UUID) (repository.AuthUser, error)
+	CreateOTP(context.Context, string, string, time.Time) (repository.OTP, error)
+	OTP(context.Context, uuid.UUID) (repository.OTP, error)
+	IncrementOTPAttempts(context.Context, uuid.UUID) error
+	MarkOTPUsed(context.Context, uuid.UUID) error
+	CreateRefreshToken(context.Context, repository.RefreshToken) error
+	RefreshToken(context.Context, uuid.UUID) (repository.RefreshToken, error)
+	RevokeRefreshToken(context.Context, uuid.UUID) error
 }
 
 func (s Service) RequestOTP(ctx context.Context, address string) (uuid.UUID, error) {
@@ -74,6 +86,9 @@ func (s Service) VerifyOTP(ctx context.Context, id uuid.UUID, code string) (Prin
 		return Principal{}, "", "", ErrInvalidOTP
 	}
 	if err := s.Store.MarkOTPUsed(ctx, otp.ID); err != nil {
+		if errors.Is(err, repository.ErrConditionalUpdate) {
+			return Principal{}, "", "", ErrInvalidOTP
+		}
 		return Principal{}, "", "", err
 	}
 	user, err := s.Store.UserByEmail(ctx, otp.Email)
@@ -118,6 +133,9 @@ func (s Service) Refresh(ctx context.Context, raw string) (Principal, string, st
 		return Principal{}, "", "", ErrInvalidOTP
 	}
 	if err := s.Store.RevokeRefreshToken(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrConditionalUpdate) {
+			return Principal{}, "", "", ErrInvalidOTP
+		}
 		return Principal{}, "", "", err
 	}
 	user, err := s.Store.UserByID(ctx, token.UserID)
@@ -161,7 +179,13 @@ func (s Service) Revoke(ctx context.Context, raw string) error {
 	if bcrypt.CompareHashAndPassword([]byte(token.TokenHash), []byte(parts[1])) != nil {
 		return ErrInvalidOTP
 	}
-	return s.Store.RevokeRefreshToken(ctx, id)
+	if err := s.Store.RevokeRefreshToken(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrConditionalUpdate) {
+			return ErrInvalidOTP
+		}
+		return err
+	}
+	return nil
 }
 
 func (s Service) now() time.Time {

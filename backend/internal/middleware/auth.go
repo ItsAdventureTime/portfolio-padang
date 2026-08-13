@@ -1,14 +1,18 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/itsadventuretime/padang-erp/backend/internal/auth"
 	"github.com/itsadventuretime/padang-erp/backend/internal/config"
 )
 
-func Authenticate(env string, tokens *auth.TokenManager) func(http.Handler) http.Handler {
+type ActiveUserLookup func(context.Context, uuid.UUID) (auth.Principal, bool)
+
+func Authenticate(env string, tokens *auth.TokenManager, lookup ActiveUserLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if env == config.Demo {
@@ -34,7 +38,16 @@ func Authenticate(env string, tokens *auth.TokenManager) func(http.Handler) http
 				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid access token")
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), principal)))
+			if lookup == nil {
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Authentication is not configured")
+				return
+			}
+			current, ok := lookup(r.Context(), principal.Subject)
+			if !ok || !current.Active() {
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid access token")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), current)))
 		})
 	}
 }

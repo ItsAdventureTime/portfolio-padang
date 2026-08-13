@@ -14,22 +14,28 @@ create_secret_from_stdin() {
   echo "created secret: $name"
 }
 prompt_secret() {
-  local name="$1" prompt="$2" value
+  local name="$1" prompt="$2" value confirm
   if secret_exists "$name"; then echo "keeping existing secret: $name"; return; fi
   read -r -s -p "$prompt (paste once, then press Return): " value
   printf '\n'
+  read -r -s -p "Confirm $prompt: " confirm
+  printf '\n'
   [[ -n "$value" ]] || { echo "empty value refused" >&2; return 1; }
+  [[ "$value" == "$confirm" ]] || { echo "values do not match" >&2; unset value confirm; return 1; }
   printf '%s' "$value" | create_secret_from_stdin "$name"
-  unset value
+  unset value confirm
 }
 prompt_value() {
-  local name="$1" prompt="$2" value
+  local name="$1" prompt="$2" value confirm
   if secret_exists "$name"; then echo "keeping existing secret: $name"; return; fi
   read -r -p "$prompt (paste once, then press Return): " value
   printf '\n'
+  read -r -p "Confirm $prompt: " confirm
+  printf '\n'
   [[ -n "$value" ]] || { echo "empty value refused" >&2; return 1; }
+  [[ "$value" == "$confirm" ]] || { echo "values do not match" >&2; unset value confirm; return 1; }
   printf '%s' "$value" | create_secret_from_stdin "$name"
-  unset value
+  unset value confirm
 }
 generate_secret() {
   local name="$1"
