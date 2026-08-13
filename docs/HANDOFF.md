@@ -8,12 +8,13 @@ STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
 remediation, documentation updates, deployment-update workflow, containerized
 validation, and frontend npm cache remediation are complete; demo/production
 deployment is not authorized in C1.
-BRANCH: feat/c1-foundation
+BRANCH: main
 BASE COMMIT: bbdd803
 LATEST IMPLEMENTATION COMMIT: 7e2771a (`fix(deploy): isolate frontend npm cache`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
-REMOTE PUSH STATUS: Fix and documentation updates are pushed through the
-authenticated HTTPS GitHub CLI path
+REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
+consolidated implementation; updates were pushed through the authenticated
+HTTPS GitHub CLI path
 DEMO VPS SSH TARGET: `jk@216.75.75.136:22`
 DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
 DEMO PUBLIC URL: `https://delegateops.business/padang/demo`
@@ -39,6 +40,10 @@ config paths. A container-level `npm ci --ignore-scripts` probe against the
 read-only source mount passes with this configuration. Recovery guidance is in
 `docs/OPERATIONS.md`; the normal update command remains
 `scripts/update-padang-demo.sh`.
+
+The previous `docs/phase-0` and `feat/c1-foundation` branches remain as
+historical references. Both are ancestors of `main` and contain no divergent
+work requiring a separate merge or repair.
 
 ---
 
@@ -304,11 +309,13 @@ an undocumented placeholder table.
 - **Current instruction:** **GO: CODEX C1** is active. Implement sequentially,
   validate runtime/build/test work only in disposable Podman containers, and do
   not deploy to the VPS during C1. Update this handoff with exact results before
-  committing and pushing the feature branch.
+  committing and pushing the working branch; the reviewed C1 history is now
+  consolidated on `main`.
 
 ## C1 Implementation and Validation Log
 
-- Branch: `feat/c1-foundation`; base: `bbdd803`.
+- Branch: `main`; consolidated source history: `feat/c1-foundation` and
+  `docs/phase-0`; base: `bbdd803`.
 - Database: foundation migration up/down and `sqlc generate` validated in
   disposable containers; seed/reset restored the exact `10|3|2` baseline for
   users/projects/progress billings after create/update/delete changes.

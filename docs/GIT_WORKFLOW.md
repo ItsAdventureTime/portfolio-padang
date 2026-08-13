@@ -79,9 +79,26 @@ the history before pushing.
 Verify the remote tip through GitHub CLI without exposing credentials:
 
 ```sh
-gh api repos/ItsAdventureTime/bridge-padang/branches/feat/c1-foundation \
+gh api repos/ItsAdventureTime/bridge-padang/branches/main \
   --jq '.name + " " + .commit.sha'
 git status --short --branch
+```
+
+## Current branch consolidation
+
+GitHub's canonical/default branch is now `main`. The histories from
+`docs/phase-0` and `feat/c1-foundation` are both included in `main` at the
+current release tip. Those source branches remain available for traceability;
+they are not divergent from `main` and were not deleted.
+
+For future work, commit on a `feat/*` or `docs/*` branch, review it, and merge
+it into `main` before release. Confirm the result with:
+
+```sh
+gh repo view ItsAdventureTime/bridge-padang \
+  --json defaultBranchRef --jq '.defaultBranchRef.name'
+gh api repos/ItsAdventureTime/bridge-padang/branches/main \
+  --jq '.name + " " + .commit.sha'
 ```
 
 Create a pull request only when the review workflow calls for one:
