@@ -6,11 +6,12 @@ CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
 CURRENT PHASE: C1 — implementation and containerized validation
 STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
 remediation, documentation updates, deployment-update workflow, containerized
-validation, frontend npm cache remediation, and Caddy route insertion
-remediation are complete; demo/production deployment is not authorized in C1.
+validation, frontend npm cache remediation, Caddy route insertion remediation,
+and offline font build remediation are complete; demo/production deployment is
+not authorized in C1.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: ee1bfc2 (`fix(deploy): make caddy route installation layout safe`)
+LATEST IMPLEMENTATION COMMIT: 8f482aa (`fix(frontend): make font builds offline-safe`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
