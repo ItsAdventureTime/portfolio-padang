@@ -20,6 +20,8 @@ INTERNAL_NETWORK="bridge-ph-padang-demo"
 PROXY_NETWORK="bridge-ph-padang-demo-proxy"
 CADDYFILE="${CADDYFILE:-/home/jk/caddy/conf/Caddyfile}"
 CADDY_CONF_DIR="${CADDY_CONF_DIR:-/home/jk/caddy/conf}"
+CADDY_HANDLER_FILE="$CADDY_CONF_DIR/padang-demo.handlers.Caddyfile"
+CADDY_HANDLER_IMPORT="/etc/caddy/padang-demo.handlers.Caddyfile"
 CADDY_QUADLET="${CADDY_QUADLET:-/home/jk/.config/containers/systemd/caddy/caddy.container}"
 if [[ -d "$CADDY_QUADLET" ]]; then
   CADDY_QUADLET="$CADDY_QUADLET/caddy.container"
@@ -82,6 +84,118 @@ check_auto_update_timer() {
     fi
   fi
 }
+
+insert_caddy_import() {
+  local input_file="$1"
+  local output_file="$2"
+  awk -v import_path="$CADDY_HANDLER_IMPORT" '
+    function brace_delta(line, clean, opens, closes) {
+      clean = line
+      gsub(/"[^"]*"/, "", clean)
+      gsub(/`[^`]*`/, "", clean)
+      sub(/#.*/, "", clean)
+      opens = gsub(/\{/, "{", clean)
+      closes = gsub(/\}/, "}", clean)
+      return opens - closes
+    }
+    BEGIN {
+      in_site = 0
+      site_count = 0
+      site_imports = 0
+      all_imports = 0
+      inserted = 0
+    }
+    {
+      line = $0
+      if (!in_site && line ~ /^[[:space:]]*delegateops\.business[[:space:]]*\{[[:space:]]*$/) {
+        in_site = 1
+        site_count++
+        depth = 1
+        print line
+        next
+      }
+      if (in_site) {
+        if (depth == 1 && line ~ "^[[:space:]]*import[[:space:]]+" import_path "[[:space:]]*(#.*)?$") {
+          site_imports++
+          all_imports++
+        } else if (line ~ "^[[:space:]]*import[[:space:]]+" import_path "[[:space:]]*(#.*)?$") {
+          all_imports++
+        }
+        if (depth == 1 && !site_imports &&
+            (line ~ /^[[:space:]]*# DelegateOps static-site fallback[[:space:]]*$/ ||
+             line ~ /^[[:space:]]*handle[[:space:]]*\{[[:space:]]*$/)) {
+          print "import " import_path
+          inserted = 1
+        }
+        print line
+        depth += brace_delta(line)
+        if (depth == 0) {
+          in_site = 0
+        }
+        next
+      }
+      if (line ~ "^[[:space:]]*import[[:space:]]+" import_path "[[:space:]]*(#.*)?$") {
+        all_imports++
+      }
+      print line
+    }
+    END {
+      if (site_count != 1 || all_imports != site_imports || site_imports > 1 ||
+          (site_imports == 0 && !inserted)) {
+        exit 42
+      }
+    }
+  ' "$input_file" > "$output_file"
+}
+
+run_caddy_fixture_tests() {
+  local fixture_dir legacy generic missing output
+  fixture_dir=$(mktemp -d)
+  trap 'rm -rf "$fixture_dir"' RETURN
+  legacy="$fixture_dir/legacy.Caddyfile"
+  generic="$fixture_dir/generic.Caddyfile"
+  missing="$fixture_dir/missing.Caddyfile"
+  output="$fixture_dir/output.Caddyfile"
+
+  printf '%s\n' \
+    'delegateops.business {' \
+    '# DelegateOps static-site fallback' \
+    'handle {' \
+    '  file_server' \
+    '}' \
+    '}' > "$legacy"
+  insert_caddy_import "$legacy" "$output"
+  grep -q '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output"
+  [[ $(grep -c '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output") -eq 1 ]]
+
+  printf '%s\n' \
+    'delegateops.business {' \
+    'handle /other/* {' \
+    '  file_server' \
+    '}' \
+    'handle {' \
+    '  file_server' \
+    '}' \
+    '}' > "$generic"
+  insert_caddy_import "$generic" "$output"
+  grep -q '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output"
+  [[ $(grep -c '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output") -eq 1 ]]
+
+  printf '%s\n' \
+    'delegateops.business {' \
+    'root * /srv/delegateops-business' \
+    '}' > "$missing"
+  if insert_caddy_import "$missing" "$output"; then
+    printf 'padang-demo-remote: unsafe fixture unexpectedly accepted\n' >&2
+    return 1
+  fi
+  log "Caddy insertion fixtures passed"
+}
+
+if [[ "${PADANG_CADDY_FIXTURE_TEST:-0}" == 1 ]]; then
+  run_caddy_fixture_tests
+  exit 0
+fi
 
 [[ "$MODE" == --apply || "$MODE" == --dry-run ]] || die "use --apply or --dry-run"
 [[ "$(id -un)" == jk ]] || die "this script must run as user jk"
@@ -400,14 +514,20 @@ EOF
 install_caddy_route() {
   [[ -f "$CADDYFILE" ]] || die "Caddyfile not found: $CADDYFILE"
   [[ -f "$CADDY_QUADLET" ]] || die "Caddy Quadlet not found: $CADDY_QUADLET"
-  local backup quadlet_backup
+  local backup quadlet_backup handler_backup
   backup="$CADDYFILE.bak.$(date +%Y%m%d%H%M%S)"
   quadlet_backup="$CADDY_QUADLET.bak.$(date +%Y%m%d%H%M%S)"
+  handler_backup="$CADDY_HANDLER_FILE.bak.$(date +%Y%m%d%H%M%S)"
   local changed=0
   local caddy_network_changed=0
   local caddyfile_changed=0
-  local api_block app_block block_file tmp_file
-  local caddy_tmp quadlet_tmp caddy_stage_dir
+  local handler_changed=0
+  local handler_existed=0
+  local inline_route=0
+  local handler_route=0
+  local handler_configured=0
+  local app_block
+  local caddy_tmp quadlet_tmp handler_tmp caddy_stage_dir
 
   caddy_tmp="$CADDYFILE.tmp.$$"
   quadlet_tmp="$CADDY_QUADLET.tmp.$$"
@@ -429,31 +549,23 @@ install_caddy_route() {
     die "could not verify Caddy proxy network insertion"
   }
 
-  api_block=$(cat <<EOF
-# BEGIN PADANG DEMO API ROUTE (managed by deploy-padang-demo-remote.sh)
-@padang_demo_api path /padang/demo/api/*
-handle @padang_demo_api {
+  app_block=$(cat <<EOF
+# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
+@padang_demo_root path /padang/demo
+redir @padang_demo_root /padang/demo/ 308
+
+handle /padang/demo/api/* {
+  uri strip_prefix /padang/demo
   header {
     >Cache-Control "private, no-store"
     >CDN-Cache-Control "no-store"
     >Pragma "no-cache"
     >X-Robots-Tag "noindex, nofollow, noarchive"
   }
-  uri strip_prefix /padang/demo
   reverse_proxy padang-demo-api:8080
 }
-# END PADANG DEMO API ROUTE
-EOF
-)
-  app_block=$(cat <<EOF
-# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
-@padang_demo_root path /padang/demo
-redir @padang_demo_root /padang/demo/ 308
 
-$(printf '%s' "$api_block")
-
-@padang_demo path /padang/demo/*
-handle @padang_demo {
+handle /padang/demo/* {
   header {
     >Cache-Control "public, max-age=0, must-revalidate"
     >X-Robots-Tag "noindex, nofollow, noarchive"
@@ -464,50 +576,89 @@ handle @padang_demo {
 EOF
 )
 
-  if ! grep -q '^@padang_demo_api path ' "$caddy_tmp"; then
-    tmp_file="$caddy_tmp.next"
-    grep -q '^# DelegateOps static-site fallback' "$caddy_tmp" || {
+  if grep -q '^@padang_demo_api path ' "$caddy_tmp"; then
+    inline_route=1
+    grep -q 'reverse_proxy padang-demo-app:3000' "$caddy_tmp" || {
       rm -f "$caddy_tmp" "$quadlet_tmp"
-      die "cannot find safe Caddy insertion marker"
+      die "existing inline Padang route is incomplete"
     }
-    block_file=$(mktemp)
-    printf '%s\n' "$app_block" > "$block_file"
-    awk -v block_file="$block_file" '
-      BEGIN { while ((getline line < block_file) > 0) block = block line ORS; close(block_file) }
-      /^# DelegateOps static-site fallback/ && !done { printf "%s\n", block; done=1 }
-      { print }
-    ' "$caddy_tmp" > "$tmp_file"
-    rm -f "$block_file"
-    mv "$tmp_file" "$caddy_tmp"
-    changed=1
-    caddyfile_changed=1
+  elif grep -q 'reverse_proxy padang-demo-app:3000' "$caddy_tmp" ||
+    grep -q '^# BEGIN PADANG DEMO ROUTE ' "$caddy_tmp"; then
+    rm -f "$caddy_tmp" "$quadlet_tmp"
+    die "existing inline Padang route is incomplete"
   fi
 
-  grep -q '^@padang_demo_api path ' "$caddy_tmp" || {
-    rm -f "$caddy_tmp" "$quadlet_tmp"
-    die "could not verify Padang API route insertion"
-  }
-  grep -q 'reverse_proxy padang-demo-app:3000' "$caddy_tmp" || {
-    rm -f "$caddy_tmp" "$quadlet_tmp"
-    die "could not verify Padang app route"
-  }
+  if ((inline_route)); then
+    if grep -qE "^[[:space:]]*import[[:space:]]+$CADDY_HANDLER_IMPORT([[:space:]]|$)" "$caddy_tmp"; then
+      rm -f "$caddy_tmp" "$quadlet_tmp"
+      die "Padang route is configured both inline and through an import"
+    fi
+  else
+    handler_configured=1
+    handler_tmp="$CADDY_HANDLER_FILE.tmp.$$"
+    if [[ -f "$CADDY_HANDLER_FILE" ]]; then
+      handler_existed=1
+      cp -p "$CADDY_HANDLER_FILE" "$handler_tmp"
+      local api_proxy_count app_proxy_count
+      api_proxy_count=$(grep -c 'reverse_proxy padang-demo-api:8080' "$handler_tmp" || true)
+      app_proxy_count=$(grep -c 'reverse_proxy padang-demo-app:3000' "$handler_tmp" || true)
+      if [[ "$api_proxy_count" == 1 && "$app_proxy_count" == 1 ]]; then
+        handler_route=1
+      elif [[ "$api_proxy_count" != 0 || "$app_proxy_count" != 0 ||
+        -s "$handler_tmp" ]]; then
+        rm -f "$caddy_tmp" "$quadlet_tmp" "$handler_tmp"
+        die "existing Padang handler file is not a complete managed route"
+      fi
+    fi
+    if ((handler_route == 0)); then
+      printf '%s\n' "$app_block" > "$handler_tmp"
+      handler_changed=1
+    fi
+
+    if ! insert_caddy_import "$caddy_tmp" "$caddy_tmp.next"; then
+      rm -f "$caddy_tmp" "$quadlet_tmp" "$handler_tmp" "$caddy_tmp.next"
+      die "cannot find safe Caddy insertion location inside delegateops.business"
+    fi
+    mv "$caddy_tmp.next" "$caddy_tmp"
+  fi
 
   caddy_stage_dir=$(mktemp -d)
   cp -p "$caddy_tmp" "$caddy_stage_dir/Caddyfile"
+  if ((handler_configured)); then
+    cp -p "$handler_tmp" "$caddy_stage_dir/padang-demo.handlers.Caddyfile"
+    sed "s|$CADDY_HANDLER_IMPORT|/stage/padang-demo.handlers.Caddyfile|g" \
+      "$caddy_stage_dir/Caddyfile" > "$caddy_stage_dir/Caddyfile.next"
+    mv "$caddy_stage_dir/Caddyfile.next" "$caddy_stage_dir/Caddyfile"
+  fi
   if ! podman run --rm \
     -v "$caddy_stage_dir:/stage:Z" \
     -v "$CADDY_CONF_DIR:/etc/caddy:ro,Z" \
     docker.io/library/caddy:alpine \
-    sh -ec 'caddy fmt --overwrite /stage/Caddyfile && caddy validate --config /stage/Caddyfile --adapter caddyfile'; then
+    sh -ec 'caddy fmt --overwrite /stage/Caddyfile && if [ -f /stage/padang-demo.handlers.Caddyfile ]; then caddy fmt --overwrite /stage/padang-demo.handlers.Caddyfile; fi && caddy validate --config /stage/Caddyfile --adapter caddyfile'; then
     rm -rf "$caddy_stage_dir"
     rm -f "$caddy_tmp" "$quadlet_tmp"
+    if ((handler_configured)); then
+      rm -f "$handler_tmp"
+    fi
     die "staged Caddyfile formatting or validation failed"
   fi
   cp -p "$caddy_stage_dir/Caddyfile" "$caddy_tmp"
+  if ((handler_configured)); then
+    sed "s|/stage/padang-demo.handlers.Caddyfile|$CADDY_HANDLER_IMPORT|g" \
+      "$caddy_tmp" > "$caddy_tmp.next"
+    mv "$caddy_tmp.next" "$caddy_tmp"
+  fi
+  if ((handler_configured)); then
+    cp -p "$caddy_stage_dir/padang-demo.handlers.Caddyfile" "$handler_tmp"
+  fi
   rm -rf "$caddy_stage_dir"
   if ! cmp -s "$caddy_tmp" "$CADDYFILE"; then
     changed=1
     caddyfile_changed=1
+  fi
+  if ((handler_configured)) && ! cmp -s "$handler_tmp" "$CADDY_HANDLER_FILE" 2>/dev/null; then
+    changed=1
+    handler_changed=1
   fi
   if ((changed)); then
     if ((caddyfile_changed)); then
@@ -515,6 +666,14 @@ EOF
       mv "$caddy_tmp" "$CADDYFILE"
     else
       rm -f "$caddy_tmp"
+    fi
+    if ((handler_configured && handler_changed)); then
+      if ((handler_existed)); then
+        cp -p "$CADDY_HANDLER_FILE" "$handler_backup"
+      fi
+      mv "$handler_tmp" "$CADDY_HANDLER_FILE"
+    elif ((handler_configured)); then
+      rm -f "$handler_tmp"
     fi
     if ((caddy_network_changed)); then
       cp -p "$CADDY_QUADLET" "$quadlet_backup"
@@ -526,6 +685,13 @@ EOF
     if ! systemctl --user show caddy.service -p ExecStart --value |
       grep -q -- "$PROXY_NETWORK"; then
       ((caddyfile_changed)) && cp -p "$backup" "$CADDYFILE"
+      if ((handler_configured && handler_changed)); then
+        if ((handler_existed)); then
+          cp -p "$handler_backup" "$CADDY_HANDLER_FILE"
+        else
+          rm -f "$CADDY_HANDLER_FILE"
+        fi
+      fi
       ((caddy_network_changed)) && cp -p "$quadlet_backup" "$CADDY_QUADLET"
       systemctl --user daemon-reload || true
       die "generated Caddy service does not include $PROXY_NETWORK"
@@ -543,6 +709,9 @@ EOF
       fi
     fi
   else
+    if ((handler_configured)); then
+      rm -f "$handler_tmp"
+    fi
     log "Caddy route and network membership already present"
   fi
 }

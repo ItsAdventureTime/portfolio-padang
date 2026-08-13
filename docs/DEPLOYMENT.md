@@ -483,11 +483,12 @@ import /etc/caddy/padang-production.handlers.Caddyfile
 > **Order:** Both imports must appear BEFORE the `handle { }` static-site fallback block,
 > identical to how `pimascor-production.handlers.Caddyfile` is currently imported.
 
-The canonical Padang routes above use imported handler files. The separate Le
-Mans demo deployment does not modify those Padang handler imports: its remote
-deployment script manages a small inline Padang demo route block in the supplied
-main Caddyfile, validates the assembled Caddyfile, and preserves timestamped
-backups before changing it.
+The canonical Padang routes above use imported handler files. The remote demo
+deployment manages `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile` and
+inserts its matching import inside the `delegateops.business` site block before
+the generic `handle { ... }` fallback. It also preserves compatibility with an
+already-installed inline managed route. The script validates the assembled
+Caddyfile and preserves timestamped backups before changing any Caddy file.
 
 ---
 
@@ -665,9 +666,11 @@ inside disposable `podman run --rm` build containers.
 
 The first deployment requires an existing `/home/jk/caddy/conf/Caddyfile` and
 `/home/jk/.config/containers/systemd/caddy/caddy.container`. The remote script
-fails closed if either is absent, if the Caddy insertion marker is missing, or
-if the user/systemd/Podman prerequisites are unavailable. Set `CADDY_QUADLET`
-explicitly only when the VPS uses a different caddy Quadlet path.
+fails closed if either is absent, if `delegateops.business` has no safe legacy
+fallback marker or generic `handle { ... }` fallback, or if the
+user/systemd/Podman prerequisites are unavailable. Set `CADDY_QUADLET`
+explicitly only when the VPS uses a different caddy Quadlet path. A dry run
+does not create or change Caddy handler files, the Caddyfile, or Quadlets.
 
 ### Operator commands
 

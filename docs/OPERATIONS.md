@@ -252,3 +252,23 @@ writable or delete source files to recover.
    proxy network; the frontend does not join the existing shared `caddy.network`
 3. Check frontend → API connectivity (same app network)
 4. Review Caddy logs: `journalctl --user -u caddy.service -n 50`
+
+### `cannot find safe Caddy insertion location`
+
+This means the deployment script could not identify a safe insertion point
+inside `delegateops.business`. The current supported layout uses the managed
+`/home/jk/caddy/conf/padang-demo.handlers.Caddyfile` import before the generic
+`handle { ... }` fallback; an older exact `# DelegateOps static-site fallback`
+marker is also supported. Do not add the route outside that site block or place
+it after the fallback. Re-sync and verify the corrected script without applying
+runtime changes, then rerun the deployment:
+
+```bash
+scripts/update-padang-demo.sh --dry-run
+scripts/update-padang-demo.sh
+```
+
+If an existing inline managed Padang route is present, the script preserves it.
+If the Caddyfile has neither a supported fallback nor an unambiguous
+`delegateops.business` site block, correct that Caddy layout manually and run
+`caddy fmt --overwrite` followed by `caddy validate` before retrying.
