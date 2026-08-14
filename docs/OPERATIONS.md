@@ -142,11 +142,12 @@ systemctl --user start bridge-ph-padang-frontend.service
 podman exec -it bridge-ph-padang-api \
   sh -c 'PGPASSWORD=$(cat /run/secrets/db-password) psql -h bridge-ph-padang-db -U padang_prod_user padang_prod'
 
-# Or from a throwaway postgres container
+# Or from a throwaway postgres container (use the same major as the target;
+# 18 is shown here)
 podman run --rm -it \
   --network bridge-ph-padang \
   --secret bridge-ph-padang-prod-db-password \
-  docker.io/library/postgres:alpine \
+  docker.io/library/postgres:18-alpine \
   sh -c 'PGPASSWORD=$(cat /run/secrets/bridge-ph-padang-prod-db-password) psql -h bridge-ph-padang-db -U padang_prod_user padang_prod'
 ```
 
@@ -304,6 +305,39 @@ containers that it did not create.
 2. Check DB is healthy: `systemctl --user status bridge-ph-padang-db.service`
 3. Check secrets are present: `podman secret ls`
 4. Check image exists: `podman images | grep padang-erp`
+
+### Demo PostgreSQL service fails or the public route returns 502
+
+The demo updater selects `postgres:18-alpine` for a clean data root and pins
+the matching supported major (14–18) when `postgres-data/PG_VERSION` already
+exists. It never wipes data or performs an in-place major upgrade. On failure,
+the updater prints the systemd status, user journal, container state, and last
+200 container log lines before exiting.
+
+Inspect the same evidence manually when needed:
+
+```bash
+systemctl --user status padang-demo-db.service --no-pager -l
+journalctl --user -u padang-demo-db.service -n 120 --no-pager
+podman inspect bridge-ph-padang-demo-db \
+  --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}'
+podman logs --tail 200 bridge-ph-padang-demo-db
+cat /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
+cat /home/jk/bridge-ph/padang-demo/config/db-user
+podman secret ls
+```
+
+The persistent directory must be a real directory owned by `jk`, readable,
+writable, searchable, and usable by the rootless user. The updater refuses a
+malformed or unreadable `PG_VERSION`, an unsupported major, a non-empty
+directory without valid PostgreSQL state, or a database identity/secret
+mismatch. Do not delete `postgres-data` or change the image to an unversioned
+tag to recover. Preserve the directory, take/verify a backup, and perform a
+reviewed major migration with `pg_upgrade` or dump/restore into a separate
+target. Official references: [PostgreSQL versioning
+policy](https://www.postgresql.org/support/versioning/), [PostgreSQL Official
+Image](https://hub.docker.com/_/postgres), and [Podman Quadlet
+units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html).
 
 ### Demo not resetting
 

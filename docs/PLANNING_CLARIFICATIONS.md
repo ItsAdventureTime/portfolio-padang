@@ -26,7 +26,7 @@ The same source code may serve both environments, but the deployment
 configuration and safety checks are different. Demo reset code is compiled
 and packaged only with the demo reset image; production has no reset command.
 
-## 2. Floating latest-LTS runtime policy
+## 2. Runtime image-channel and persistent-database policy
 
 The upstream runtime policy is:
 
@@ -34,17 +34,20 @@ The upstream runtime policy is:
 |---|---|
 | Node.js build/runtime | Official `node:lts-alpine` floating tag |
 | Go build image | Official `golang:alpine` floating tag; Go has no LTS channel |
-| PostgreSQL | `postgres:alpine` floating official channel; major-version changes require migration and restore validation |
+| PostgreSQL | `postgres:18-alpine` for clean demo state; persistent deployments select the matching supported `PG_VERSION` major and require reviewed upgrade/restore work |
 | Next.js | Latest supported release selected by the project package manifest; no major number in container tags |
-| OS/base image digest | Inspect and record the resolved digest at release time; do not put a version-number tag in Quadlets |
+| OS/base image digest | Inspect and record the resolved digest at release time; persistent PostgreSQL is the explicit versioned-tag exception |
 
 “Floating” applies to upstream image tags. Dependency lockfiles remain
 required for the application package graph because they record the exact
 resolved graph used for a build and are required by the constitution.
 
 PostgreSQL is different from Node.js: automatically moving a live database to
-a new major can require migration or dump/restore validation. The selected
-digest and detected major version must be recorded before each approved update.
+a new major can require migration or dump/restore validation. The demo updater
+therefore reads `PG_VERSION`, selects `postgres:<major>-alpine` for supported
+majors 14–18, and fails closed rather than changing or deleting persistent
+state. The selected digest and detected major version must be recorded before
+each approved update.
 
 ## 3. Why demo and production need separate Next.js image builds
 
@@ -143,8 +146,8 @@ from the project’s approved container workflow and published as
 6. exits non-zero on any failure.
 
 The backup image is not a runtime application image. The production Quadlet
-uses `backup:latest`, while the database uses the floating official
-`postgres:alpine` channel. Backblaze application-key credentials are mounted
+uses `backup:latest`, while the database must use a PostgreSQL image major
+compatible with its persistent `PG_VERSION`. Backblaze application-key credentials are mounted
 as files and converted into an ephemeral rclone configuration under `/run`;
 no secret value appears in an image, repository file, command argument, or
 log.

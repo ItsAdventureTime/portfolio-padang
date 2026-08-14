@@ -135,6 +135,23 @@ also SIGKILL/OOM-killed by that shared VM before serving; the in-app browser
 session remains client-blocked. The public four-route gate remains HTTP 404 at
 both BunnyCDN and direct Caddy origin.
 
+## PostgreSQL Demo Startup Remediation (2026-08-14)
+
+The Luna deployment finding is addressed in the shared repository. The demo
+updater now prepares and validates the rootless persistent data directory,
+selects PostgreSQL 18 for clean state or the matching supported major from an
+existing `PG_VERSION`, and fails closed for unsupported, malformed, unreadable,
+non-empty-invalid, or ownership/permission-incompatible state. It never wipes
+or auto-upgrades data. The database identity record and post-start
+role/database/password check prevent persisted user/secret drift. DB Quadlets
+declare `RequiresMountsFor`, avoid `Notify=healthy`, and print service status,
+journal, container state, and container logs on startup failure. Disposable
+fixtures cover clean, compatible, unsupported-major, malformed, unreadable,
+    and invalid non-empty state. The updater starts the application stack before
+    activating a newly changed Caddy route, so a failed service does not turn a
+    previously working public route into a new 502. Caddy route remediation
+    remains unchanged otherwise.
+
 ---
 
 ## Specification Overview & Architectural Decisions
@@ -147,7 +164,9 @@ planning and supersede older contradictory wording in this document.
 2. **Tech Stack**:
    - Backend: latest supported Go release (`golang:alpine`) + Chi. sqlc + pgx for type-safe database queries. golang-migrate for SQL migrations.
    - Frontend: latest supported Next.js App Router release + TypeScript + Tailwind CSS + shadcn/ui + TanStack Query/Table, built with the official floating `node:lts-alpine` image.
-   - RDBMS: latest supported PostgreSQL release via floating `postgres:alpine`.
+   - RDBMS: official PostgreSQL Alpine image with persistent-major guarding;
+     clean demo state uses `postgres:18-alpine`, while existing state matches
+     `PG_VERSION`.
    - File Storage: Backblaze B2 (`bridge-ph` bucket, prefix `padang/demo/` for demo, `padang/` for prod). Shared keys stored in separate Podman secrets per environment (`bridge-ph-padang-{env}-b2-key-id`, `bridge-ph-padang-{env}-b2-application-key`).
    - Email: Resend Go SDK with swappable adapter pattern (`EMAIL_PROVIDER=resend`) in production; demo uses the log adapter and does not send email.
    - Auth: Production uses passwordless Email OTP (6-digit, 10-min TTL, bcrypt hash in DB, rate-limited) + RS256 JWT (15-min access, 7-day rotating refresh cookie). Demo has no authentication and uses a guarded synthetic identity with validated header-based role switching (`X-Demo-Role`).
@@ -157,8 +176,10 @@ planning and supersede older contradictory wording in this document.
    - Retention: 10% standard deduction per progress billing; running total retained payable tracking.
    - Variation Orders: Cumulative cap at 10% of contract amount (8% warning alert, 10% hard stop alert).
 4. **Container & Infrastructure Design**:
-   - Rootless Podman Quadlets with floating channel tags and no auto-update
-     policy; the timer stays disabled and updates remain operator-triggered.
+   - Rootless Podman Quadlets with reviewed mutable channel tags for
+     stateless/build runtimes, a `PG_VERSION`-matched PostgreSQL major for
+     persistent state, and no auto-update policy; the timer stays disabled and
+     updates remain operator-triggered.
    - Proxy-Network isolation pattern: Caddy + Frontend + API on `proxy.network`; API + DB on internal `network`. DB is non-routable from host or edge.
    - Ingress: Path-based routing via existing Caddy (`/padang` prod, `/padang/demo` demo). Frontend is built twice from one source revision because Next.js `basePath` is build-time.
    - Production target: Quadlets at `/home/jk/.config/containers/systemd/bridge-ph/padang/`, persistent state at `/home/jk/bridge-ph/padang/`, and release identity `padang-bridge-ph:prod`.
@@ -202,9 +223,10 @@ Codex must implement the application sequentially following the ordered tasks be
   - All indexes, sequences (`seq_pr_number`, `seq_po_number`, `seq_fr_number`), and polymorphic `attachments` table.
 - **ACCEPTANCE CRITERIA:**
   - All tables from `docs/DATABASE.md` created with constraints, foreign keys, and indexes.
-  - Up and down migrations execute without errors against the selected floating PostgreSQL image.
+   - Up and down migrations execute without errors against the selected
+     supported PostgreSQL major.
   - `sqlc generate` generates type-safe Go structs and query functions cleanly.
-- **REQUIRED TESTS:** Ephemeral Podman test running `golang-migrate` up and down against a clean `postgres:alpine` container.
+- **REQUIRED TESTS:** Ephemeral Podman test running `golang-migrate` up and down against a clean `postgres:18-alpine` container.
 - **DEFINITION OF DONE:** Migration files committed, `sqlc` configured and generating Go code, up/down test verified cleanly.
 
 TASK-001 also includes the complete operational data-model addendum in

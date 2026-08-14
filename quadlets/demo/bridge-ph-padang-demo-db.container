@@ -1,24 +1,27 @@
 [Unit]
 Description=Padang ERP Demo PostgreSQL
 After=network-online.target bridge-ph-padang-demo.network
+Requires=bridge-ph-padang-demo.network
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/postgres-data
 
 [Container]
-Image=docker.io/library/postgres:alpine
+Image=docker.io/library/postgres:18-alpine
 ContainerName=bridge-ph-padang-demo-db
 Network=bridge-ph-padang-demo.network
-Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql/data:Z
+Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql:Z
+Environment=PGDATA=/var/lib/postgresql/18/docker
 Environment=POSTGRES_DB=padang_demo
 Environment=POSTGRES_USER=padang_demo_user
 Environment=POSTGRES_PASSWORD_FILE=/run/secrets/db-password
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
-HealthCmd=pg_isready -U padang_demo_user -d padang_demo
+HealthCmd=pg_isready -h 127.0.0.1
 HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
-Notify=healthy
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target

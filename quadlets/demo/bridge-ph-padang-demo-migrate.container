@@ -2,12 +2,13 @@
 Description=Padang ERP Demo database migrations
 After=bridge-ph-padang-demo-db.service
 Requires=bridge-ph-padang-demo-db.service
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/source/backend/migrations
 
 [Container]
 Image=docker.io/migrate/migrate:latest
 ContainerName=bridge-ph-padang-demo-migrate
 Network=bridge-ph-padang-demo.network
-Volume=/home/jk/bridge-ph/padang-demo/migrations:/migrations:ro
+Volume=/home/jk/bridge-ph/padang-demo/source/backend/migrations:/migrations:ro,Z
 Environment=DB_HOST=bridge-ph-padang-demo-db
 Environment=DB_NAME=padang_demo
 Environment=DB_USER=padang_demo_user

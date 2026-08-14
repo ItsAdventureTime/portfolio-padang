@@ -29,6 +29,11 @@ This runbook follows the current upstream model for the selected stack:
 - Quadlet `[Install]` relationships describe boot-time activation, but the
   updater explicitly starts generated units after `daemon-reload`; routine
   updates do not run `systemctl enable` on generated container services.
+- PostgreSQL persistent state is handled as a compatibility boundary. A clean
+  demo data root defaults to the current supported major (18); an existing
+  `PG_VERSION` selects the matching supported `postgres:<major>-alpine` image.
+  Unsupported, malformed, unreadable, non-empty-invalid, or rootless-unwritable
+  state fails closed without deleting or upgrading data.
 - If deployment is later moved into GitHub Actions, use a protected GitHub
   environment, restricted deployment branches, required approval, and a
   concurrency group so production deployments cannot overlap.
@@ -193,24 +198,28 @@ NetworkName=bridge-ph-padang-proxy
 [Unit]
 Description=Padang ERP Demo - PostgreSQL
 After=network-online.target
+Requires=bridge-ph-padang-demo.network
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/postgres-data
 
 [Container]
-Image=docker.io/library/postgres:alpine
+Image=docker.io/library/postgres:18-alpine
 ContainerName=bridge-ph-padang-demo-db
 Network=bridge-ph-padang-demo.network
-Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql/data:Z
+Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql:Z
+Environment=PGDATA=/var/lib/postgresql/18/docker
 
 Environment=POSTGRES_DB=padang_demo
 Environment=POSTGRES_USER=padang_demo_user
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 
-HealthCmd=pg_isready -U padang_demo_user -d padang_demo
+HealthCmd=pg_isready -h 127.0.0.1
 HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target
@@ -223,6 +232,8 @@ WantedBy=default.target
 [Unit]
 Description=Padang ERP Demo - Go API
 After=bridge-ph-padang-demo-db.service
+Requires=bridge-ph-padang-demo-db.service
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/build/backend
 
 [Container]
 Image=ghcr.io/itsadventuretime/padang-erp-api:demo-latest
@@ -263,6 +274,8 @@ WantedBy=default.target
 [Unit]
 Description=Padang ERP Demo - Next.js Frontend
 After=bridge-ph-padang-demo-api.service
+Requires=bridge-ph-padang-demo-api.service
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/build/frontend
 
 [Container]
 Image=ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
@@ -296,9 +309,12 @@ WantedBy=default.target
 ```ini
 [Unit]
 Description=Padang ERP Demo - Reset (one-shot)
+After=bridge-ph-padang-demo-migrate.service
+Requires=bridge-ph-padang-demo-migrate.service
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/source/seed /home/jk/bridge-ph/padang-demo/source/scripts
 
 [Container]
-Image=docker.io/library/postgres:alpine
+Image=docker.io/library/postgres:18-alpine
 ContainerName=bridge-ph-padang-demo-reset
 Network=bridge-ph-padang-demo.network
 
@@ -310,8 +326,8 @@ Environment=DB_USER=padang_demo_user
 Environment=RESET_GUARD=demo-only
 Environment=SEED_FILE=/app/seed/demo_seed.sql
 
-Volume=/home/jk/bridge-ph/padang-demo/seed:/app/seed:ro
-Volume=/home/jk/bridge-ph/padang-demo/scripts:/app/scripts:ro
+Volume=/home/jk/bridge-ph/padang-demo/source/seed:/app/seed:ro,Z
+Volume=/home/jk/bridge-ph/padang-demo/source/scripts:/app/scripts:ro,Z
 
 Secret=bridge-ph-padang-demo-db-password,type=mount,target=/run/secrets/db-password
 
@@ -618,10 +634,19 @@ hands control to `scripts/deploy-padang-demo-remote.sh` on the VPS.
 The remote script:
 
 - validates rootless Podman, cgroup v2, and the user systemd bus;
-- automatically generates a random database username, persists only that
-  non-secret username at
-  `/home/jk/bridge-ph/padang-demo/config/db-user`, and generates the database
-  password inside a disposable Alpine container directly into a Podman secret;
+  prepares the rootless PostgreSQL data directory and checks ownership,
+  permissions, write access, and `PG_VERSION` before writing Quadlets;
+- automatically generates a random database username only for clean state and
+    persists only that non-secret username at
+    `/home/jk/bridge-ph/padang-demo/config/db-user`; existing state uses its
+    persisted identity, or the legacy-compatible `padang_demo_user` default when
+    no identity record exists, and every case is verified against PostgreSQL;
+    the database password is generated inside a disposable Alpine container
+    directly into a Podman secret;
+  - selects PostgreSQL 18 for a clean data root, or the matching supported
+    major from existing `PG_VERSION`; it never auto-upgrades or wipes a data
+    directory. A persisted database identity record and post-start SQL check
+    keep the secret and database identity aligned;
 - prompts interactively only for the Backblaze B2 S3 key ID and application key
   through `scripts/secrets-setup.sh padang-demo`. The macOS wrapper allocates a
   remote TTY for this prompt; the database credentials are
@@ -651,17 +676,22 @@ The remote script:
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
   and container names use the `padang-demo` deployment identity and remain
   separate from production;
-- runs migrations, preserves the existing demo database by default, and starts
-  the 30-minute reset timer; `--seed-demo` is required for an intentional
-  destructive reseed; and
+- starts the database and waits for its health and identity checks, runs
+  migrations, and passes API/frontend health gates before activating or
+  reloading the Caddy route. This preserves the previous public route when an
+  application service fails. It then preserves the existing demo database by
+  default and starts the 30-minute reset timer; `--seed-demo` is required for
+  an intentional destructive reseed; and
 - makes only the required Caddy network and `/padang/demo/*` page/API route
   changes, stages the Caddyfile, formats it with `caddy fmt --overwrite`,
   validates it with `caddy validate`, then atomically replaces it after a
   timestamped backup;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
-  `podman run --rm`, with a systemd restart fallback. The database Quadlet reports
-  readiness only after its healthcheck passes, so migrations do not race a
-  PostgreSQL process that is still starting.
+  `podman run --rm`, with a systemd restart fallback. The updater explicitly
+  waits for the database healthcheck and then verifies the
+  database role, database name, and secret before migrations, so startup
+  failures emit service status, journal, container inspection, and container
+  log diagnostics instead of being hidden behind `Notify=healthy`.
 
 Caddy reaches the app and API through the dedicated
 `bridge-ph-padang-demo-proxy` network. The API also joins the private
@@ -671,7 +701,9 @@ because the browser calls the same-origin `/padang/demo/api/*` path, while the
 existing supplied Caddyfile must use the authoritative `/padang/demo/*`
 route.
 
-Runtime Quadlets use floating official `postgres:alpine`, `node:lts-alpine`,
+Runtime Quadlets use the supported-major official `postgres:<major>-alpine`
+(18 for clean state, existing supported `PG_VERSION` major otherwise),
+`node:lts-alpine`,
 `alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts
 are bind-mounted from the deployment data directory; no persistent build image
 or host compiler is required. `--dry-run` uploads and compiles the source and
@@ -694,6 +726,33 @@ fallback marker or generic `handle { ... }` fallback, or if the
 user/systemd/Podman prerequisites are unavailable. Set `CADDY_QUADLET`
 explicitly only when the VPS uses a different caddy Quadlet path. A dry run
 does not create or change Caddy handler files, the Caddyfile, or Quadlets.
+
+### PostgreSQL startup recovery
+
+If `padang-demo-db.service` fails, the updater leaves the existing Caddy route
+in place and prints service diagnostics. Do not remove `postgres-data`, run an
+unversioned `postgres:alpine`, or run `pg_upgrade` in place. The updater has
+already failed closed when `PG_VERSION` is unsupported, malformed, unreadable,
+or incompatible with rootless storage. Inspect the exact state without
+changing it:
+
+```bash
+systemctl --user status padang-demo-db.service --no-pager -l
+journalctl --user -u padang-demo-db.service -n 120 --no-pager
+podman logs --tail 200 bridge-ph-padang-demo-db
+cat /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
+cat /home/jk/bridge-ph/padang-demo/config/db-user
+podman secret ls
+```
+
+A supported existing major is selected from `PG_VERSION`; a clean directory
+uses PostgreSQL 18 and the official versioned `PGDATA` layout. Permission or
+ownership failures must be corrected by the VPS operator after confirming the
+directory is the intended demo data root. A major-version change requires a
+reviewed backup plus `pg_upgrade` or dump/restore into a separate target; it is
+never an automatic deployment step. See the official [PostgreSQL versioning
+policy](https://www.postgresql.org/support/versioning/) and [PostgreSQL
+Official Image](https://hub.docker.com/_/postgres) guidance.
 
 ### Operator commands
 

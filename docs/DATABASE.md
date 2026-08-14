@@ -10,8 +10,9 @@
 - Status transitions enforced in service layer (not DB constraints alone)
 - Audit log: append-only `audit_log` table; no UPDATE or DELETE on this table
 - File attachments: polymorphic `attachments` table (`entity_type`, `entity_id`)
-- Latest supported PostgreSQL release via the official floating Alpine channel;
-  migration tool: golang-migrate
+- Official PostgreSQL Alpine image with a persistent-major compatibility guard;
+  clean demo state defaults to `postgres:18-alpine`, existing state uses the
+  matching supported `PG_VERSION` major; migration tool: golang-migrate
 
 ---
 

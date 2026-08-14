@@ -1,6 +1,6 @@
 # ADR-003: PostgreSQL as Database
 
-**Date:** 2026-08-11  
+**Date:** 2026-08-11; amended 2026-08-14
 **Status:** Accepted  
 **Deciders:** Google Antigravity (Architect)
 
@@ -15,9 +15,12 @@ The ERP stores:
 
 ## Decision
 
-**The latest supported PostgreSQL release from the official floating Alpine
-channel (`postgres:alpine`).** PostgreSQL has no Node-style LTS channel, so a
-changed floating digest must pass migration and restore validation before use.
+**PostgreSQL from the official Alpine image, with the major version treated as
+part of persistent database state.** Clean Padang demo state defaults to
+`postgres:18-alpine`; an existing cluster selects its supported major from
+`PG_VERSION` (currently 14–18). A deployment must fail closed on an unsupported
+or malformed state rather than silently selecting a newer major. Major upgrades
+require a reviewed `pg_upgrade` or dump/restore operation.
 
 ## Rationale
 
@@ -30,8 +33,8 @@ changed floating digest must pass migration and restore validation before use.
 - Generated columns: for computed fields (e.g., budget item totals)
 - Excellent current pgx driver for Go: high performance, native protocol
 - sqlc: generates type-safe Go code from SQL; PostgreSQL-native
-- Support follows the upstream release selected by the floating channel; the
-  resolved digest and detected major version are recorded at each update
+- Supported-major maintenance follows the upstream release policy; the
+  resolved digest and detected major are recorded at each update
 
 ## Alternatives Considered
 

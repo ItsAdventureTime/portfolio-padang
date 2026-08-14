@@ -2,6 +2,7 @@
 Description=Padang ERP Demo Go API
 After=bridge-ph-padang-demo-migrate.service
 Requires=bridge-ph-padang-demo-migrate.service
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/build/backend
 
 [Container]
 Image=ghcr.io/itsadventuretime/padang-erp-api:demo-latest
@@ -28,6 +29,7 @@ HealthRetries=3
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target

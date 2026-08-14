@@ -71,8 +71,8 @@ Key units requiring tests:
 
 ### Integration Tests
 
-Tool: `testcontainers-go` (spins up the selected floating PostgreSQL Alpine
-image in Docker/Podman)
+Tool: `testcontainers-go` (spins up the selected supported PostgreSQL Alpine
+major in Docker/Podman; clean fixtures use PostgreSQL 18)
 Location: `backend/internal/repository/*_integration_test.go`
 
 Run: `go test ./... -tags=integration`
@@ -146,11 +146,12 @@ The minimum implementation gate for the current C1 foundation is:
   `npm run lint`;
 - both demo and production frontend builds, with `--webpack` when the local
   Podman VM cannot sustain Turbopack;
-- clean PostgreSQL migration up and down against `postgres:alpine`;
+- clean PostgreSQL migration up and down against `postgres:18-alpine`;
 - `bash -n` for operational scripts, the deployment/local helper `--help`
   commands, `scripts/check-padang-public-routes.sh --help`, the disposable
-  Caddy route fixtures (`bash scripts/test-deploy-padang-demo-caddy.sh`), and
-  `git diff --check`;
+  Caddy route fixtures (`bash scripts/test-deploy-padang-demo-caddy.sh`), the
+  disposable PostgreSQL state fixtures
+  (`bash scripts/test-padang-demo-postgres.sh`), and `git diff --check`;
 - `scripts/check-padang-public-routes.sh --demo-only` must pass the demo page
   and health routes after a demo deployment; the default checker must pass all
   four URLs before a public release covering both environments is called

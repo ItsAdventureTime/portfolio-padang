@@ -128,6 +128,33 @@ Primary Caddy references:
 - [Caddy `import` directive](https://caddyserver.com/docs/caddyfile/directives/import)
 - [Caddy configuration concepts](https://caddyserver.com/docs/caddyfile/concepts)
 
+### Demo PostgreSQL Persistence Refresh: Current Maintainer Guidance (2026-08-14)
+
+The demo deployment no longer lets a floating PostgreSQL tag choose a major
+version for persistent state. PostgreSQL's official versioning policy
+supports each major for five years and recommends staying current on the minor
+release within that major. The current supported default is PostgreSQL 18.
+
+The updater therefore selects `postgres:18-alpine` for an empty demo data root,
+or the matching supported `postgres:<major>-alpine` image after reading an
+existing `PG_VERSION` (supported majors 14–18). It fails closed for an
+unsupported or malformed state, refuses ownership/permission mismatches for
+rootless storage, and never wipes or auto-upgrades a data directory. PostgreSQL
+18's official image uses versioned `PGDATA`; clean state uses
+`/var/lib/postgresql/18/docker`, while legacy data with `PG_VERSION` at the
+mount root retains the `/var/lib/postgresql/data` layout and matching major.
+
+The Quadlet DB unit declares `RequiresMountsFor` for persistent storage and
+does not use `Notify=healthy`; the updater waits for a network-only readiness
+check, verifies the role/database/password identity, and prints systemd,
+journal, container inspection, and container log diagnostics on failure.
+
+Primary references:
+
+- [PostgreSQL versioning policy](https://www.postgresql.org/support/versioning/)
+- [PostgreSQL Official Image](https://hub.docker.com/_/postgres)
+- [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
+
 ---
 
 ## 1. Philippine Construction Industry — Billing, Retention, Variation Orders
@@ -205,13 +232,14 @@ sqlc, and the selected container/runtime channels
 
 | Option | Verdict |
 |---|---|
-| **PostgreSQL via `postgres:alpine`** | ✅ Selected — industry standard; relational model ideal for ERP; excellent Go support |
+| **PostgreSQL via official Alpine images** | ✅ Selected — industry standard; relational model ideal for ERP; persistent major is matched to `PG_VERSION` |
 | MySQL/MariaDB | Common but weaker JSONB/analytical capabilities |
 | SQLite | ❌ Not suitable for multi-user concurrent ERP |
 
-PostgreSQL has no Node-style LTS channel. The floating official Alpine tag is
-used, with the resolved digest and detected major version recorded before each
-approved update and restore validation required for major changes.
+PostgreSQL has no Node-style LTS channel. Clean demo state uses
+`postgres:18-alpine`; persistent state selects the matching supported major from
+`PG_VERSION` and records the resolved digest. Major changes require reviewed
+upgrade or restore validation rather than a floating runtime tag.
 
 ### Type-Safe DB Access
 

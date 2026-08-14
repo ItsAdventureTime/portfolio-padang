@@ -58,7 +58,7 @@ External services (reached from API container via outbound HTTPS):
 
 | Component | Technology | Notes |
 |---|---|---|
-| RDBMS | PostgreSQL | Latest official supported Alpine channel; `postgres:alpine` floating tag |
+| RDBMS | PostgreSQL | Official Alpine image; persistent deployments pin the major to `PG_VERSION` (demo clean default: `postgres:18-alpine`) |
 | Connection pooling | PgBouncer (optional) | Evaluate if connection count becomes a concern |
 
 ### Infrastructure
@@ -67,7 +67,7 @@ External services (reached from API container via outbound HTTPS):
 |---|---|
 | Containerization | Rootless Podman + Podman Quadlets (operator-triggered updates) |
 | Build strategy | All builds via `podman run --rm`; multi-stage Containerfiles; no host toolchain required |
-| Image tags | Official floating channels; resolved digests recorded for audit; updates remain manually applied |
+| Image tags | Official floating channels for build/stateless runtimes; persistent PostgreSQL major is selected from `PG_VERSION`; resolved digests recorded for audit |
 | Ingress | Existing Caddy (path-based routing; proxy-network pattern) |
 | OS | Fedora CoreOS (latest stable) |
 | OCI Registry | GHCR (`ghcr.io/itsadventuretime/padang-erp-{api\|frontend}`) |
@@ -304,7 +304,7 @@ See `docs/adr/` for all ADRs.
 |---|---|
 | ADR-001 | Go + Chi as backend framework |
 | ADR-002 | Next.js App Router as frontend framework; latest supported release |
-| ADR-003 | PostgreSQL database via floating supported Alpine channel |
+| ADR-003 | PostgreSQL database with persistent-major compatibility guard |
 | ADR-004 | sqlc for type-safe database access |
 | ADR-005 | Backblaze B2 for file storage |
 | ADR-006 | Provider-neutral email adapter pattern |

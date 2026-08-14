@@ -1,6 +1,8 @@
 [Unit]
 Description=Padang ERP Demo Next.js Frontend
 After=bridge-ph-padang-demo-api.service
+Requires=bridge-ph-padang-demo-api.service
+RequiresMountsFor=/home/jk/bridge-ph/padang-demo/build/frontend
 
 [Container]
 Image=ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
@@ -17,6 +19,7 @@ HealthRetries=3
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target

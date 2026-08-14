@@ -60,7 +60,7 @@ padang-bridge-dashboard/
 │   ├── PLANNING_CLARIFICATIONS.md ← Resolved intake decisions and analogies
 │   ├── HANDOFF.md               ← Current handoff state (always up to date)
 │   └── adr/                     ← Architecture Decision Records
-├── backend/                     ← Go API (Chi + sqlc + PostgreSQL floating Alpine channel)
+├── backend/                     ← Go API (Chi + sqlc + supported PostgreSQL major)
 ├── frontend/                    ← Next.js latest supported release (App Router + shadcn/ui)
 ├── quadlets/                    ← Podman Quadlet templates (demo + prod)
 ├── scripts/                     ← Operational bash scripts
@@ -77,7 +77,7 @@ padang-bridge-dashboard/
 | API | REST/JSON + OpenAPI 3.1 |
 | Frontend | Next.js App Router (LTS) + TypeScript |
 | UI library | shadcn/ui + Tailwind CSS |
-| Database | Latest supported PostgreSQL release via floating official Alpine channel |
+| Database | Supported PostgreSQL major; demo clean state defaults to `18-alpine` and persistent state matches `PG_VERSION` |
 | File storage | Backblaze B2 (`bridge-ph` bucket) |
 | Email | Resend (adapter pattern; future Azure) |
 | Auth | Passwordless Email OTP + RS256 JWT |

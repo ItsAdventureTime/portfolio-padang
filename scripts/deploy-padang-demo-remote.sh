@@ -9,10 +9,10 @@ FRONTEND_BUILD="$BUILD_ROOT/frontend"
 BACKEND_BUILD="$BUILD_ROOT/backend"
 DB_NAME="padang_demo"
 DB_USER_FILE="$APP_ROOT/config/db-user"
-DB_USER="padang_demo_user"
-if [[ -r "$DB_USER_FILE" ]]; then
-  DB_USER=$(<"$DB_USER_FILE")
-fi
+DB_IDENTITY_FILE="$APP_ROOT/config/db-identity"
+DB_DEFAULT_USER="padang_demo_user"
+DB_USER="$DB_DEFAULT_USER"
+DB_CONTAINER="bridge-ph-padang-demo-db"
 DB_SECRET="bridge-ph-padang-demo-db-password"
 B2_KEY_ID_SECRET="bridge-ph-padang-demo-b2-key-id"
 B2_APPLICATION_KEY_SECRET="bridge-ph-padang-demo-b2-application-key"
@@ -476,7 +476,7 @@ fi
 [[ "$APP_ROOT" == /home/jk/bridge-ph/padang-demo ]] || die "demo root guard failed"
 [[ "$QUADLET_DIR" == /home/jk/.config/containers/systemd/bridge-ph/padang-demo ]] || die "Quadlet directory guard failed"
 
-for command_name in podman systemctl awk sed grep find install cmp; do
+for command_name in podman systemctl awk sed grep find install cmp journalctl stat; do
   command -v "$command_name" >/dev/null 2>&1 || die "$command_name is required"
 done
 
@@ -484,6 +484,8 @@ podman info --format '{{.Host.CgroupsVersion}}' | grep -qx 'v2' || die "rootless
 systemctl --user show-environment >/dev/null 2>&1 || die "user systemd bus is unavailable"
 check_auto_update_timer
 [[ -d "$SOURCE_ROOT/backend" && -d "$SOURCE_ROOT/frontend" ]] || die "source tree is incomplete"
+POSTGRES_DEFAULT_MAJOR=18
+source "$SOURCE_ROOT/scripts/lib/padang-demo-postgres.sh"
 [[ "$DB_USER" =~ ^[a-z_][a-z0-9_]{2,30}$ ]] || die "stored database username is invalid"
 
 if find "$SOURCE_ROOT" -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \) -print -quit | grep -q .; then
@@ -531,10 +533,28 @@ ensure_external_secret() {
 }
 
 ensure_db_user() {
-  if [[ -r "$DB_USER_FILE" ]]; then
+  if [[ -e "$DB_USER_FILE" || -L "$DB_USER_FILE" ]]; then
+    [[ -f "$DB_USER_FILE" && ! -L "$DB_USER_FILE" && -r "$DB_USER_FILE" ]] ||
+      die "database username record is unreadable: $DB_USER_FILE"
     DB_USER=$(<"$DB_USER_FILE")
     [[ "$DB_USER" =~ ^[a-z_][a-z0-9_]{2,30}$ ]] ||
       die "stored database username is invalid"
+    return
+  fi
+  if [[ -e "$DB_IDENTITY_FILE" ]]; then
+    [[ -f "$DB_IDENTITY_FILE" && ! -L "$DB_IDENTITY_FILE" &&
+      -r "$DB_IDENTITY_FILE" ]] ||
+      die "database identity record is unreadable: $DB_IDENTITY_FILE"
+    DB_USER=$(awk -F= '$1 == "db_user" {print substr($0, index($0, "=") + 1)}' \
+      "$DB_IDENTITY_FILE")
+    [[ "$DB_USER" =~ ^[a-z_][a-z0-9_]{2,30}$ ]] ||
+      die "database identity record does not contain a valid database username"
+    log "using the database username from the persisted identity record"
+    return
+  fi
+  if ((POSTGRES_DATA_EXISTS)); then
+    DB_USER="$DB_DEFAULT_USER"
+    log "no stored database username; using the legacy-compatible default and verifying it at runtime"
     return
   fi
   [[ "$MODE" == --apply ]] || {
@@ -551,6 +571,57 @@ ensure_db_user() {
   rm -f "$temporary_user"
   DB_USER=$(<"$DB_USER_FILE")
   log "generated the Padang demo database username"
+}
+
+validate_db_identity_file() {
+  local stored_name stored_user stored_major stored_layout
+
+  if [[ ! -e "$DB_IDENTITY_FILE" ]]; then
+    if ((POSTGRES_DATA_EXISTS)); then
+      log "legacy PostgreSQL state has no identity record; runtime identity verification is required"
+    fi
+    return 0
+  fi
+  [[ -f "$DB_IDENTITY_FILE" && ! -L "$DB_IDENTITY_FILE" && -r "$DB_IDENTITY_FILE" ]] ||
+    die "database identity record is unreadable: $DB_IDENTITY_FILE"
+  stored_name=$(awk -F= '$1 == "db_name" {print substr($0, index($0, "=") + 1)}' "$DB_IDENTITY_FILE")
+  stored_user=$(awk -F= '$1 == "db_user" {print substr($0, index($0, "=") + 1)}' "$DB_IDENTITY_FILE")
+  stored_major=$(awk -F= '$1 == "postgres_major" {print substr($0, index($0, "=") + 1)}' "$DB_IDENTITY_FILE")
+  stored_layout=$(awk -F= '$1 == "data_layout" {print substr($0, index($0, "=") + 1)}' "$DB_IDENTITY_FILE")
+  [[ -n "$stored_name" && -n "$stored_user" && -n "$stored_major" &&
+    -n "$stored_layout" ]] ||
+    die "database identity record is incomplete: $DB_IDENTITY_FILE"
+  [[ "$stored_user" =~ ^[a-z_][a-z0-9_]{2,30}$ ]] ||
+    die "database identity record contains an invalid database username"
+  [[ "$stored_name" == "$DB_NAME" && "$stored_user" == "$DB_USER" ]] ||
+    die "database identity record disagrees with configured DB_NAME/DB_USER; refusing to start"
+  [[ "$stored_major" == "$POSTGRES_MAJOR" && "$stored_layout" == "$POSTGRES_DATA_LAYOUT" ]] ||
+    die "database identity record disagrees with PG_VERSION/layout; refusing to start"
+  ((POSTGRES_DATA_EXISTS)) ||
+    die "database identity record exists but the PostgreSQL data directory is empty"
+}
+
+write_db_user() {
+  local temporary_file="$DB_USER_FILE.tmp.$$"
+  printf '%s\n' "$DB_USER" >"$temporary_file" ||
+    die "could not write database username record"
+  chmod 0640 "$temporary_file" ||
+    die "could not set database username record permissions"
+  mv -f -- "$temporary_file" "$DB_USER_FILE" ||
+    die "could not install database username record"
+}
+
+write_db_identity() {
+  local temporary_file="$DB_IDENTITY_FILE.tmp.$$"
+  {
+    printf 'db_name=%s\n' "$DB_NAME"
+    printf 'db_user=%s\n' "$DB_USER"
+    printf 'postgres_major=%s\n' "$POSTGRES_MAJOR"
+    printf 'data_layout=%s\n' "$POSTGRES_DATA_LAYOUT"
+  } >"$temporary_file" || die "could not write database identity record"
+  chmod 0640 "$temporary_file" || die "could not set database identity record permissions"
+  mv -f -- "$temporary_file" "$DB_IDENTITY_FILE" ||
+    die "could not install database identity record"
 }
 
 build_backend() {
@@ -610,8 +681,10 @@ write_quadlets() {
     "$APP_ROOT/data" "$QUADLET_DIR"
   chmod 0750 "$APP_ROOT" "$BUILD_ROOT" "$APP_ROOT/config" "$APP_ROOT/data"
   local quadlet_dir="$QUADLET_DIR"
+  local postgres_image
   local quadlet_stage_dir
   local staged_file
+  postgres_image=$(postgres_image_for_state) || die "could not resolve a supported PostgreSQL image"
   quadlet_stage_dir=$(mktemp -d "$APP_ROOT/.quadlet-stage.XXXXXX")
   trap 'rm -rf "$quadlet_stage_dir"' RETURN
   log "staging Padang demo Quadlets under $quadlet_dir"
@@ -637,21 +710,22 @@ EOF
 Description=Bridge PH Padang demo PostgreSQL
 After=network-online.target $INTERNAL_NETWORK.network
 Requires=$INTERNAL_NETWORK.network
+RequiresMountsFor=$APP_ROOT/postgres-data
 
 [Container]
-Image=docker.io/library/postgres:alpine
+Image=$postgres_image
 ContainerName=bridge-ph-padang-demo-db
 Network=$INTERNAL_NETWORK.network
-Volume=$APP_ROOT/postgres-data:/var/lib/postgresql/data:Z
+Volume=$POSTGRES_DATA_VOLUME
+Environment=PGDATA=$POSTGRES_PGDATA
 Environment=POSTGRES_DB=$DB_NAME
 Environment=POSTGRES_USER=$DB_USER
 Environment=POSTGRES_PASSWORD_FILE=/run/secrets/db-password
 Secret=$DB_SECRET,type=mount,target=/run/secrets/db-password
-HealthCmd=pg_isready -U $DB_USER -d $DB_NAME
+HealthCmd=pg_isready -h 127.0.0.1
 HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
-Notify=healthy
 [Service]
 Restart=always
 TimeoutStartSec=900
@@ -665,6 +739,7 @@ EOF
 Description=Bridge PH Padang demo database migrations
 After=padang-demo-db.service
 Requires=padang-demo-db.service
+RequiresMountsFor=$SOURCE_ROOT/backend/migrations
 
 [Container]
 Image=docker.io/migrate/migrate:latest
@@ -686,6 +761,7 @@ EOF
 Description=Bridge PH Padang demo Go API
 After=padang-demo-migrate.service
 Requires=padang-demo-migrate.service
+RequiresMountsFor=$BACKEND_BUILD
 
 [Container]
 Image=docker.io/library/alpine:latest
@@ -725,6 +801,7 @@ EOF
 Description=Bridge PH Padang demo Next.js app
 After=padang-demo-api.service
 Requires=padang-demo-api.service
+RequiresMountsFor=$FRONTEND_BUILD
 
 [Container]
 Image=docker.io/library/node:lts-alpine
@@ -755,9 +832,10 @@ EOF
 Description=Bridge PH Padang demo reset
 After=padang-demo-migrate.service
 Requires=padang-demo-migrate.service
+RequiresMountsFor=$SOURCE_ROOT/seed $SOURCE_ROOT/scripts
 
 [Container]
-Image=docker.io/library/postgres:alpine
+Image=$postgres_image
 ContainerName=bridge-ph-padang-demo-reset
 Network=$INTERNAL_NETWORK.network
 Environment=APP_ENV=demo
@@ -998,6 +1076,17 @@ restart_caddy_after_quadlet_stage() {
   systemctl --user restart caddy.service
 }
 
+print_service_diagnostics() {
+  local service="$1"
+  local container="$2"
+  printf 'padang-demo: diagnostics for %s (%s)\n' "$service" "$container" >&2
+  systemctl --user status "$service" --no-pager -l >&2 || true
+  journalctl --user -u "$service" -n 120 --no-pager >&2 || true
+  podman inspect "$container" --format \
+    'container status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' >&2 || true
+  podman logs --tail 200 "$container" >&2 || true
+}
+
 wait_healthy() {
   local container="$1"
   local attempts=30
@@ -1008,27 +1097,71 @@ wait_healthy() {
     sleep 2
     attempts=$((attempts - 1))
   done
-  podman logs "$container" >&2 || true
-  die "$container did not become healthy"
+  return 1
+}
+
+verify_db_identity() {
+  podman exec "$DB_CONTAINER" sh -ec '
+    set -eu
+    export PGPASSWORD="$(cat /run/secrets/db-password)"
+    psql --no-password --host=127.0.0.1 --username="$1" --dbname="$2" \
+      -v ON_ERROR_STOP=1 -Atqc "SELECT 1" >/dev/null
+  ' sh "$DB_USER" "$DB_NAME" || return 1
+
+  podman exec --user postgres "$DB_CONTAINER" sh -ec '
+    set -eu
+    role_exists=$(psql --no-password --username=postgres --dbname=postgres \
+      -Atqc "SELECT 1 FROM pg_roles WHERE rolname = '\''$1'\'' LIMIT 1")
+    db_exists=$(psql --no-password --username=postgres --dbname=postgres \
+      -Atqc "SELECT 1 FROM pg_database WHERE datname = '\''$2'\'' LIMIT 1")
+    [[ "$role_exists" == 1 && "$db_exists" == 1 ]]
+  ' sh "$DB_USER" "$DB_NAME"
 }
 
 start_stack() {
   systemctl --user daemon-reload
   systemctl --user start "${INTERNAL_NETWORK}-network.service" \
     "${PROXY_NETWORK}-network.service"
-  systemctl --user start padang-demo-db.service
-  wait_healthy bridge-ph-padang-demo-db
-  systemctl --user restart padang-demo-migrate.service
+  if ! systemctl --user start padang-demo-db.service; then
+    print_service_diagnostics padang-demo-db.service "$DB_CONTAINER"
+    die "PostgreSQL service failed to start; persistent data was not removed or upgraded"
+  fi
+  if ! wait_healthy "$DB_CONTAINER"; then
+    print_service_diagnostics padang-demo-db.service "$DB_CONTAINER"
+    die "PostgreSQL did not become ready; persistent data was not removed or upgraded"
+  fi
+  if ! verify_db_identity; then
+    print_service_diagnostics padang-demo-db.service "$DB_CONTAINER"
+    die "PostgreSQL database identity or secret does not match persisted state; persistent data was not removed or upgraded"
+  fi
+  [[ -e "$DB_USER_FILE" ]] || write_db_user
+  [[ -e "$DB_IDENTITY_FILE" ]] || write_db_identity
+  if ! systemctl --user restart padang-demo-migrate.service; then
+    print_service_diagnostics padang-demo-migrate.service bridge-ph-padang-demo-migrate
+    die "database migrations failed; inspect the migration journal"
+  fi
   if ((SEED_DEMO)); then
     log "explicit --seed-demo requested; reseeding demo database"
     systemctl --user start padang-demo-reset.service
   else
     log "preserving demo database; use --seed-demo only for an intentional reset"
   fi
-  systemctl --user restart padang-demo-api.service
-  wait_healthy bridge-ph-padang-demo-api
-  systemctl --user restart padang-demo-app.service
-  wait_healthy bridge-ph-padang-demo-frontend
+  if ! systemctl --user restart padang-demo-api.service; then
+    print_service_diagnostics padang-demo-api.service bridge-ph-padang-demo-api
+    die "API service failed to start"
+  fi
+  if ! wait_healthy bridge-ph-padang-demo-api; then
+    print_service_diagnostics padang-demo-api.service bridge-ph-padang-demo-api
+    die "API did not become healthy"
+  fi
+  if ! systemctl --user restart padang-demo-app.service; then
+    print_service_diagnostics padang-demo-app.service bridge-ph-padang-demo-frontend
+    die "frontend service failed to start"
+  fi
+  if ! wait_healthy bridge-ph-padang-demo-frontend; then
+    print_service_diagnostics padang-demo-app.service bridge-ph-padang-demo-frontend
+    die "frontend did not become healthy"
+  fi
   systemctl --user start padang-demo-reset.timer
 }
 
@@ -1038,7 +1171,7 @@ record_image_digests() {
   {
     printf '# Padang demo image digests recorded at %s UTC\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     for image in \
-      docker.io/library/postgres:alpine \
+      "$(postgres_image_for_state)" \
       docker.io/migrate/migrate:latest \
       docker.io/library/alpine:latest \
       docker.io/library/node:lts-alpine \
@@ -1056,16 +1189,18 @@ ensure_db_secret
 ensure_external_secret
 build_backend
 build_frontend
-ensure_db_user
 
 if [[ "$MODE" == --dry-run ]]; then
   log "dry-run complete; build artifacts and build directories changed only; no Quadlets, secrets, or Caddy files changed"
   exit 0
 fi
 
-install_caddy_route
+postgres_prepare_storage "$APP_ROOT/postgres-data"
+ensure_db_user
+validate_db_identity_file
 write_quadlets
-restart_caddy_after_quadlet_stage
 start_stack
+install_caddy_route
+restart_caddy_after_quadlet_stage
 record_image_digests
 log "Padang demo is running at https://delegateops.business/padang/demo"

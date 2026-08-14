@@ -190,11 +190,11 @@ podman exec bridge-ph-padang-db \
   -c "DROP DATABASE IF EXISTS padang_prod;" \
   -c "CREATE DATABASE padang_prod OWNER padang_prod_user;"
 
-# 5. Restore
+# 5. Restore (use the same PostgreSQL major as the target cluster; 18 shown)
 podman run --rm \
   -v /tmp/restore:/restore:ro,Z \
   --network bridge-ph-padang \
-  docker.io/library/postgres:alpine \
+  docker.io/library/postgres:18-alpine \
   pg_restore -h bridge-ph-padang-db -U padang_prod_user \
   -d padang_prod /restore/$BACKUP_FILE
 
