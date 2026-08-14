@@ -12,7 +12,7 @@ The public release gate is currently failing with HTTP 404; the full ERP
 workflow surface is not yet implemented.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 3fb9021 (`fix(ux): make foundation preview honest and testable`)
+LATEST IMPLEMENTATION COMMIT: f015e97 (`fix(ui): surface live data and harden update helpers`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
