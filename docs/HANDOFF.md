@@ -135,6 +135,39 @@ also SIGKILL/OOM-killed by that shared VM before serving; the in-app browser
 session remains client-blocked. The public four-route gate remains HTTP 404 at
 both BunnyCDN and direct Caddy origin.
 
+## Luna Reviewer UI Audit Implementation (2026-08-14)
+
+The bounded frontend remediation is now implemented in the working tree:
+
+- Production `/padang` and known module routes use the existing
+  `padang_refresh_token` cookie for Next.js `proxy.ts` gating and an API-backed `/me`
+  session gate before rendering. The API cookie Path was widened to `/` so the
+  canonical same-origin `/padang` and `/padang/api` routes can use the existing
+  refresh-token flow. Demo remains unauthenticated and visibly synthetic.
+- The shared shell uses `frontend/public/assets/padang-logo.svg`, preserves
+  compiled `basePath` links, filters demo navigation by role, shows role
+  permission copy, and uses read-only/status affordances for unsupported
+  creation and notification actions. Production exposes only the existing API
+  logout action.
+- The mobile drawer now exposes expanded/controlled state, focuses and traps
+  focus, closes on Escape/overlay/navigation, restores focus, hides/makes the
+  page background inert, locks scroll, and prevents page-level horizontal
+  overflow. Loading skeletons and drawer motion honor reduced-motion settings.
+- The responsive shell keeps a 72px icon-only sidebar from 768px through
+  1023px, then switches to the keyboard-safe drawer below 768px. Data tables
+  become labeled cards on mobile so essential fields remain visible without
+  page-level horizontal scrolling.
+- Module registers reset and abort on role changes, never substitute fallback
+  rows for API failures, expose retry/live-empty/search-empty states, announce
+  status changes, and share PHP/date/status formatting and badges. Login now
+  handles focus, status/error announcements, retry cooldown, OTP expiry, and
+  the existing OTP/refresh/logout capabilities without faking authentication.
+
+Remaining limits are unchanged: detailed production dashboard widgets, CRUD,
+approval, payment, QBO, report-export, and full browser/axe verification are
+not implemented. The public route gate remains dependent on the unresolved
+deployment HTTP 404 state described above.
+
 ## PostgreSQL Demo Startup Remediation (2026-08-14)
 
 The Luna deployment finding is addressed in the shared repository. The demo

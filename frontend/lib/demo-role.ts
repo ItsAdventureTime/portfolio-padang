@@ -13,6 +13,28 @@ export const demoRoles = [
 
 export type DemoRole = (typeof demoRoles)[number][0];
 
+export type DemoModule = 'dashboard' | 'projects' | 'fabrication' | 'procurement' | 'inventory' | 'billing' | 'finance' | 'reports' | 'settings';
+
+type DemoRolePermissions = {
+  modules: readonly DemoModule[];
+  canCreate: boolean;
+  canApprove: boolean;
+  summary: string;
+};
+
+export const demoRolePermissions: Record<DemoRole, DemoRolePermissions> = {
+  administrator: { modules: ['dashboard', 'projects', 'fabrication', 'procurement', 'inventory', 'billing', 'finance', 'reports', 'settings'], canCreate: true, canApprove: true, summary: 'Full navigation is visible; workflow writes remain unavailable in this preview.' },
+  general_manager: { modules: ['dashboard', 'projects', 'fabrication', 'procurement', 'inventory', 'billing', 'finance', 'reports'], canCreate: false, canApprove: true, summary: 'Approval views are visible; creation and approval actions are read-only in this preview.' },
+  disbursing_check_signing_officer: { modules: ['dashboard', 'procurement', 'inventory', 'billing', 'finance', 'reports'], canCreate: false, canApprove: true, summary: 'Finance and approval views are visible; payment actions are not connected.' },
+  project_manager: { modules: ['dashboard', 'projects', 'fabrication', 'inventory', 'reports'], canCreate: true, canApprove: false, summary: 'Project and field views are visible; record creation is not connected.' },
+  procurement_officer: { modules: ['dashboard', 'procurement', 'inventory', 'reports'], canCreate: true, canApprove: false, summary: 'Procurement views are visible; purchase workflows are read-only.' },
+  fabrication_supervisor: { modules: ['dashboard', 'fabrication', 'inventory', 'reports'], canCreate: true, canApprove: false, summary: 'Shop-floor views are visible; job-order actions are not connected.' },
+  finance_staff: { modules: ['dashboard', 'billing', 'finance', 'reports'], canCreate: true, canApprove: false, summary: 'Finance views are visible; payment and liquidation actions are not connected.' },
+  billing_clerk: { modules: ['dashboard', 'projects', 'billing', 'reports'], canCreate: true, canApprove: false, summary: 'Billing views are visible; billing submission is not connected.' },
+  inventory_clerk: { modules: ['dashboard', 'procurement', 'inventory', 'reports'], canCreate: true, canApprove: false, summary: 'Inventory views are visible; stock mutation actions are not connected.' },
+  viewer: { modules: ['dashboard', 'projects', 'fabrication', 'reports'], canCreate: false, canApprove: false, summary: 'Read-only navigation is visible for this role.' },
+};
+
 const defaultDemoRole: DemoRole = 'general_manager';
 export const demoRoleStorageKey = 'padang_demo_role';
 
@@ -47,4 +69,12 @@ export function subscribeDemoRole(callback: () => void): () => void {
 
 export function demoRoleLabel(role: DemoRole): string {
   return demoRoles.find(([value]) => value === role)?.[1] ?? 'General Manager';
+}
+
+export function demoPermissions(role: DemoRole): DemoRolePermissions {
+  return demoRolePermissions[role];
+}
+
+export function demoCanAccess(role: DemoRole, module: DemoModule): boolean {
+  return demoRolePermissions[role].modules.includes(module);
 }

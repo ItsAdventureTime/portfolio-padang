@@ -186,7 +186,7 @@ func (s Server) logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie("padang_refresh_token"); err == nil && s.Auth != nil {
 		_ = s.Auth.Revoke(r.Context(), cookie.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "padang_refresh_token", Value: "", Path: "/api/v1/auth", MaxAge: -1, HttpOnly: true, Secure: s.Config.AppEnv == config.Production, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: "padang_refresh_token", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Config.AppEnv == config.Production, SameSite: http.SameSiteStrictMode})
 	JSON(w, http.StatusOK, map[string]any{"data": map[string]string{"status": "logged_out"}})
 }
 func (s Server) me(w http.ResponseWriter, r *http.Request) {
@@ -356,5 +356,5 @@ func (s Server) openapi(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(document)
 }
 func (s Server) setRefreshCookie(w http.ResponseWriter, value string) {
-	http.SetCookie(w, &http.Cookie{Name: "padang_refresh_token", Value: value, Path: "/api/v1/auth", MaxAge: 7 * 24 * 60 * 60, HttpOnly: true, Secure: s.Config.AppEnv == config.Production, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: "padang_refresh_token", Value: value, Path: "/", MaxAge: 7 * 24 * 60 * 60, HttpOnly: true, Secure: s.Config.AppEnv == config.Production, SameSite: http.SameSiteStrictMode})
 }

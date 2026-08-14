@@ -22,6 +22,22 @@ a gold ribbon banner, and clean bold typography.
 - Micro-animations enhance perceived responsiveness; never distract from data
 - WCAG 2.2 AA minimum contrast on all text
 
+### Luna audit interaction pattern (2026-08-14)
+
+The frontend uses a small local adaptation of the SmoothUI design principle:
+drawer entry and loading skeletons use short CSS transitions/pulses only when
+`prefers-reduced-motion: no-preference` is active. No SmoothUI package, runtime
+registry, CLI fetch, or motion dependency is used; the existing CSS token and
+React component system is sufficient for these two interactions. Production
+data states are intentionally quiet: loading, live, error, and empty states
+communicate through text and `aria-live`, not decorative effects.
+
+The shared `formatPHP`, `formatDate`, `formatStatus`, and `StatusBadge` helpers
+are the canonical register formatting path. Status badges use green for
+complete/active states, amber for in-progress/approval states, blue for
+informational states, slate for unset states, and red for failure/overdue
+states.
+
 ---
 
 ## Color Tokens

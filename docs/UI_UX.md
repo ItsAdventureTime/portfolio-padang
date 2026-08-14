@@ -7,6 +7,22 @@
 > controls must be disabled or labeled as coming soon rather than implying a
 > completed action path.
 
+> **Luna audit implementation (2026-08-14):** Production `/padang` and module
+> routes now require a refresh-cookie presence check plus a client `/me`
+> verification before the shell renders. Demo `/padang/demo` remains public and
+> is labeled as synthetic preview data. The demo role selector now filters
+> navigation, exposes the selected role's permission summary, and resets/cancels
+> module loads when the role changes. Registers use live-only rows for API-backed
+> data, skeletons, retry/error states, and separate live-empty/search-empty
+> messages. The mobile drawer has a focus trap, focus restoration, Escape close,
+> `aria-expanded`/`aria-controls`, and an inert/hidden background.
+
+> The responsive shell uses an icon-only sidebar at tablet widths and labeled
+> card-stacked tables below 768px. The dashboard's production view shows only
+> API-confirmed summary values. Detailed dashboard widgets, CRUD, approval,
+> payment, QBO, and report-export
+> workflows remain backend/UI limits and are explicitly labeled unavailable.
+
 ## UX Principles
 
 1. **Role-aware surfaces** — Each role sees only what they need. No cognitive clutter.
@@ -59,6 +75,11 @@
 - Left: breadcrumb navigation (clickable ancestors)
 - Right (demo): role switcher chip (gold)
 - Right (production): notification bell + user avatar dropdown
+
+Production exposes the existing API-backed sign-out action only after session
+verification. Notifications and record creation are rendered as read-only
+status affordances until their API workflows exist; they are not disabled fake
+buttons.
 
 ---
 

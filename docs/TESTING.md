@@ -14,6 +14,32 @@ intentional generated artifacts.
 The local Podman VM currently has 2 GiB available. Use `-p 1` for Go checks
 and the Webpack build fallback for Next.js when Turbopack exceeds that limit.
 
+### Luna audit focused checks (2026-08-14)
+
+For the current bounded frontend implementation, verify all of the following
+in both build artifacts where applicable:
+
+- production `proxy.ts` protects `/padang` and each known `/padang/{module}`
+  route, while `/padang/demo` remains public and visibly labeled;
+- a production shell does not render until `/api/v1/auth/me` succeeds, and an
+  API/auth failure shows an error/retry state rather than synthetic rows;
+- changing the demo role changes visible navigation and permission/action copy,
+  aborts the previous register request, clears search, and resets the register;
+- API-backed registers show skeletons while loading, a retry action on error,
+  live-empty and search-empty states separately, shared PHP/date formatting,
+  status badges, and `aria-live` announcements;
+- at 375px, 768px, 834px, and 1024px there is no page-level horizontal overflow;
+  the 768–1023px shell is icon-only and mobile tables use labeled cards;
+  the drawer exposes `aria-expanded`/`aria-controls`, focuses its close button,
+  traps focus, closes on Escape/overlay/navigation, restores focus, and makes
+  the background inert/hidden;
+- login focuses the active field, announces request/verification status,
+  handles retry cooldown and ten-minute OTP expiry, and uses only the existing
+  OTP/refresh/logout API endpoints.
+
+The current repository has no Playwright or axe test suite; these remain manual
+or future automated gates until those files are added.
+
 ### Pyramid
 
 ```

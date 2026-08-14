@@ -54,6 +54,11 @@ No passwords. Users authenticate by entering their registered email address and 
 - Refresh token: stored server-side as bcrypt hash in `refresh_tokens` table
 - Access token: stored in memory only (never localStorage, never sessionStorage)
 - Refresh token delivery: HttpOnly, Secure, SameSite=Strict cookie (production)
+- The Next.js 16 `frontend/proxy.ts` uses refresh-cookie presence only for an
+  optimistic redirect at the `/padang` boundary; the client then verifies the
+  session with `GET /api/v1/auth/me` before rendering production records.
+- Refresh-cookie Path is `/` so the `/padang` route boundary and same-origin
+  `/padang/api` refresh flow receive the same HttpOnly cookie.
 - Token revocation: refresh token revoked on logout; explicit security reset
   revokes active refresh tokens
 

@@ -155,6 +155,33 @@ Primary references:
 - [PostgreSQL Official Image](https://hub.docker.com/_/postgres)
 - [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
 
+### Luna Reviewer UI Audit Refresh (2026-08-14)
+
+The bounded UI remediation keeps the existing Next.js/React/CSS stack and
+does not add a SmoothUI runtime dependency. SmoothUI documents manual copying
+and registry/CLI installation for animated components; that would add runtime
+and dependency surface for a drawer and skeleton that are already covered by
+local accessible CSS. The implementation therefore uses a small local pattern
+inspired by SmoothUI's restrained component motion, guarded by
+`prefers-reduced-motion`, with no registry fetch:
+
+- SmoothUI reference: https://github.com/educlopez/smoothui
+- WCAG 2.2 status communication and focus requirements remain the acceptance
+  baseline: https://www.w3.org/TR/WCAG22/
+- Next.js 16 renamed the request-boundary convention from `middleware.ts` to
+  `proxy.ts`; the implementation follows the current `proxy.ts` convention and
+  uses it only for the optimistic cookie redirect. The client `/me` check
+  remains the authoritative session verification step:
+  https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+- Production auth continues to use the existing Email OTP, memory-only access
+  token, and HttpOnly refresh-token convention. The refresh cookie Path is `/`
+  so the same-origin `/padang` route guard and `/padang/api` calls can share the
+  existing cookie without introducing a second client-side auth marker.
+
+The remaining uncertainty is operational: full browser verification at all four
+viewport widths and end-to-end OTP/API behavior require a running deployment,
+which is outside this frontend-only remediation.
+
 ---
 
 ## 1. Philippine Construction Industry — Billing, Retention, Variation Orders

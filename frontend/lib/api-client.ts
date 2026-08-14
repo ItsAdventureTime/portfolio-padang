@@ -2,6 +2,20 @@ import { getDemoRole } from './demo-role';
 
 export type ApiError = { code: string; message: string; details?: unknown };
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly retryAfter?: number;
+
+  constructor(message: string, status: number, code?: string, retryAfter?: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+    this.retryAfter = retryAfter;
+  }
+}
+
 const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? '').replace(/\/+$/, '');
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
 let accessToken: string | null = null;
@@ -12,6 +26,14 @@ export function setAccessToken(token: string) {
 
 export function clearAccessToken() {
   accessToken = null;
+}
+
+export async function logout() {
+  try {
+    await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+  } finally {
+    clearAccessToken();
+  }
 }
 
 function demoRole() {
@@ -26,11 +48,12 @@ function urlFor(path: string) {
   return `${apiOrigin}${routePrefix}${normalizedPath}`;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(signal?: AbortSignal): Promise<string | null> {
   const response = await fetch(urlFor('/api/v1/auth/refresh'), {
     method: 'POST',
     headers: { Accept: 'application/json' },
     credentials: 'include',
+    signal,
   });
   if (!response.ok) {
     clearAccessToken();
@@ -53,15 +76,22 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`);
   let response = await fetch(urlFor(path), { ...init, headers, credentials: 'include' });
   if (response.status === 401 && !path.includes('/auth/')) {
-    const token = await refreshAccessToken();
+    const token = await refreshAccessToken(init.signal ?? undefined);
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
-      response = await fetch(urlFor(path), { ...init, headers, credentials: 'include' });
+      response = await fetch(urlFor(path), { ...init, headers, credentials: 'include', signal: init.signal });
     }
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: ApiError } | null;
-    throw new Error(payload?.error?.message ?? `API request failed (${response.status})`);
+    const retryAfterHeader = response.headers.get('Retry-After');
+    const retryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : undefined;
+    throw new ApiRequestError(
+      payload?.error?.message ?? `API request failed (${response.status})`,
+      response.status,
+      payload?.error?.code,
+      Number.isFinite(retryAfter) ? retryAfter : undefined,
+    );
   }
   return response.json() as Promise<T>;
 }
