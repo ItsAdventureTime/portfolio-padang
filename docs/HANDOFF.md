@@ -12,7 +12,8 @@ The public release gate is currently failing with HTTP 404; the full ERP
 workflow surface is not yet implemented.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 1734a39 (`fix Padang PostgreSQL scaffold guard and refine UX`)
+LATEST IMPLEMENTATION COMMIT: current `main` tip (`fix Padang PostgreSQL
+scaffold guard and refine UX`); verify with `git rev-parse HEAD`
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
