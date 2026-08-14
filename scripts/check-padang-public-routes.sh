@@ -7,11 +7,16 @@ TIMEOUT_SECONDS=20
 usage() {
   cat <<'USAGE'
 Usage: check-padang-public-routes.sh [--origin URL] [--timeout SECONDS]
+                                      [--demo-only|--production-only]
 
 Checks the Padang demo and production pages plus both API health routes.
 The default origin is https://delegateops.business.
+Use --demo-only when only the deployed demo is in scope.
+Use --production-only when only the production release is in scope.
 USAGE
 }
+
+ROUTE_SCOPE="all"
 
 while (($#)); do
   case "$1" in
@@ -24,6 +29,22 @@ while (($#)); do
       (($# >= 2)) || { printf '%s\n' '--timeout requires seconds' >&2; exit 2; }
       TIMEOUT_SECONDS="$2"
       shift 2
+      ;;
+    --demo-only)
+      [[ "$ROUTE_SCOPE" == all ]] || {
+        printf '%s\n' '--demo-only cannot be combined with --production-only' >&2
+        exit 2
+      }
+      ROUTE_SCOPE="demo"
+      shift
+      ;;
+    --production-only)
+      [[ "$ROUTE_SCOPE" == all ]] || {
+        printf '%s\n' '--production-only cannot be combined with --demo-only' >&2
+        exit 2
+      }
+      ROUTE_SCOPE="production"
+      shift
       ;;
     -h|--help)
       usage
@@ -47,14 +68,21 @@ command -v curl >/dev/null 2>&1 || {
 }
 
 ORIGIN="${ORIGIN%/}"
-declare -a ROUTES=(
-  "demo page|$ORIGIN/padang/demo"
-  "production page|$ORIGIN/padang"
-  "demo API health|$ORIGIN/padang/demo/api/v1/health"
-  "production API health|$ORIGIN/padang/api/v1/health"
-)
+declare -a ROUTES=()
+if [[ "$ROUTE_SCOPE" == all || "$ROUTE_SCOPE" == demo ]]; then
+  ROUTES+=(
+    "demo page|$ORIGIN/padang/demo"
+    "demo API health|$ORIGIN/padang/demo/api/v1/health"
+  )
+fi
+if [[ "$ROUTE_SCOPE" == all || "$ROUTE_SCOPE" == production ]]; then
+  ROUTES+=(
+    "production page|$ORIGIN/padang"
+    "production API health|$ORIGIN/padang/api/v1/health"
+  )
+fi
 
-printf 'Checking Padang public routes at %s\n' "$ORIGIN"
+printf 'Checking Padang %s public routes at %s\n' "$ROUTE_SCOPE" "$ORIGIN"
 failed=0
 for route in "${ROUTES[@]}"; do
   IFS='|' read -r label url <<< "$route"

@@ -42,6 +42,12 @@ enabled.
 ### Health Check
 
 ```bash
+# Demo release gate (use this after the demo updater)
+scripts/check-padang-public-routes.sh --demo-only
+
+# Full release gate (requires both demo and production)
+scripts/check-padang-public-routes.sh
+
 # API health
 curl https://delegateops.business/padang/api/v1/health
 
@@ -325,9 +331,10 @@ This means the deployment script could not identify a safe insertion point
 inside `delegateops.business`. The current supported layout uses the managed
 `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile` import before the generic
 `handle { ... }` fallback; an older exact `# DelegateOps static-site fallback`
-marker is also supported. Do not add the route outside that site block or place
-it after the fallback. Re-sync and verify the corrected script without applying
-runtime changes, then rerun the deployment:
+marker is also supported. The updater recognizes both the canonical direct-path
+route and the older named-matcher/upstream form. Do not add the route outside
+that site block or place it after the fallback. Re-sync and verify the corrected
+script without applying runtime changes, then rerun the deployment:
 
 ```bash
 scripts/update-padang-demo.sh --dry-run
@@ -335,6 +342,26 @@ scripts/update-padang-demo.sh
 ```
 
 If an existing inline managed Padang route is present, the script preserves it.
-If the Caddyfile has neither a supported fallback nor an unambiguous
-`delegateops.business` site block, correct that Caddy layout manually and run
-`caddy fmt --overwrite` followed by `caddy validate` before retrying.
+Exactly one complete route owner is required: inline or imported. Duplicate
+imports, inline-plus-import configurations, incomplete canonical/legacy routes,
+and imports outside `delegateops.business` are rejected before any Quadlet files
+are installed. The assembled Caddyfile and handler are validated in a
+disposable Caddy container before runtime files are changed.
+
+### Caddy reports `matcher is defined more than once`
+
+This indicates that an inline Padang route and an imported Padang handler (or
+two imported handlers) are expanding in the same `delegateops.business` site.
+Do not delete a route blindly. Inspect the route owner and let the updater fail
+closed until only one complete owner remains:
+
+```bash
+grep -nE 'padang_demo|padang/demo|padang-demo.handlers' \
+  /home/jk/caddy/conf/Caddyfile \
+  /home/jk/caddy/conf/padang-demo.handlers.Caddyfile
+```
+
+The generated handler uses inline path matchers for the root redirect and the
+canonical upstreams `bridge-ph-padang-demo-api` and
+`bridge-ph-padang-demo-frontend`. A handler-only change still requires a Caddy
+reload; the updater performs that reload after staged validation.

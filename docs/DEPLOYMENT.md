@@ -33,8 +33,10 @@ This runbook follows the current upstream model for the selected stack:
   environment, restricted deployment branches, required approval, and a
   concurrency group so production deployments cannot overlap.
 - From the macOS control plane, use `scripts/start-padang-local.sh` for a
-  disposable demo preview and `scripts/check-padang-public-routes.sh` for the
-  public release gate. Both commands use built-in defaults; no exported
+  disposable demo preview and
+  `scripts/check-padang-public-routes.sh --demo-only` for the demo release
+  gate. The checker defaults to both demo and production routes once both
+  environments are deployed. Both commands use built-in defaults; no exported
   environment variables are required.
 - The local helper supplies `NEXT_PUBLIC_API_ORIGIN` internally for the direct
   API port. When that value is set, the frontend does not prepend the compiled
@@ -57,10 +59,10 @@ Slug format: `{client}-{app}-{env}-{component}`
 | App data directory | `/home/jk/bridge-ph/padang-demo/` | `/home/jk/bridge-ph/padang/` |
 | Internal network | `bridge-ph-padang-demo.network` | `bridge-ph-padang.network` |
 | Proxy network | `bridge-ph-padang-demo-proxy.network` | `bridge-ph-padang-proxy.network` |
-| Frontend container | `padang-demo-app` | `bridge-ph-padang-frontend` |
-| API container | `padang-demo-api` | `bridge-ph-padang-api` |
-| DB container | `padang-demo-db` | `bridge-ph-padang-db` |
-| Reset container | `padang-demo-reset` | N/A |
+| Frontend service / container | `padang-demo-app` / `bridge-ph-padang-demo-frontend` | `bridge-ph-padang-frontend` |
+| API service / container | `padang-demo-api` / `bridge-ph-padang-demo-api` | `bridge-ph-padang-api` |
+| DB service / container | `padang-demo-db` / `bridge-ph-padang-demo-db` | `bridge-ph-padang-db` |
+| Reset service / container | `padang-demo-reset` / `bridge-ph-padang-demo-reset` | N/A |
 | Backup container | N/A | `bridge-ph-padang-backup` |
 | DB name | `padang_demo` | `padang_prod` |
 | DB user | `padang_demo_user` | `padang_prod_user` |
@@ -120,15 +122,15 @@ Internet (port 443)
 Demo stack:
   caddy
     → (bridge-ph-padang-demo-proxy.network)
-      → padang-demo-app  (Next.js; reverse proxy)
-      → padang-demo-api  (Go API; reverse proxy for /padang/demo/api/*)
+      → bridge-ph-padang-demo-frontend  (Next.js; service padang-demo-app)
+      → bridge-ph-padang-demo-api       (Go API; service padang-demo-api)
 
-  padang-demo-api
+  bridge-ph-padang-demo-api
     → (bridge-ph-padang-demo.network — internal only)
-      → padang-demo-db  (PostgreSQL; not reachable from Caddy)
+      → bridge-ph-padang-demo-db  (PostgreSQL; not reachable from Caddy)
 
 Additional (demo):
-  padang-demo-reset  (one-shot; joins bridge-ph-padang-demo.network → DB)
+  bridge-ph-padang-demo-reset  (one-shot service padang-demo-reset)
 
 Production stack (identical pattern, different network names and containers):
   caddy → bridge-ph-padang-proxy.network → frontend + api
@@ -151,10 +153,10 @@ Production stack (identical pattern, different network names and containers):
 
 The examples in this section describe the checked-in static templates under
 `quadlets/demo/` and `quadlets/prod/`. The current demo deployment script
-renders its own `padang-demo-*` files under the VPS Quadlet directory so it can
-pin the locally built artifacts and manage migrations safely. For the live
-demo, follow the updater procedure below instead of copying these demo
-templates directly.
+renders `padang-demo-*` service files under the VPS Quadlet directory, with
+`bridge-ph-padang-demo-*` container names matching the checked-in templates and
+Caddy upstreams. For the live demo, follow the updater procedure below instead
+of copying these demo templates directly.
 
 ### Networks
 
@@ -409,8 +411,7 @@ Create: `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile`
 # Padang ERP Demo — handler directives only
 # Imported inside the delegateops.business block
 
-@padang_demo_root path /padang/demo
-redir @padang_demo_root /padang/demo/ 308
+redir /padang/demo /padang/demo/ 308
 
 # Canonical public URL: https://delegateops.business/padang/demo
 # Caddy redirects the exact path to the slash form for the frontend.
@@ -494,9 +495,14 @@ import /etc/caddy/padang-production.handlers.Caddyfile
 The canonical Padang routes above use imported handler files. The remote demo
 deployment manages `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile` and
 inserts its matching import inside the `delegateops.business` site block before
-the generic `handle { ... }` fallback. It also preserves compatibility with an
-already-installed inline managed route. The script validates the assembled
-Caddyfile and preserves timestamped backups before changing any Caddy file.
+the generic `handle { ... }` fallback. Exactly one complete Padang route owner
+must exist: either the canonical/legacy inline route or the managed handler
+import. Duplicate imports, inline-plus-import layouts, incomplete routes, and
+imports outside the site block fail closed. The script uses direct path matchers
+for the generated root redirect, validates the assembled Caddyfile before
+installing Quadlets, and reloads Caddy when only the imported handler changes.
+When the Padang proxy network is new, its Quadlet is staged before the required
+Caddy restart so Caddy never starts with a reference to a missing network unit.
 
 ---
 

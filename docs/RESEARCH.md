@@ -109,6 +109,25 @@ Primary deployment references:
 - [Caddy command line](https://caddyserver.com/docs/command-line)
 - [Backblaze S3-compatible application keys](https://www.backblaze.com/docs/cloud-storage-s3-compatible-app-keys)
 
+### Caddy Route-Collision Refresh: Current Maintainer Guidance (2026-08-14)
+
+The failed demo update exposed a Caddyfile ownership problem: a named matcher
+such as `@padang_demo_root` was expanded more than once in the same site block.
+The deployment baseline now treats the route as an owned unit and requires
+exactly one complete owner, either an inline route or an imported handler. The
+generated handler uses direct path matchers for the root redirect, keeps API and
+frontend routing in mutually exclusive `handle` blocks, validates the staged
+configuration before installation, and reloads Caddy when only the handler
+changes.
+
+Primary Caddy references:
+
+- [Caddy request matchers](https://caddyserver.com/docs/caddyfile/matchers)
+- [Caddy `handle` directive](https://caddyserver.com/docs/caddyfile/directives/handle)
+- [Caddy `handle_path` directive](https://caddyserver.com/docs/caddyfile/directives/handle_path)
+- [Caddy `import` directive](https://caddyserver.com/docs/caddyfile/directives/import)
+- [Caddy configuration concepts](https://caddyserver.com/docs/caddyfile/concepts)
+
 ---
 
 ## 1. Philippine Construction Industry — Billing, Retention, Variation Orders

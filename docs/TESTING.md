@@ -148,10 +148,13 @@ The minimum implementation gate for the current C1 foundation is:
   Podman VM cannot sustain Turbopack;
 - clean PostgreSQL migration up and down against `postgres:alpine`;
 - `bash -n` for operational scripts, the deployment/local helper `--help`
-  commands, `scripts/check-padang-public-routes.sh --help`, and
+  commands, `scripts/check-padang-public-routes.sh --help`, the disposable
+  Caddy route fixtures (`bash scripts/test-deploy-padang-demo-caddy.sh`), and
   `git diff --check`;
-- `scripts/check-padang-public-routes.sh` must pass all four URLs before a
-  public release is called working;
+- `scripts/check-padang-public-routes.sh --demo-only` must pass the demo page
+  and health routes after a demo deployment; the default checker must pass all
+  four URLs before a public release covering both environments is called
+  working;
 - `govulncheck ./...` when the scanner is installed in the Go container.
 
 Example backend check:
@@ -269,6 +272,8 @@ Steps:
 /opt/homebrew/bin/podman machine list
 git diff --check
 bash -n scripts/secrets-setup.sh
+bash scripts/test-deploy-padang-demo-caddy.sh
+bash scripts/check-padang-public-routes.sh --demo-only
 
 # Backend: run inside the containerized Go toolchain
 podman run --rm -v "$PWD/backend:/src:ro" -w /src \

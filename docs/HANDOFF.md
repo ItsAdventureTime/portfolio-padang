@@ -54,11 +54,21 @@ the remote script could not find the literal `# DelegateOps static-site
 fallback` comment in the existing Caddyfile. The updater now manages the
 documented `padang-demo.handlers.Caddyfile` import inside the
 `delegateops.business` site block, supports the older marker and generic
-`handle { ... }` fallback, preserves an existing inline managed route, and
-fails closed when no unambiguous site/fallback exists. It stages and validates
-the assembled Caddyfile with disposable Caddy tooling before changing the
-timestamped backups or reloading Caddy. Local insertion fixtures cover legacy,
-generic, and unsafe layouts.
+`handle { ... }` fallback, and recognizes canonical direct-path plus legacy
+named-matcher/upstream route forms. Exactly one complete Padang route owner is
+allowed: inline or imported. Duplicate imports, inline-plus-import layouts,
+incomplete routes, and imports outside the site block fail closed.
+
+The generated handler uses direct path matchers for the root redirect and the
+documented `bridge-ph-padang-demo-api` / `bridge-ph-padang-demo-frontend`
+container names. Caddy validates the staged main file and handler before
+Quadlets or timestamped backups are changed. A handler-only change triggers a
+graceful Caddy reload; a proxy-network change triggers a restart. Fixtures cover
+canonical, legacy, duplicate, inline/import, idempotent, handler-only, and
+unsafe layouts. The public route checker now accepts `--demo-only` for the
+demo-only release gate; its default remains the four-route demo plus production
+gate. A new proxy network is staged before the deferred Caddy restart, avoiding
+a generated Caddy unit that references a network Quadlet not yet installed.
 
 ## Offline Font Build Remediation (2026-08-14)
 

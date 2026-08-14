@@ -67,13 +67,16 @@ checks both `https://delegateops.business/padang/demo` and
 `https://delegateops.business/padang/demo/api/v1/health` after an apply. Use
 `--dry-run` to validate without changing Quadlets, secrets, Caddy, or runtime
 data. Use `--seed-demo` only when an intentional synthetic-data reset is
-required. After a successful apply, check both environments with
-`scripts/check-padang-public-routes.sh`. See `docs/DEPLOYMENT.md` for the full
+required. After a successful demo apply, run
+`scripts/check-padang-public-routes.sh --demo-only`; use the default checker
+once production is deployed as well. See `docs/DEPLOYMENT.md` for the full
 runbook.
 
-The public route check is currently a release gate: the last end-to-end audit
-found HTTP 404 responses from both BunnyCDN and the direct VPS Caddy origin.
-Do not treat a GitHub push or a successful local build as a public deployment.
+Use `scripts/check-padang-public-routes.sh --demo-only` when validating the
+demo release by itself. The default check covers both environments and should
+be used after production is deployed. The last end-to-end audit found HTTP 404
+responses from both BunnyCDN and the direct VPS Caddy origin. Do not treat a
+GitHub push or a successful local build as a public deployment.
 
 ---
 

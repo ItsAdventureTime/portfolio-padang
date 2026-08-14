@@ -22,6 +22,9 @@ CADDYFILE="${CADDYFILE:-/home/jk/caddy/conf/Caddyfile}"
 CADDY_CONF_DIR="${CADDY_CONF_DIR:-/home/jk/caddy/conf}"
 CADDY_HANDLER_FILE="$CADDY_CONF_DIR/padang-demo.handlers.Caddyfile"
 CADDY_HANDLER_IMPORT="/etc/caddy/padang-demo.handlers.Caddyfile"
+CADDY_DEMO_API_UPSTREAM="bridge-ph-padang-demo-api:8080"
+CADDY_DEMO_FRONTEND_UPSTREAM="bridge-ph-padang-demo-frontend:3000"
+CADDY_NETWORK_CHANGED=0
 CADDY_QUADLET="${CADDY_QUADLET:-/home/jk/.config/containers/systemd/caddy/caddy.container}"
 if [[ -d "$CADDY_QUADLET" ]]; then
   CADDY_QUADLET="$CADDY_QUADLET/caddy.container"
@@ -98,6 +101,10 @@ insert_caddy_import() {
       closes = gsub(/\}/, "}", clean)
       return opens - closes
     }
+    function managed_import(line) {
+      return line ~ /^[[:space:]]*import[[:space:]]+/ &&
+        line ~ /padang-demo[.]handlers[.]Caddyfile([[:space:]]|$)/
+    }
     BEGIN {
       in_site = 0
       site_count = 0
@@ -115,10 +122,14 @@ insert_caddy_import() {
         next
       }
       if (in_site) {
-        if (depth == 1 && line ~ "^[[:space:]]*import[[:space:]]+" import_path "[[:space:]]*(#.*)?$") {
+        if (depth == 1 && managed_import(line)) {
           site_imports++
           all_imports++
-        } else if (line ~ "^[[:space:]]*import[[:space:]]+" import_path "[[:space:]]*(#.*)?$") {
+          if (site_imports == 1) {
+            print "import " import_path
+            next
+          }
+        } else if (managed_import(line)) {
           all_imports++
         }
         if (depth == 1 && !site_imports &&
@@ -134,7 +145,7 @@ insert_caddy_import() {
         }
         next
       }
-      if (line ~ "^[[:space:]]*import[[:space:]]+" import_path "[[:space:]]*(#.*)?$") {
+      if (managed_import(line)) {
         all_imports++
       }
       print line
@@ -148,48 +159,311 @@ insert_caddy_import() {
   ' "$input_file" > "$output_file"
 }
 
+padang_demo_handler_block() {
+  cat <<EOF
+# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
+# Path matchers are inline so this imported route does not define a named
+# matcher that can collide with another route in the delegateops.business site.
+redir /padang/demo /padang/demo/ 308
+
+handle /padang/demo/api/* {
+  uri strip_prefix /padang/demo
+  header {
+    >Cache-Control "private, no-store"
+    >CDN-Cache-Control "no-store"
+    >Pragma "no-cache"
+    >X-Robots-Tag "noindex, nofollow, noarchive"
+  }
+  reverse_proxy $CADDY_DEMO_API_UPSTREAM
+}
+
+handle /padang/demo/* {
+  header {
+    >Cache-Control "public, max-age=0, must-revalidate"
+    >X-Robots-Tag "noindex, nofollow, noarchive"
+  }
+  reverse_proxy $CADDY_DEMO_FRONTEND_UPSTREAM
+}
+# END PADANG DEMO ROUTE
+EOF
+}
+
+handler_route_state() {
+  local input_file="$1"
+  local api_blocks app_blocks api_proxies app_proxies root_redirects evidence
+  api_blocks=$(grep -Ec '^[[:space:]]*handle([[:space:]]+(/padang/demo/api/\*|@padang_demo_api))[[:space:]]*\{' "$input_file" || true)
+  app_blocks=$(grep -Ec '^[[:space:]]*handle([[:space:]]+(/padang/demo/\*|@padang_demo))[[:space:]]*\{' "$input_file" || true)
+  api_proxies=$(grep -Ec '^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-api|padang-demo-api):8080([[:space:]]|$)' "$input_file" || true)
+  app_proxies=$(grep -Ec '^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-frontend|padang-demo-app):3000([[:space:]]|$)' "$input_file" || true)
+  root_redirects=$(grep -Ec '^[[:space:]]*redir[[:space:]]+(@padang_demo_root[[:space:]]+/padang/demo/[[:space:]]+308|/padang/demo[[:space:]]+/padang/demo/[[:space:]]+308)[[:space:]]*$' "$input_file" || true)
+  evidence=$(grep -Ec 'PADANG DEMO ROUTE|PADANG DEMO API ROUTE|@padang_demo(_root|_api)?|/padang/demo(/api)?/\*|bridge-ph-padang-demo-(api|frontend):|padang-demo-(api|app):' "$input_file" || true)
+  printf '%s %s %s %s %s %s\n' \
+    "$api_blocks" "$app_blocks" "$api_proxies" "$app_proxies" \
+    "$root_redirects" "$evidence"
+}
+
+caddy_site_route_state() {
+  local input_file="$1"
+  awk '
+    function brace_delta(line, clean, opens, closes) {
+      clean = line
+      gsub(/"[^"]*"/, "", clean)
+      gsub(/`[^`]*`/, "", clean)
+      sub(/#.*/, "", clean)
+      opens = gsub(/\{/, "{", clean)
+      closes = gsub(/\}/, "}", clean)
+      return opens - closes
+    }
+    function managed_import(line) {
+      return line ~ /^[[:space:]]*import[[:space:]]+/ &&
+        line ~ /padang-demo[.]handlers[.]Caddyfile([[:space:]]|$)/
+    }
+    BEGIN {
+      in_site = 0
+      site_count = 0
+      site_imports = 0
+      all_imports = 0
+      api_blocks = 0
+      app_blocks = 0
+      api_proxies = 0
+      app_proxies = 0
+      root_redirects = 0
+      evidence = 0
+    }
+    {
+      line = $0
+      if (!in_site && line ~ /^[[:space:]]*delegateops\.business[[:space:]]*\{[[:space:]]*$/) {
+        in_site = 1
+        site_count++
+        depth = 1
+        next
+      }
+      if (in_site) {
+        if (managed_import(line)) {
+          all_imports++
+          if (depth == 1) site_imports++
+        }
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo\/api\/\*[[:space:]]*\{[[:space:]]*$/) {
+          api_blocks++
+          evidence++
+        }
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+@padang_demo_api[[:space:]]*\{[[:space:]]*$/) {
+          api_blocks++
+          evidence++
+        }
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo\/\*[[:space:]]*\{[[:space:]]*$/) {
+          app_blocks++
+          evidence++
+        }
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+@padang_demo[[:space:]]*\{[[:space:]]*$/) {
+          app_blocks++
+          evidence++
+        }
+        if (line ~ /^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-api|padang-demo-api):8080([[:space:]]|$)/) {
+          api_proxies++
+          evidence++
+        }
+        if (line ~ /^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-frontend|padang-demo-app):3000([[:space:]]|$)/) {
+          app_proxies++
+          evidence++
+        }
+        if (line ~ /^[[:space:]]*redir[[:space:]]+@padang_demo_root[[:space:]]+\/padang\/demo\/[[:space:]]+308[[:space:]]*$/ ||
+            line ~ /^[[:space:]]*redir[[:space:]]+\/padang\/demo[[:space:]]+\/padang\/demo\/[[:space:]]+308[[:space:]]*$/) {
+          root_redirects++
+          evidence++
+        }
+        if (line ~ /PADANG DEMO ROUTE|PADANG DEMO API ROUTE/) evidence++
+        depth += brace_delta(line)
+        if (depth == 0) in_site = 0
+        next
+      }
+    }
+    END {
+      complete = (api_blocks == 1 && app_blocks == 1 &&
+        api_proxies == 1 && app_proxies == 1 && root_redirects == 1)
+      printf "%d %d %d %d %d %d %d %d %d %d\n", site_count, site_imports,
+        all_imports, complete, evidence, api_blocks, app_blocks, api_proxies,
+        app_proxies, root_redirects
+    }
+  ' "$input_file"
+}
+
+rewrite_managed_import() {
+  local input_file="$1"
+  local output_file="$2"
+  local replacement="$3"
+  awk -v replacement="$replacement" '
+    function managed_import(line) {
+      return line ~ /^[[:space:]]*import[[:space:]]+/ &&
+        line ~ /padang-demo[.]handlers[.]Caddyfile([[:space:]]|$)/
+    }
+    managed_import($0) { print "import " replacement; next }
+    { print }
+  ' "$input_file" > "$output_file"
+}
+
+is_unambiguous_caddy_route() {
+  local input_file="$1"
+  local site_count site_imports all_imports inline_complete inline_evidence
+  local api_blocks app_blocks api_proxies app_proxies root_redirects
+  read -r site_count site_imports all_imports inline_complete inline_evidence \
+    api_blocks app_blocks api_proxies app_proxies root_redirects \
+    < <(caddy_site_route_state "$input_file")
+  ((site_count == 1)) || return 1
+  ((all_imports == site_imports)) || return 1
+  ((site_imports <= 1)) || return 1
+  if ((inline_complete && site_imports)); then
+    return 1
+  fi
+  if ((inline_evidence && !inline_complete)); then
+    return 1
+  fi
+  return 0
+}
+
+caddy_fixture_validate() {
+  local fixture_dir="$1"
+  podman run --rm \
+    -v "$fixture_dir:/stage:Z" \
+    docker.io/library/caddy:alpine \
+    sh -ec 'caddy fmt --overwrite /stage/Caddyfile && caddy fmt --overwrite /stage/padang-demo.handlers.Caddyfile && caddy validate --config /stage/Caddyfile --adapter caddyfile' >/dev/null
+}
+
 run_caddy_fixture_tests() {
-  local fixture_dir legacy generic missing output
+  local fixture_dir legacy canonical duplicate inline_import imported handler output output2
+  local script_path="${BASH_SOURCE[0]}"
   fixture_dir=$(mktemp -d)
   trap 'rm -rf "$fixture_dir"' RETURN
   legacy="$fixture_dir/legacy.Caddyfile"
-  generic="$fixture_dir/generic.Caddyfile"
-  missing="$fixture_dir/missing.Caddyfile"
+  canonical="$fixture_dir/canonical.Caddyfile"
+  duplicate="$fixture_dir/duplicate.Caddyfile"
+  inline_import="$fixture_dir/inline-import.Caddyfile"
+  imported="$fixture_dir/imported.Caddyfile"
+  handler="$fixture_dir/padang-demo.handlers.Caddyfile"
   output="$fixture_dir/output.Caddyfile"
+  output2="$fixture_dir/output2.Caddyfile"
 
   printf '%s\n' \
     'delegateops.business {' \
-    '# DelegateOps static-site fallback' \
-    'handle {' \
-    '  file_server' \
-    '}' \
+    '  @padang_demo_root path /padang/demo' \
+    '  redir @padang_demo_root /padang/demo/ 308' \
+    '  @padang_demo_api path /padang/demo/api/*' \
+    '  @padang_demo path /padang/demo/*' \
+    '  handle @padang_demo_api {' \
+    '    uri strip_prefix /padang/demo' \
+    '    reverse_proxy padang-demo-api:8080' \
+    '  }' \
+    '  handle @padang_demo {' \
+    '    reverse_proxy padang-demo-app:3000' \
+    '  }' \
+    '  handle {' \
+    '    respond "fallback"' \
+    '  }' \
     '}' > "$legacy"
-  insert_caddy_import "$legacy" "$output"
-  grep -q '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output"
-  [[ $(grep -c '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output") -eq 1 ]]
+  [[ "$(caddy_site_route_state "$legacy" | awk '{print $5}')" -gt 0 ]]
+  [[ "$(caddy_site_route_state "$legacy" | awk '{print $4}')" == 1 ]]
+
+  padang_demo_handler_block > "$handler"
+  ! grep -q '^@padang_demo_root' "$handler"
+  grep -q '^  reverse_proxy bridge-ph-padang-demo-api:8080$' "$handler"
+  grep -q '^  reverse_proxy bridge-ph-padang-demo-frontend:3000$' "$handler"
+  cp "$legacy" "$fixture_dir/Caddyfile"
+  caddy_fixture_validate "$fixture_dir"
+  printf '%s\n' \
+    'delegateops.business {' \
+    '  redir /padang/demo /padang/demo/ 308' \
+    '  handle /padang/demo/api/* {' \
+    '    uri strip_prefix /padang/demo' \
+    '    reverse_proxy bridge-ph-padang-demo-api:8080' \
+    '  }' \
+    '  handle /padang/demo/* {' \
+    '    reverse_proxy bridge-ph-padang-demo-frontend:3000' \
+    '  }' \
+    '  handle {' \
+    '    respond "fallback"' \
+    '  }' \
+    '}' > "$canonical"
+  [[ "$(caddy_site_route_state "$canonical" | awk '{print $4}')" == 1 ]]
+  cp "$canonical" "$fixture_dir/Caddyfile"
+  caddy_fixture_validate "$fixture_dir"
 
   printf '%s\n' \
     'delegateops.business {' \
-    'handle /other/* {' \
-    '  file_server' \
-    '}' \
-    'handle {' \
-    '  file_server' \
-    '}' \
-    '}' > "$generic"
-  insert_caddy_import "$generic" "$output"
-  grep -q '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output"
-  [[ $(grep -c '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output") -eq 1 ]]
-
-  printf '%s\n' \
-    'delegateops.business {' \
-    'root * /srv/delegateops-business' \
-    '}' > "$missing"
-  if insert_caddy_import "$missing" "$output"; then
-    printf 'padang-demo-remote: unsafe fixture unexpectedly accepted\n' >&2
+    '  import /etc/caddy/padang-demo.handlers.Caddyfile' \
+    '  import /etc/caddy/padang-demo.handlers.Caddyfile' \
+    '  handle {' \
+    '    respond "fallback"' \
+    '  }' \
+    '}' > "$duplicate"
+  if is_unambiguous_caddy_route "$duplicate"; then
+    printf 'padang-demo-remote: duplicate owner fixture unexpectedly accepted\n' >&2
     return 1
   fi
-  log "Caddy insertion fixtures passed"
+
+  cp "$canonical" "$inline_import"
+  sed -i.bak 's|  handle {|  import /etc/caddy/padang-demo.handlers.Caddyfile\n  handle {|' "$inline_import"
+  if is_unambiguous_caddy_route "$inline_import"; then
+    printf 'padang-demo-remote: inline/import fixture unexpectedly accepted\n' >&2
+    return 1
+  fi
+
+  printf '%s\n' \
+    'delegateops.business {' \
+    '  handle /other/* {' \
+    '    file_server' \
+    '  }' \
+    '  handle {' \
+    '    file_server' \
+    '  }' \
+    '}' > "$imported"
+  insert_caddy_import "$imported" "$output"
+  grep -q '^import /etc/caddy/padang-demo.handlers.Caddyfile$' "$output"
+  insert_caddy_import "$output" "$output2"
+  cmp -s "$output" "$output2"
+  cp "$output" "$fixture_dir/Caddyfile"
+  rewrite_managed_import "$fixture_dir/Caddyfile" "$fixture_dir/Caddyfile.next" \
+    "/stage/padang-demo.handlers.Caddyfile"
+  mv "$fixture_dir/Caddyfile.next" "$fixture_dir/Caddyfile"
+  caddy_fixture_validate "$fixture_dir"
+
+  cp "$output" "$fixture_dir/handler-only-main-before"
+  cp "$output" "$fixture_dir/handler-only-main-after"
+  cp "$handler" "$fixture_dir/handler-before"
+  cat > "$fixture_dir/legacy-handler" <<'EOF'
+@padang_demo_root path /padang/demo
+redir @padang_demo_root /padang/demo/ 308
+@padang_demo_api path /padang/demo/api/*
+@padang_demo path /padang/demo/*
+handle @padang_demo_api {
+  uri strip_prefix /padang/demo
+  reverse_proxy padang-demo-api:8080
+}
+handle @padang_demo {
+  reverse_proxy padang-demo-app:3000
+}
+EOF
+  cp "$fixture_dir/legacy-handler" "$handler"
+  if ! handler_route_state "$handler" | awk '$1 == 1 && $2 == 1 && $3 == 1 && $4 == 1 && $5 == 1 { found = 1 } END { exit !found }'; then
+    printf 'padang-demo-remote: complete legacy handler fixture was rejected\n' >&2
+    return 1
+  fi
+  cmp -s "$fixture_dir/handler-only-main-before" "$fixture_dir/handler-only-main-after"
+  if cmp -s "$fixture_dir/handler-before" "$handler" ||
+    ! grep -q 'caddyfile_changed || handler_changed' "$script_path"; then
+    printf 'padang-demo-remote: handler-only reload fixture failed\n' >&2
+    return 1
+  fi
+  cp "$legacy" "$fixture_dir/duplicate-named.Caddyfile"
+  sed -i.bak \
+    's|  handle {|  import /etc/caddy/padang-demo.handlers.Caddyfile\n  handle {|' \
+    "$fixture_dir/duplicate-named.Caddyfile"
+  cp "$fixture_dir/duplicate-named.Caddyfile" "$fixture_dir/Caddyfile"
+  if caddy_fixture_validate "$fixture_dir" >/dev/null 2>&1; then
+    printf 'padang-demo-remote: duplicate named-matcher fixture unexpectedly validated\n' >&2
+    return 1
+  fi
+  cp "$fixture_dir/handler-before" "$handler"
+  log "Caddy legacy, canonical, duplicate, inline/import, handler-only, and idempotent fixtures passed"
 }
 
 if [[ "${PADANG_CADDY_FIXTURE_TEST:-0}" == 1 ]]; then
@@ -335,8 +609,13 @@ write_quadlets() {
   mkdir -p "$APP_ROOT" "$APP_ROOT/postgres-data" "$APP_ROOT/config" \
     "$APP_ROOT/data" "$QUADLET_DIR"
   chmod 0750 "$APP_ROOT" "$BUILD_ROOT" "$APP_ROOT/config" "$APP_ROOT/data"
-  log "installing Padang demo Quadlets under $QUADLET_DIR"
-  cat > "$QUADLET_DIR/$INTERNAL_NETWORK.network" <<EOF
+  local quadlet_dir="$QUADLET_DIR"
+  local quadlet_stage_dir
+  local staged_file
+  quadlet_stage_dir=$(mktemp -d "$APP_ROOT/.quadlet-stage.XXXXXX")
+  trap 'rm -rf "$quadlet_stage_dir"' RETURN
+  log "staging Padang demo Quadlets under $quadlet_dir"
+  cat > "$quadlet_stage_dir/$INTERNAL_NETWORK.network" <<EOF
 [Unit]
 Description=Bridge PH Padang demo internal network
 
@@ -345,7 +624,7 @@ NetworkName=$INTERNAL_NETWORK
 Internal=true
 EOF
 
-  cat > "$QUADLET_DIR/$PROXY_NETWORK.network" <<EOF
+  cat > "$quadlet_stage_dir/$PROXY_NETWORK.network" <<EOF
 [Unit]
 Description=Bridge PH Padang demo Caddy proxy network
 
@@ -353,7 +632,7 @@ Description=Bridge PH Padang demo Caddy proxy network
 NetworkName=$PROXY_NETWORK
 EOF
 
-  cat > "$QUADLET_DIR/padang-demo-db.container" <<EOF
+  cat > "$quadlet_stage_dir/padang-demo-db.container" <<EOF
 [Unit]
 Description=Bridge PH Padang demo PostgreSQL
 After=network-online.target $INTERNAL_NETWORK.network
@@ -361,7 +640,7 @@ Requires=$INTERNAL_NETWORK.network
 
 [Container]
 Image=docker.io/library/postgres:alpine
-ContainerName=padang-demo-db
+ContainerName=bridge-ph-padang-demo-db
 Network=$INTERNAL_NETWORK.network
 Volume=$APP_ROOT/postgres-data:/var/lib/postgresql/data:Z
 Environment=POSTGRES_DB=$DB_NAME
@@ -381,7 +660,7 @@ TimeoutStartSec=900
 WantedBy=default.target
 EOF
 
-  cat > "$QUADLET_DIR/padang-demo-migrate.container" <<EOF
+  cat > "$quadlet_stage_dir/padang-demo-migrate.container" <<EOF
 [Unit]
 Description=Bridge PH Padang demo database migrations
 After=padang-demo-db.service
@@ -389,12 +668,12 @@ Requires=padang-demo-db.service
 
 [Container]
 Image=docker.io/migrate/migrate:latest
-ContainerName=padang-demo-migrate
+ContainerName=bridge-ph-padang-demo-migrate
 Network=$INTERNAL_NETWORK.network
 Volume=$SOURCE_ROOT/backend/migrations:/migrations:ro,Z
 Secret=$DB_SECRET,type=mount,target=/run/secrets/db-password
 Entrypoint=/bin/sh
-Exec=-ec 'export PGPASSWORD="\$(cat /run/secrets/db-password)"; exec migrate -path /migrations -database "postgres://$DB_USER@padang-demo-db:5432/$DB_NAME?sslmode=disable" up'
+Exec=-ec 'export PGPASSWORD="\$(cat /run/secrets/db-password)"; exec migrate -path /migrations -database "postgres://$DB_USER@bridge-ph-padang-demo-db:5432/$DB_NAME?sslmode=disable" up'
 
 [Service]
 Type=oneshot
@@ -402,7 +681,7 @@ RemainAfterExit=yes
 TimeoutStartSec=900
 EOF
 
-  cat > "$QUADLET_DIR/padang-demo-api.container" <<EOF
+  cat > "$quadlet_stage_dir/padang-demo-api.container" <<EOF
 [Unit]
 Description=Bridge PH Padang demo Go API
 After=padang-demo-migrate.service
@@ -410,14 +689,14 @@ Requires=padang-demo-migrate.service
 
 [Container]
 Image=docker.io/library/alpine:latest
-ContainerName=padang-demo-api
+ContainerName=bridge-ph-padang-demo-api
 Network=$INTERNAL_NETWORK.network
 Network=$PROXY_NETWORK.network
 Volume=$BACKEND_BUILD/padang-api:/usr/local/bin/padang-api:ro,Z
 Environment=APP_ENV=demo
 Environment=RUN_MODE=api
 Environment=HTTP_ADDR=:8080
-Environment=DB_HOST=padang-demo-db
+Environment=DB_HOST=bridge-ph-padang-demo-db
 Environment=DB_PORT=5432
 Environment=DB_NAME=$DB_NAME
 Environment=DB_USER=$DB_USER
@@ -441,7 +720,7 @@ TimeoutStartSec=900
 WantedBy=default.target
 EOF
 
-  cat > "$QUADLET_DIR/padang-demo-app.container" <<EOF
+  cat > "$quadlet_stage_dir/padang-demo-app.container" <<EOF
 [Unit]
 Description=Bridge PH Padang demo Next.js app
 After=padang-demo-api.service
@@ -449,14 +728,14 @@ Requires=padang-demo-api.service
 
 [Container]
 Image=docker.io/library/node:lts-alpine
-ContainerName=padang-demo-app
+ContainerName=bridge-ph-padang-demo-frontend
 Network=$PROXY_NETWORK.network
 WorkDir=/app
 Volume=$FRONTEND_BUILD:/app:ro,Z
 Environment=NODE_ENV=production
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 Environment=NEXT_PUBLIC_APP_ENV=demo
-Environment=API_INTERNAL_URL=http://padang-demo-api:8080
+Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
 Exec=node /app/server.js
 User=node
 HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo/ || exit 1
@@ -471,7 +750,7 @@ TimeoutStartSec=900
 WantedBy=default.target
 EOF
 
-  cat > "$QUADLET_DIR/padang-demo-reset.container" <<EOF
+  cat > "$quadlet_stage_dir/padang-demo-reset.container" <<EOF
 [Unit]
 Description=Bridge PH Padang demo reset
 After=padang-demo-migrate.service
@@ -479,11 +758,11 @@ Requires=padang-demo-migrate.service
 
 [Container]
 Image=docker.io/library/postgres:alpine
-ContainerName=padang-demo-reset
+ContainerName=bridge-ph-padang-demo-reset
 Network=$INTERNAL_NETWORK.network
 Environment=APP_ENV=demo
 Environment=RUN_MODE=seed
-Environment=DB_HOST=padang-demo-db
+Environment=DB_HOST=bridge-ph-padang-demo-db
 Environment=DB_NAME=$DB_NAME
 Environment=DB_USER=$DB_USER
 Environment=RESET_GUARD=demo-only
@@ -499,7 +778,7 @@ RemainAfterExit=no
 TimeoutStartSec=900
 EOF
 
-  cat > "$QUADLET_DIR/padang-demo-reset.timer" <<EOF
+  cat > "$quadlet_stage_dir/padang-demo-reset.timer" <<EOF
 [Unit]
 Description=Bridge PH Padang demo reset timer
 
@@ -512,6 +791,12 @@ Unit=padang-demo-reset.service
 [Install]
 WantedBy=timers.target
 EOF
+  for staged_file in "$quadlet_stage_dir"/*; do
+    install -m 0640 "$staged_file" "$quadlet_dir/$(basename "$staged_file")"
+  done
+  rm -rf "$quadlet_stage_dir"
+  trap - RETURN
+  log "installed staged Padang demo Quadlets under $quadlet_dir"
 }
 
 install_caddy_route() {
@@ -526,7 +811,6 @@ install_caddy_route() {
   local caddyfile_changed=0
   local handler_changed=0
   local handler_existed=0
-  local inline_route=0
   local handler_route=0
   local handler_configured=0
   local app_block
@@ -552,63 +836,51 @@ install_caddy_route() {
     die "could not verify Caddy proxy network insertion"
   }
 
-  app_block=$(cat <<EOF
-# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
-@padang_demo_root path /padang/demo
-redir @padang_demo_root /padang/demo/ 308
-
-handle /padang/demo/api/* {
-  uri strip_prefix /padang/demo
-  header {
-    >Cache-Control "private, no-store"
-    >CDN-Cache-Control "no-store"
-    >Pragma "no-cache"
-    >X-Robots-Tag "noindex, nofollow, noarchive"
-  }
-  reverse_proxy padang-demo-api:8080
-}
-
-handle /padang/demo/* {
-  header {
-    >Cache-Control "public, max-age=0, must-revalidate"
-    >X-Robots-Tag "noindex, nofollow, noarchive"
-  }
-  reverse_proxy padang-demo-app:3000
-}
-# END PADANG DEMO ROUTE
-EOF
-)
-
-  if grep -q '^@padang_demo_api path ' "$caddy_tmp"; then
-    inline_route=1
-    grep -q 'reverse_proxy padang-demo-app:3000' "$caddy_tmp" || {
-      rm -f "$caddy_tmp" "$quadlet_tmp"
-      die "existing inline Padang route is incomplete"
-    }
-  elif grep -q 'reverse_proxy padang-demo-app:3000' "$caddy_tmp" ||
-    grep -q '^# BEGIN PADANG DEMO ROUTE ' "$caddy_tmp"; then
+  app_block=$(padang_demo_handler_block)
+  local site_count site_imports all_imports inline_complete inline_evidence
+  local api_blocks app_blocks api_proxies app_proxies root_redirects
+  read -r site_count site_imports all_imports inline_complete inline_evidence \
+    api_blocks app_blocks api_proxies app_proxies root_redirects \
+    < <(caddy_site_route_state "$caddy_tmp")
+  ((site_count == 1)) || {
     rm -f "$caddy_tmp" "$quadlet_tmp"
-    die "existing inline Padang route is incomplete"
+    die "delegateops.business site block is missing or ambiguous"
+  }
+  ((all_imports == site_imports)) || {
+    rm -f "$caddy_tmp" "$quadlet_tmp"
+    die "Padang handler import exists outside delegateops.business"
+  }
+  ((site_imports <= 1)) || {
+    rm -f "$caddy_tmp" "$quadlet_tmp"
+    die "Padang handler import is defined more than once"
+  }
+  if ((inline_complete && site_imports)); then
+    rm -f "$caddy_tmp" "$quadlet_tmp"
+    die "Padang route is configured both inline and through an import"
+  fi
+  if ((inline_evidence && !inline_complete)); then
+    rm -f "$caddy_tmp" "$quadlet_tmp"
+    die "existing inline Padang route is incomplete or duplicated"
   fi
 
-  if ((inline_route)); then
-    if grep -qE "^[[:space:]]*import[[:space:]]+$CADDY_HANDLER_IMPORT([[:space:]]|$)" "$caddy_tmp"; then
-      rm -f "$caddy_tmp" "$quadlet_tmp"
-      die "Padang route is configured both inline and through an import"
-    fi
+  if ((inline_complete)); then
+    :
   else
     handler_configured=1
     handler_tmp="$CADDY_HANDLER_FILE.tmp.$$"
     if [[ -f "$CADDY_HANDLER_FILE" ]]; then
       handler_existed=1
       cp -p "$CADDY_HANDLER_FILE" "$handler_tmp"
-      local api_proxy_count app_proxy_count
-      api_proxy_count=$(grep -c 'reverse_proxy padang-demo-api:8080' "$handler_tmp" || true)
-      app_proxy_count=$(grep -c 'reverse_proxy padang-demo-app:3000' "$handler_tmp" || true)
-      if [[ "$api_proxy_count" == 1 && "$app_proxy_count" == 1 ]]; then
+      local handler_api_blocks handler_app_blocks handler_api_proxies handler_app_proxies
+      local handler_root_redirects handler_evidence
+      read -r handler_api_blocks handler_app_blocks handler_api_proxies \
+        handler_app_proxies handler_root_redirects handler_evidence \
+        < <(handler_route_state "$handler_tmp")
+      if [[ "$handler_api_blocks" == 1 && "$handler_app_blocks" == 1 &&
+        "$handler_api_proxies" == 1 && "$handler_app_proxies" == 1 &&
+        "$handler_root_redirects" == 1 ]]; then
         handler_route=1
-      elif [[ "$api_proxy_count" != 0 || "$app_proxy_count" != 0 ||
-        -s "$handler_tmp" ]]; then
+      elif [[ "$handler_evidence" != 0 || -s "$handler_tmp" ]]; then
         rm -f "$caddy_tmp" "$quadlet_tmp" "$handler_tmp"
         die "existing Padang handler file is not a complete managed route"
       fi
@@ -629,8 +901,8 @@ EOF
   cp -p "$caddy_tmp" "$caddy_stage_dir/Caddyfile"
   if ((handler_configured)); then
     cp -p "$handler_tmp" "$caddy_stage_dir/padang-demo.handlers.Caddyfile"
-    sed "s|$CADDY_HANDLER_IMPORT|/stage/padang-demo.handlers.Caddyfile|g" \
-      "$caddy_stage_dir/Caddyfile" > "$caddy_stage_dir/Caddyfile.next"
+    rewrite_managed_import "$caddy_stage_dir/Caddyfile" \
+      "$caddy_stage_dir/Caddyfile.next" "/stage/padang-demo.handlers.Caddyfile"
     mv "$caddy_stage_dir/Caddyfile.next" "$caddy_stage_dir/Caddyfile"
   fi
   if ! podman run --rm \
@@ -647,8 +919,7 @@ EOF
   fi
   cp -p "$caddy_stage_dir/Caddyfile" "$caddy_tmp"
   if ((handler_configured)); then
-    sed "s|/stage/padang-demo.handlers.Caddyfile|$CADDY_HANDLER_IMPORT|g" \
-      "$caddy_tmp" > "$caddy_tmp.next"
+    rewrite_managed_import "$caddy_tmp" "$caddy_tmp.next" "$CADDY_HANDLER_IMPORT"
     mv "$caddy_tmp.next" "$caddy_tmp"
   fi
   if ((handler_configured)); then
@@ -700,10 +971,10 @@ EOF
       die "generated Caddy service does not include $PROXY_NETWORK"
     fi
     if ((caddy_network_changed)); then
-      log "restarting Caddy after adding the Padang proxy network"
-      systemctl --user restart caddy.service
-    elif ((caddyfile_changed)); then
-      log "gracefully reloading Caddy through a disposable Podman client"
+      CADDY_NETWORK_CHANGED=1
+      log "deferring Caddy restart until the Padang proxy Quadlet is staged"
+    elif ((caddyfile_changed || handler_changed)); then
+      log "gracefully reloading Caddy after the Padang route files changed"
       if ! podman run --rm --network container:caddy \
         -v "$CADDY_CONF_DIR:/etc/caddy:ro,Z" docker.io/library/caddy:alpine \
         caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
@@ -717,6 +988,14 @@ EOF
     fi
     log "Caddy route and network membership already present"
   fi
+}
+
+restart_caddy_after_quadlet_stage() {
+  ((CADDY_NETWORK_CHANGED)) || return 0
+  systemctl --user daemon-reload
+  systemctl --user start "${PROXY_NETWORK}-network.service"
+  log "restarting Caddy after adding the Padang proxy network"
+  systemctl --user restart caddy.service
 }
 
 wait_healthy() {
@@ -738,7 +1017,7 @@ start_stack() {
   systemctl --user start "${INTERNAL_NETWORK}-network.service" \
     "${PROXY_NETWORK}-network.service"
   systemctl --user start padang-demo-db.service
-  wait_healthy padang-demo-db
+  wait_healthy bridge-ph-padang-demo-db
   systemctl --user restart padang-demo-migrate.service
   if ((SEED_DEMO)); then
     log "explicit --seed-demo requested; reseeding demo database"
@@ -747,9 +1026,9 @@ start_stack() {
     log "preserving demo database; use --seed-demo only for an intentional reset"
   fi
   systemctl --user restart padang-demo-api.service
-  wait_healthy padang-demo-api
+  wait_healthy bridge-ph-padang-demo-api
   systemctl --user restart padang-demo-app.service
-  wait_healthy padang-demo-app
+  wait_healthy bridge-ph-padang-demo-frontend
   systemctl --user start padang-demo-reset.timer
 }
 
@@ -784,8 +1063,9 @@ if [[ "$MODE" == --dry-run ]]; then
   exit 0
 fi
 
-write_quadlets
 install_caddy_route
+write_quadlets
+restart_caddy_after_quadlet_stage
 start_stack
 record_image_digests
 log "Padang demo is running at https://delegateops.business/padang/demo"
