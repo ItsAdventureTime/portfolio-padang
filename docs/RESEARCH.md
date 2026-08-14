@@ -139,8 +139,12 @@ The updater therefore selects `postgres:18-alpine` for an empty demo data root,
 or the matching supported `postgres:<major>-alpine` image after reading an
 existing `PG_VERSION` (supported majors 14–18). It fails closed for an
 unsupported or malformed state, refuses ownership/permission mismatches for
-rootless storage, and never wipes or auto-upgrades a data directory. PostgreSQL
-18's official image uses versioned `PGDATA`; clean state uses
+rootless storage, and never wipes or auto-upgrades a data directory. Because
+PostgreSQL files may be owned by subordinate IDs inside a rootless Podman user
+namespace, the updater performs metadata, discovery, and version-file reads via
+`podman unshare`; the direct-host path exists only for the disposable fixture
+container where Podman nesting is unavailable. PostgreSQL 18's official image
+uses versioned `PGDATA`; clean state uses
 `/var/lib/postgresql/18/docker`, while legacy data with `PG_VERSION` at the
 mount root retains the `/var/lib/postgresql/data` layout and matching major.
 

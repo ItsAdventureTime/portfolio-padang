@@ -200,9 +200,12 @@ non-empty-invalid, or ownership/permission-incompatible state. It never wipes
 or auto-upgrades data. The database identity record and post-start
 role/database/password check prevent persisted user/secret drift. DB Quadlets
 declare `RequiresMountsFor`, avoid `Notify=healthy`, and print service status,
-journal, container state, and container logs on startup failure. Disposable
-fixtures cover clean, compatible, unsupported-major, malformed, unreadable,
-    and invalid non-empty state. The updater starts the application stack before
+    journal, container state, and container logs on startup failure. Disposable
+    fixtures cover clean, compatible, unsupported-major, malformed, unreadable,
+    invalid non-empty, legacy/versioned layout, and rootless namespace
+    inspection state. Existing PostgreSQL metadata and `PG_VERSION` reads run
+    via `podman unshare`, so subordinate container UIDs do not make valid state
+    uninspectable; the direct-host path is fixture-only. The updater starts the application stack before
     activating a newly changed Caddy route, so a failed service does not turn a
     previously working public route into a new 502. Caddy route remediation
     remains unchanged otherwise.

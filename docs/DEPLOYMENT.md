@@ -634,8 +634,11 @@ hands control to `scripts/deploy-padang-demo-remote.sh` on the VPS.
 The remote script:
 
 - validates rootless Podman, cgroup v2, and the user systemd bus;
-  prepares the rootless PostgreSQL data directory and checks ownership,
-  permissions, write access, and `PG_VERSION` before writing Quadlets;
+  prepares the rootless PostgreSQL data directory and inspects ownership,
+  permissions, write access, and `PG_VERSION` through `podman unshare` before
+  writing Quadlets. A genuinely missing root is created; existing state is
+  inspected read-only and is never chmod'ed, chowned, repaired, or probed by
+  creating a temporary file;
 - automatically generates a random database username only for clean state and
     persists only that non-secret username at
     `/home/jk/bridge-ph/padang-demo/config/db-user`; existing state uses its
@@ -740,17 +743,23 @@ changing it:
 systemctl --user status padang-demo-db.service --no-pager -l
 journalctl --user -u padang-demo-db.service -n 120 --no-pager
 podman logs --tail 200 bridge-ph-padang-demo-db
-cat /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
+podman unshare stat -c '%F uid=%u mode=%a' -- /home/jk/bridge-ph/padang-demo/postgres-data
+podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
+  -maxdepth 3 -type f -name PG_VERSION -print
+podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
 cat /home/jk/bridge-ph/padang-demo/config/db-user
 podman secret ls
 ```
 
 A supported existing major is selected from `PG_VERSION`; a clean directory
-uses PostgreSQL 18 and the official versioned `PGDATA` layout. Permission or
-ownership failures must be corrected by the VPS operator after confirming the
-directory is the intended demo data root. A major-version change requires a
-reviewed backup plus `pg_upgrade` or dump/restore into a separate target; it is
-never an automatic deployment step. See the official [PostgreSQL versioning
+uses PostgreSQL 18 and the official versioned `PGDATA` layout. If inspection
+fails through the rootless Podman namespace, treat that as an access or
+UID-mapping failure; malformed `PG_VERSION` and non-empty-invalid state are
+separate fail-closed diagnostics. Permission or ownership failures must be
+corrected by the VPS operator after confirming the directory is the intended
+demo data root. A major-version change requires a reviewed backup plus
+`pg_upgrade` or dump/restore into a separate target; it is never an automatic
+deployment step. See the official [PostgreSQL versioning
 policy](https://www.postgresql.org/support/versioning/) and [PostgreSQL
 Official Image](https://hub.docker.com/_/postgres) guidance.
 

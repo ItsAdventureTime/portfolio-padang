@@ -322,14 +322,20 @@ journalctl --user -u padang-demo-db.service -n 120 --no-pager
 podman inspect bridge-ph-padang-demo-db \
   --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}'
 podman logs --tail 200 bridge-ph-padang-demo-db
-cat /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
+podman unshare stat -c '%F uid=%u mode=%a' -- /home/jk/bridge-ph/padang-demo/postgres-data
+podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
+  -maxdepth 3 -type f -name PG_VERSION -print
+podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
 cat /home/jk/bridge-ph/padang-demo/config/db-user
 podman secret ls
 ```
 
-The persistent directory must be a real directory owned by `jk`, readable,
-writable, searchable, and usable by the rootless user. The updater refuses a
-malformed or unreadable `PG_VERSION`, an unsupported major, a non-empty
+The updater runs these PostgreSQL state checks through `podman unshare`, so
+files created by the rootless database container under subordinate UID mappings
+remain inspectable without changing ownership. The data root must be a real
+directory owned by the rootless Podman identity in that namespace, readable,
+writable, searchable, and usable by the database container. The updater refuses
+a malformed or unreadable `PG_VERSION`, an unsupported major, a non-empty
 directory without valid PostgreSQL state, or a database identity/secret
 mismatch. Do not delete `postgres-data` or change the image to an unversioned
 tag to recover. Preserve the directory, take/verify a backup, and perform a

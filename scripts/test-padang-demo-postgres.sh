@@ -56,6 +56,14 @@ postgres_prepare_storage "$compatible_state"
 [[ "$(postgres_image_for_state)" == docker.io/library/postgres:17-alpine ]] ||
   fail 'existing state did not pin the matching PostgreSQL major'
 
+versioned_state="$TEST_ROOT/versioned"
+mkdir -p "$versioned_state/16/docker"
+printf '16\n' >"$versioned_state/16/docker/PG_VERSION"
+postgres_prepare_storage "$versioned_state"
+[[ "$POSTGRES_MAJOR" == 16 ]] || fail 'versioned PostgreSQL 16 state was not selected'
+[[ "$POSTGRES_DATA_LAYOUT" == versioned ]] || fail 'versioned PostgreSQL state was not selected'
+[[ "$POSTGRES_PGDATA" == /var/lib/postgresql/16/docker ]] || fail 'versioned PostgreSQL PGDATA was incorrect'
+
 mismatch_state="$TEST_ROOT/mismatch"
 mkdir -p "$mismatch_state"
 printf '13\n' >"$mismatch_state/PG_VERSION"
@@ -81,4 +89,51 @@ printf 'left-by-operator\n' >"$nonempty_state/README"
 expect_failure 'nonempty malformed state' 'non-empty but has no valid PG_VERSION' \
   postgres_prepare_storage "$nonempty_state"
 
-printf '%s\n' 'PostgreSQL clean, compatible, mismatch, malformed, ownership, and non-empty-state fixtures passed.'
+namespace_state="$TEST_ROOT/namespace aware"
+mkdir -p "$namespace_state/17/docker"
+printf '17\n' >"$namespace_state/17/docker/PG_VERSION"
+namespace_bin="$TEST_ROOT/namespace-bin"
+namespace_log="$TEST_ROOT/namespace.log"
+mkdir -p "$namespace_bin"
+cat >"$namespace_bin/podman" <<'SH'
+#!/bin/sh
+set -eu
+[ "${1:-}" = unshare ] || exit 64
+shift
+printf '%s\n' "${1:-}" >>"$FAKE_PODMAN_LOG"
+exec "$@"
+SH
+chmod +x "$namespace_bin/podman"
+(
+  export PATH="$namespace_bin:$PATH"
+  export FAKE_PODMAN_LOG="$namespace_log"
+  postgres_prepare_storage "$namespace_state"
+  [[ "$POSTGRES_MAJOR" == 17 ]] || fail 'namespace-aware inspection selected the wrong major'
+  grep -Fqx 'find' "$namespace_log" || fail 'namespace-aware inspection did not use Podman for find'
+  grep -Fqx 'stat' "$namespace_log" || fail 'namespace-aware inspection did not use Podman for stat'
+  grep -Fqx 'cat' "$namespace_log" || fail 'namespace-aware inspection did not use Podman for read'
+)
+
+inaccessible_state="$TEST_ROOT/inaccessible"
+mkdir -p "$inaccessible_state"
+printf '17\n' >"$inaccessible_state/PG_VERSION"
+inaccessible_bin="$TEST_ROOT/inaccessible-bin"
+mkdir -p "$inaccessible_bin"
+cat >"$inaccessible_bin/podman" <<'SH'
+#!/bin/sh
+set -eu
+[ "${1:-}" = unshare ] || exit 64
+shift
+if [ "${1:-}" = find ]; then
+  exit 77
+fi
+exec "$@"
+SH
+chmod +x "$inaccessible_bin/podman"
+(
+  export PATH="$inaccessible_bin:$PATH"
+  expect_failure 'namespace-inaccessible state' 'state may be inaccessible' \
+    postgres_prepare_storage "$inaccessible_state"
+)
+
+printf '%s\n' 'PostgreSQL clean, legacy/versioned compatible, mismatch, malformed, ownership, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'

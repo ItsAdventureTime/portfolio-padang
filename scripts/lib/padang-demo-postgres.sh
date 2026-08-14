@@ -14,14 +14,47 @@ postgres_major_supported() {
   esac
 }
 
+postgres_podman_command() {
+  command -v podman >/dev/null 2>&1 || return 1
+  command -v podman
+}
+
+postgres_inspection_context() {
+  if postgres_podman_command >/dev/null 2>&1; then
+    printf '%s\n' 'rootless Podman user namespace'
+  else
+    printf '%s\n' 'direct host fallback because Podman is unavailable (fixture-only)'
+  fi
+}
+
+postgres_inspect() {
+  local podman_command
+
+  if podman_command=$(postgres_podman_command); then
+    "$podman_command" unshare "$@"
+  else
+    # The deployment preflight requires Podman. This fallback exists for the
+    # disposable fixture container, where nesting Podman is intentionally not
+    # required. A real deployment therefore always takes the branch above.
+    "$@"
+  fi
+}
+
+postgres_inspect_path_metadata() {
+  postgres_inspect stat -c '%F|%u' -- "$1"
+}
+
 postgres_read_version() {
   local version_file="$1"
+  local file_type
   local version
 
-  [[ -f "$version_file" && ! -L "$version_file" && -r "$version_file" ]] ||
+  file_type=$(postgres_inspect stat -c '%F' -- "$version_file" 2>/dev/null) ||
     return 1
-  version=$(<"$version_file") || return 1
-  [[ "$version" =~ ^[0-9]+$ ]] || return 1
+  [[ "$file_type" == 'regular file' ]] || return 2
+  postgres_inspect test -r "$version_file" >/dev/null 2>&1 || return 1
+  version=$(postgres_inspect cat -- "$version_file" 2>/dev/null) || return 1
+  [[ "$version" =~ ^[0-9]+$ ]] || return 2
   printf '%s\n' "$version"
 }
 
@@ -34,34 +67,44 @@ postgres_prepare_storage() {
   local data_dir="$1"
   local create_allowed="${2:-1}"
   local root_version_file nested_matches nested_count version_file
+  local data_metadata data_type data_uid expected_uid inspection_context
+  local read_status
   local version
   local -a nested_version_files=()
 
-  if [[ ! -e "$data_dir" ]]; then
-    ((create_allowed)) ||
-      postgres_state_failure "data directory is missing: $data_dir" || return 1
-    mkdir -p -- "$data_dir" ||
-      postgres_state_failure "could not create $data_dir" || return 1
+  inspection_context=$(postgres_inspection_context)
+  if ! data_metadata=$(postgres_inspect_path_metadata "$data_dir" 2>/dev/null); then
+    if [[ ! -e "$data_dir" ]]; then
+      ((create_allowed)) ||
+        postgres_state_failure "data directory is missing: $data_dir" || return 1
+      mkdir -p -- "$data_dir" ||
+        postgres_state_failure "could not create $data_dir" || return 1
+      data_metadata=$(postgres_inspect_path_metadata "$data_dir" 2>/dev/null) ||
+        postgres_state_failure "could not inspect newly created $data_dir through $inspection_context" || return 1
+    else
+      postgres_state_failure "could not inspect $data_dir through $inspection_context; state may be inaccessible (permission denied or rootless UID mapping issue)" || return 1
+    fi
   fi
-  [[ -d "$data_dir" && ! -L "$data_dir" ]] ||
+
+  IFS='|' read -r data_type data_uid <<<"$data_metadata"
+  [[ "$data_type" == 'directory' ]] ||
     postgres_state_failure "$data_dir is not a real directory" || return 1
-  [[ -r "$data_dir" && -w "$data_dir" && -x "$data_dir" ]] ||
-    postgres_state_failure "$data_dir must be readable, writable, and searchable by the rootless user" || return 1
+  postgres_inspect test ! -L "$data_dir" >/dev/null 2>&1 ||
+    postgres_state_failure "$data_dir is a symbolic link; refusing to inspect redirected state" || return 1
 
-  if [[ "$(stat -c '%u' "$data_dir" 2>/dev/null || true)" != "$(id -u)" ]]; then
-    postgres_state_failure "$data_dir must be owned by $(id -un); refusing automatic chown" || return 1
-  fi
-  chmod 0700 -- "$data_dir" ||
-    postgres_state_failure "could not set rootless-safe permissions on $data_dir" || return 1
+  expected_uid=$(postgres_inspect id -u 2>/dev/null) ||
+    postgres_state_failure "could not determine the inspection UID through $inspection_context" || return 1
+  [[ "$data_uid" == "$expected_uid" ]] ||
+    postgres_state_failure "$data_dir must be owned by uid $expected_uid in $inspection_context; found uid $data_uid; refusing automatic chown" || return 1
 
-  local write_probe="$data_dir/.padang-rootless-write-probe.$$"
-  if ! : >"$write_probe" || ! rm -f -- "$write_probe"; then
-    postgres_state_failure "rootless user cannot create and remove files in $data_dir" || return 1
-  fi
+  postgres_inspect test -r "$data_dir" >/dev/null 2>&1 &&
+    postgres_inspect test -w "$data_dir" >/dev/null 2>&1 &&
+    postgres_inspect test -x "$data_dir" >/dev/null 2>&1 ||
+    postgres_state_failure "$data_dir must be readable, writable, and searchable through $inspection_context; state may be inaccessible" || return 1
 
   root_version_file="$data_dir/PG_VERSION"
-  nested_matches=$(find -P "$data_dir" -maxdepth 3 -type f -name PG_VERSION -print 2>/dev/null) ||
-    postgres_state_failure "could not inspect $data_dir/PG_VERSION" || return 1
+  nested_matches=$(postgres_inspect find -P "$data_dir" -maxdepth 3 -type f -name PG_VERSION -print 2>/dev/null) ||
+    postgres_state_failure "could not inspect $data_dir/PG_VERSION through $inspection_context; state may be inaccessible" || return 1
   if [[ -n "$nested_matches" ]]; then
     while IFS= read -r version_file; do
       [[ -n "$version_file" ]] && nested_version_files+=("$version_file")
@@ -74,15 +117,29 @@ postgres_prepare_storage() {
       postgres_state_failure "multiple or unexpected PG_VERSION files exist under $data_dir" || return 1
     [[ "${nested_version_files[0]}" == "$root_version_file" ]] ||
       postgres_state_failure "multiple or unexpected PG_VERSION files exist under $data_dir" || return 1
-    version=$(postgres_read_version "$root_version_file") ||
-      postgres_state_failure "$root_version_file is unreadable or malformed" || return 1
+    if version=$(postgres_read_version "$root_version_file"); then
+      :
+    else
+      read_status=$?
+      if ((read_status == 2)); then
+        postgres_state_failure "$root_version_file is unreadable or malformed (not a regular PostgreSQL version file)" || return 1
+      fi
+      postgres_state_failure "could not read $root_version_file through $inspection_context; state may be inaccessible" || return 1
+    fi
     POSTGRES_DATA_LAYOUT=legacy
     POSTGRES_DATA_EXISTS=1
     POSTGRES_STATE_VERSION_FILE="$root_version_file"
   elif ((nested_count == 1)); then
     version_file="${nested_version_files[0]}"
-    version=$(postgres_read_version "$version_file") ||
-      postgres_state_failure "$version_file is unreadable or malformed" || return 1
+    if version=$(postgres_read_version "$version_file"); then
+      :
+    else
+      read_status=$?
+      if ((read_status == 2)); then
+        postgres_state_failure "$version_file is unreadable or malformed (not a regular PostgreSQL version file)" || return 1
+      fi
+      postgres_state_failure "could not read $version_file through $inspection_context; state may be inaccessible" || return 1
+    fi
     [[ "$version_file" == "$data_dir/$version/docker/PG_VERSION" ]] ||
       postgres_state_failure "$version_file is not in the official versioned PGDATA layout" || return 1
     POSTGRES_DATA_LAYOUT=versioned
@@ -90,8 +147,8 @@ postgres_prepare_storage() {
     POSTGRES_STATE_VERSION_FILE="$version_file"
   else
     local first_entry
-    first_entry=$(find -P "$data_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ||
-      postgres_state_failure "could not inspect entries under $data_dir" || return 1
+    first_entry=$(postgres_inspect find -P "$data_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ||
+      postgres_state_failure "could not inspect entries under $data_dir through $inspection_context; state may be inaccessible" || return 1
     [[ -z "$first_entry" ]] ||
       postgres_state_failure "$data_dir is non-empty but has no valid PG_VERSION; refusing initialization" || return 1
     version="$POSTGRES_DEFAULT_MAJOR"
