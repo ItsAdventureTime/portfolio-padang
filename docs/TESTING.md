@@ -187,8 +187,9 @@ The minimum implementation gate for the current C1 foundation is:
 The PostgreSQL fixture covers clean PostgreSQL 17 legacy state, a known-empty
 versioned scaffold left by a previous image attempt (retained as versioned
 PGDATA under `17/docker`), supported legacy and versioned `PGDATA` layouts,
-malformed/unsupported/ambiguous state, symlink and ownership failures, and
-partial non-empty state. It also supplies a fake `podman unshare` command to
+malformed/unsupported/ambiguous state, an accepted UID 70 data-root owner, a
+rejected UID 12345 owner, symlink failures, and partial non-empty state. It also
+supplies a fake `podman unshare` command to
 verify that state metadata, `PG_VERSION` discovery, and version reads use the
 rootless namespace when available, while preserving the direct-host fallback
 inside the disposable fixture container. An inaccessible namespace probe must

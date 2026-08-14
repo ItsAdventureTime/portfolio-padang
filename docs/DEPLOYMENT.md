@@ -636,9 +636,11 @@ The remote script:
 - validates rootless Podman, cgroup v2, and the user systemd bus;
   prepares the rootless PostgreSQL data directory and inspects ownership,
   permissions, write access, and `PG_VERSION` through `podman unshare` before
-  writing Quadlets. A genuinely missing root is created; existing state is
-  inspected read-only and is never chmod'ed, chowned, repaired, or probed by
-  creating a temporary file;
+  writing Quadlets. The data-root owner must be the rootless Podman namespace
+  UID (normally 0) or UID 70, the `postgres` user in official
+  `postgres:14-18-alpine` images. A genuinely missing root is created; existing
+  state is inspected read-only and is never chmod'ed, chowned, repaired, or
+  probed by creating a temporary file;
 - automatically generates a random database username only for clean state and
     persists only that non-secret username at
     `/home/jk/bridge-ph/padang-demo/config/db-user`; existing state uses its
@@ -772,7 +774,8 @@ PostgreSQL persistent state is unsafe: /home/jk/bridge-ph/padang-demo/postgres-d
 That message means the path contains unknown or partial state. Preserve it;
 do not delete, move, chmod, chown, repair, or initialize over it. If the
 directory is inaccessible through the rootless Podman namespace, treat that as
-an access or UID-mapping failure. Permission or ownership failures must be
+an access or UID-mapping failure. An owner other than the namespace UID
+(normally 0) or UID 70 is rejected without chown; ownership failures must be
 corrected by the VPS operator only after confirming the directory is the
 intended demo data root. Take and verify a backup/copy before a reviewed
 dump/restore or a separately chosen new data root. A major-version change

@@ -202,14 +202,17 @@ selects PostgreSQL 17 for clean state or a provably empty versioned scaffold
 from a previous image attempt, or the matching supported major from an existing
 root or versioned `PG_VERSION`, and fails closed for unsupported, malformed,
 unknown/partial, ambiguous, symlinked, or ownership/permission-incompatible
-state. It never wipes or auto-upgrades data. The database identity record and
+state; data-root ownership is valid for the rootless namespace UID (normally 0)
+or UID 70, the `postgres` user in official `postgres:14-18-alpine` images. It
+never wipes or auto-upgrades data. The database identity record and
 post-start role/database/password check prevent persisted user/secret drift. DB
 Quadlets declare `RequiresMountsFor`, avoid `Notify=healthy`, and print service
 status, journal, container state, and container logs on startup failure.
 Disposable fixtures cover clean, known-empty scaffold, compatible,
 unsupported-major, malformed, unreadable, invalid non-empty,
 legacy/versioned-layout, symlink, ambiguous, and rootless namespace inspection
-state. Existing PostgreSQL metadata and `PG_VERSION` reads run via
+state, including accepted UID 70 and rejected UID 12345 data-root ownership.
+Existing PostgreSQL metadata and `PG_VERSION` reads run via
 `podman unshare`, so subordinate container UIDs do not make valid state
 uninspectable; the direct-host path is fixture-only. The updater starts the
 application stack before activating a newly changed Caddy route, so a failed

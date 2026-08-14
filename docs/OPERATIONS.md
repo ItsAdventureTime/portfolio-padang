@@ -346,9 +346,10 @@ verified backup and reviewed recovery before another apply.
 The updater runs these PostgreSQL state checks through `podman unshare`, so
 files created by the rootless database container under subordinate UID mappings
 remain inspectable without changing ownership. The data root must be a real
-directory owned by the rootless Podman identity in that namespace, readable,
-writable, searchable, and usable by the database container. The updater refuses
-a malformed or unreadable version file, an unsupported major, a non-empty
+directory owned by either the rootless Podman namespace UID (normally 0) or UID
+70, the `postgres` user in official `postgres:14-18-alpine` images; it must be
+readable, writable, searchable, and usable by the database container. The updater
+refuses a malformed or unreadable version file, an unsupported major, a non-empty
 directory without valid PostgreSQL state, or a database identity/secret
 mismatch. The exact non-empty-state error means the directory contains unknown
 or partial files; preserve it and do not delete, move, chmod, chown, repair,

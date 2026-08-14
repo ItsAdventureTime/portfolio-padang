@@ -132,6 +132,15 @@ postgres_known_empty_versioned_scaffold_major() {
   printf '%s\n' "$match_major"
 }
 
+# Rootless Podman inspection normally reports namespace root as uid 0. The
+# official postgres:14-18-alpine images use uid 70 for their postgres user.
+postgres_data_root_owner_allowed() {
+  local data_uid="$1"
+  local namespace_uid="$2"
+
+  [[ "$data_uid" == "$namespace_uid" || "$data_uid" == 70 ]]
+}
+
 postgres_prepare_storage() {
   local data_dir="$1"
   local create_allowed="${2:-1}"
@@ -164,8 +173,8 @@ postgres_prepare_storage() {
 
   expected_uid=$(postgres_inspect id -u 2>/dev/null) ||
     postgres_state_failure "could not determine the inspection UID through $inspection_context" || return 1
-  [[ "$data_uid" == "$expected_uid" ]] ||
-    postgres_state_failure "$data_dir must be owned by uid $expected_uid in $inspection_context; found uid $data_uid; refusing automatic chown" || return 1
+  postgres_data_root_owner_allowed "$data_uid" "$expected_uid" ||
+    postgres_state_failure "$data_dir must be owned by uid $expected_uid in $inspection_context or uid 70 (postgres in official postgres:14-18-alpine images); found uid $data_uid; refusing automatic chown" || return 1
 
   postgres_inspect test -r "$data_dir" >/dev/null 2>&1 &&
     postgres_inspect test -w "$data_dir" >/dev/null 2>&1 &&

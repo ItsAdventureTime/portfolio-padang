@@ -73,6 +73,17 @@ postgres_prepare_storage "$compatible_state"
 [[ "$(postgres_image_for_state)" == docker.io/library/postgres:17-alpine ]] ||
   fail 'existing state did not pin the matching PostgreSQL major'
 
+postgres_user_owner_state="$TEST_ROOT/postgres-user-owner"
+mkdir -p "$postgres_user_owner_state"
+printf '17\n' >"$postgres_user_owner_state/PG_VERSION"
+chown 70:70 "$postgres_user_owner_state"
+postgres_prepare_storage "$postgres_user_owner_state"
+[[ "$POSTGRES_MAJOR" == 17 ]] || fail 'uid 70 state selected the wrong major'
+[[ "$POSTGRES_DATA_LAYOUT" == legacy ]] || fail 'uid 70 legacy state selected the wrong layout'
+[[ "$POSTGRES_DATA_EXISTS" == 1 ]] || fail 'uid 70 state was treated as uninitialized'
+[[ "$(stat -c '%u' "$postgres_user_owner_state")" == 70 ]] ||
+  fail 'uid 70 state ownership was modified'
+
 versioned_state="$TEST_ROOT/versioned"
 mkdir -p "$versioned_state/16/docker"
 printf '16\n' >"$versioned_state/16/docker/PG_VERSION"
@@ -97,7 +108,7 @@ wrong_owner_state="$TEST_ROOT/wrong-owner"
 mkdir -p "$wrong_owner_state"
 printf '17\n' >"$wrong_owner_state/PG_VERSION"
 chown 12345:12345 "$wrong_owner_state"
-expect_failure 'incompatible state ownership' 'must be owned by' \
+expect_failure 'incompatible state ownership' 'uid 70 (postgres in official postgres:14-18-alpine images)' \
   postgres_prepare_storage "$wrong_owner_state"
 
 nonempty_state="$TEST_ROOT/nonempty"

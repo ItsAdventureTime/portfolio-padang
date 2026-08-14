@@ -142,8 +142,10 @@ The updater therefore selects `postgres:17-alpine` for an empty demo data root
 or a provably empty versioned scaffold left by a prior image attempt, or the
 matching supported `postgres:<major>-alpine` image after reading an existing
 root or versioned `PG_VERSION` (supported majors 14–18). It fails closed for an unsupported,
-malformed, unknown/partial, or ambiguous state, refuses ownership/permission
-mismatches for rootless storage, and never wipes or auto-upgrades a data
+malformed, unknown/partial, or ambiguous state, and refuses ownership/permission
+mismatches for rootless storage unless the data-root owner matches the namespace
+UID (normally 0) or UID 70, the `postgres` user in official
+`postgres:14-18-alpine` images. It never wipes or auto-upgrades a data
 directory. Because
 PostgreSQL files may be owned by subordinate IDs inside a rootless Podman user
 namespace, the updater performs metadata, discovery, and version-file reads via
