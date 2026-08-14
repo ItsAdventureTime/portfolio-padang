@@ -15,7 +15,10 @@ DESIGN | CONSTRUCT | SUPPLY, and AAA ACCREDITED CONTRACTOR.
 - Authoritative source: `/photo_2026-08-03_00-36-49.jpg` (the original user-provided 834 × 721 JPG).
 - Bundled web derivative: `frontend/public/assets/padang-logo.jpg`, a byte-identical copy of the source retained for static asset delivery. The original JPG remains the source of truth and must not be deleted or replaced.
 - The legacy `frontend/public/assets/padang-logo.svg` may remain for historical compatibility, but it is not the active brand mark and must not be used in new UI.
-- The source JPG must be visibly used in the desktop sidebar, tablet/sidebar treatment, mobile drawer, login screen, production session gate, and metadata/icon treatment. Do not substitute a generic monogram or wordmark.
+- The source JPG must be visibly used in the desktop sidebar, tablet/sidebar
+  treatment, compact mobile header, mobile drawer, login screen, production
+  session gate, and metadata/icon treatment. Do not substitute a generic
+  monogram or wordmark.
 
 ---
 
@@ -33,12 +36,13 @@ DESIGN | CONSTRUCT | SUPPLY, and AAA ACCREDITED CONTRACTOR.
 
 The frontend uses a small local adaptation of the responsive, typed, accessible
 interaction intent documented by [SmoothUI](https://github.com/educlopez/smoothui):
-drawer entry, button hover lift, table hover feedback, and loading skeletons use
-short local CSS transitions/pulses only when `prefers-reduced-motion:
-no-preference` is active. No SmoothUI package, runtime registry, CLI fetch,
-Motion dependency, or network requirement is used. Production data states are
-intentionally quiet: loading, live, error, and empty states communicate through
-text and `aria-live`, not decorative effects.
+drawer entry, restrained content stagger, button hover/pressed feedback, table
+hover feedback, and loading skeletons use transform/opacity/local CSS motion only
+when `prefers-reduced-motion: no-preference` is active. Layouts use a capped
+content measure and `100dvh`-safe shell/session heights. No SmoothUI package,
+runtime registry, CLI fetch, Motion dependency, or network requirement is used.
+Production data states are intentionally quiet: loading, live, error, and empty
+states communicate through text and `aria-live`, not decorative effects.
 
 The accessibility baseline is [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/):
 semantic labels and status text remain primary, the existing drawer focus trap
@@ -229,12 +233,14 @@ glassmorphism is part of the product contract.
 
 ### Top Bar (Header)
 
-- Height: 56px
+- Minimum height: 72px on desktop; compact header controls below 768px
 - Opaque light navigation surface with subtle border
 - Breadcrumb navigation (left)
 - Page title (center or left of breadcrumb)
 - Demo: role switcher dropdown (right)
 - Production: user menu (avatar + name + role) + notifications bell (right)
+- Mobile: menu trigger and compact crest mark remain visible; the breadcrumb
+  moves into the drawer context
 
 ### Role Switcher (Demo only)
 

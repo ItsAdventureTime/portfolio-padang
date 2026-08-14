@@ -1,12 +1,15 @@
 [Unit]
 Description=Padang ERP Production PostgreSQL
 After=network-online.target bridge-ph-padang.network
+Requires=bridge-ph-padang.network
+RequiresMountsFor=/home/jk/bridge-ph/padang/postgres-data
 
 [Container]
-Image=docker.io/library/postgres:alpine
+Image=docker.io/library/postgres:18-alpine
 ContainerName=bridge-ph-padang-db
 Network=bridge-ph-padang.network
-Volume=/home/jk/bridge-ph/padang/postgres-data:/var/lib/postgresql/data:Z
+Volume=/home/jk/bridge-ph/padang/postgres-data:/var/lib/postgresql:Z
+Environment=PGDATA=/var/lib/postgresql/18/docker
 Environment=POSTGRES_DB=padang_prod
 Environment=POSTGRES_USER=padang_prod_user
 Environment=POSTGRES_PASSWORD_FILE=/run/secrets/db-password
@@ -15,10 +18,10 @@ HealthCmd=pg_isready -U padang_prod_user -d padang_prod
 HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
-Notify=healthy
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target

@@ -184,13 +184,15 @@ The minimum implementation gate for the current C1 foundation is:
   working;
 - `govulncheck ./...` when the scanner is installed in the Go container.
 
-The PostgreSQL fixture covers both supported legacy and versioned `PGDATA`
-layouts. It also supplies a fake `podman unshare` command to verify that state
-metadata, `PG_VERSION` discovery, and version reads use the rootless namespace
-when available, while preserving the direct-host fallback inside the
-disposable fixture container. An inaccessible namespace probe must fail closed;
-the deployment must never respond by deleting, moving, repairing, chowning, or
-upgrading persistent state.
+The PostgreSQL fixture covers clean state, the known-empty PostgreSQL 18
+`18/docker` scaffold, supported legacy and versioned `PGDATA` layouts,
+malformed/unsupported/ambiguous state, symlink and ownership failures, and
+partial non-empty state. It also supplies a fake `podman unshare` command to
+verify that state metadata, `PG_VERSION` discovery, and version reads use the
+rootless namespace when available, while preserving the direct-host fallback
+inside the disposable fixture container. An inaccessible namespace probe must
+fail closed; the deployment must never respond by deleting, moving, repairing,
+chowning, or upgrading persistent state.
 
 Example backend check:
 

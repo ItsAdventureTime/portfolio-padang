@@ -12,7 +12,7 @@ The public release gate is currently failing with HTTP 404; the full ERP
 workflow surface is not yet implemented.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 70e1967 (`fix(deploy): guard persistent demo PostgreSQL state`)
+LATEST IMPLEMENTATION COMMIT: 1734a39 (`fix Padang PostgreSQL scaffold guard and refine UX`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
@@ -154,6 +154,9 @@ The bounded frontend remediation is now implemented in the working tree:
   focus, closes on Escape/overlay/navigation, restores focus, hides/makes the
   page background inert, locks scroll, and prevents page-level horizontal
   overflow. Loading skeletons and drawer motion honor reduced-motion settings.
+- The compact mobile header keeps the Padang crest visible beside the menu
+  trigger; the focus-managed drawer continues to expose the full crest and
+  navigation.
 - The responsive shell keeps a 72px icon-only sidebar from 768px through
   1023px, then switches to the keyboard-safe drawer below 768px. Data tables
   become labeled cards on mobile so essential fields remain visible without
@@ -170,7 +173,7 @@ The active frontend branding now uses the exact repository-root source
 `/photo_2026-08-03_00-36-49.jpg`. `frontend/public/assets/padang-logo.jpg` is a
 byte-identical copy for static delivery; the original JPG remains the source of
 truth and is not removed. The shared JPG mark is visible in the desktop/tablet
-sidebar treatment, mobile drawer, login screen, production session gate, and
+ sidebar treatment, compact mobile header, mobile drawer, login screen, production session gate, and
 metadata/icon treatment. `frontend/public/assets/padang-logo.svg` remains only
 as a historical asset and is not used by new branding surfaces.
 
@@ -190,25 +193,36 @@ approval, payment, QBO, report-export, and full browser/axe verification are
 not implemented. The public route gate remains dependent on the unresolved
 deployment HTTP 404 state described above.
 
-## PostgreSQL Demo Startup Remediation (2026-08-14)
+## PostgreSQL Demo Startup Remediation (2026-08-15)
 
 The Luna deployment finding is addressed in the shared repository. The demo
 updater now prepares and validates the rootless persistent data directory,
-selects PostgreSQL 18 for clean state or the matching supported major from an
-existing `PG_VERSION`, and fails closed for unsupported, malformed, unreadable,
-non-empty-invalid, or ownership/permission-incompatible state. It never wipes
-or auto-upgrades data. The database identity record and post-start
-role/database/password check prevent persisted user/secret drift. DB Quadlets
-declare `RequiresMountsFor`, avoid `Notify=healthy`, and print service status,
-    journal, container state, and container logs on startup failure. Disposable
-    fixtures cover clean, compatible, unsupported-major, malformed, unreadable,
-    invalid non-empty, legacy/versioned layout, and rootless namespace
-    inspection state. Existing PostgreSQL metadata and `PG_VERSION` reads run
-    via `podman unshare`, so subordinate container UIDs do not make valid state
-    uninspectable; the direct-host path is fixture-only. The updater starts the application stack before
-    activating a newly changed Caddy route, so a failed service does not turn a
-    previously working public route into a new 502. Caddy route remediation
-    remains unchanged otherwise.
+selects PostgreSQL 18 for clean state or a provably empty `18/docker` scaffold,
+or the matching supported major from an existing root or versioned
+`PG_VERSION`, and fails closed for unsupported, malformed, unreadable,
+unknown/partial, ambiguous, symlinked, or ownership/permission-incompatible
+state. It never wipes or auto-upgrades data. The database identity record and
+post-start role/database/password check prevent persisted user/secret drift. DB
+Quadlets declare `RequiresMountsFor`, avoid `Notify=healthy`, and print service
+status, journal, container state, and container logs on startup failure.
+Disposable fixtures cover clean, known-empty scaffold, compatible,
+unsupported-major, malformed, unreadable, invalid non-empty,
+legacy/versioned-layout, symlink, ambiguous, and rootless namespace inspection
+state. Existing PostgreSQL metadata and `PG_VERSION` reads run via
+`podman unshare`, so subordinate container UIDs do not make valid state
+uninspectable; the direct-host path is fixture-only. The updater starts the
+application stack before activating a newly changed Caddy route, so a failed
+service does not turn a previously working public route into a new 502. Caddy
+route remediation remains unchanged otherwise. The operator error for an
+unknown non-empty root now includes read-only root/versioned-layout diagnostics
+and explicit preservation/recovery guidance; it never silently switches data
+roots.
+
+The final focused validation passed the PostgreSQL fixtures, shell syntax,
+offline-font check, TypeScript, ESLint, and browser checks for desktop/mobile
+branding, drawer navigation, and focus restoration. The public VPS data
+directory remains untouched until an operator inspects and reviews its unknown
+contents.
 
 ---
 

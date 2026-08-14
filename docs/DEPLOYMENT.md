@@ -745,21 +745,33 @@ journalctl --user -u padang-demo-db.service -n 120 --no-pager
 podman logs --tail 200 bridge-ph-padang-demo-db
 podman unshare stat -c '%F uid=%u mode=%a' -- /home/jk/bridge-ph/padang-demo/postgres-data
 podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
-  -maxdepth 3 -type f -name PG_VERSION -print
+  -maxdepth 4 -print
+podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
+  -maxdepth 4 -type f -name PG_VERSION -print
 podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
+podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/18/docker/PG_VERSION
 cat /home/jk/bridge-ph/padang-demo/config/db-user
 podman secret ls
 ```
 
-A supported existing major is selected from `PG_VERSION`; a clean directory
-uses PostgreSQL 18 and the official versioned `PGDATA` layout. If inspection
-fails through the rootless Podman namespace, treat that as an access or
-UID-mapping failure; malformed `PG_VERSION` and non-empty-invalid state are
-separate fail-closed diagnostics. Permission or ownership failures must be
-corrected by the VPS operator after confirming the directory is the intended
-demo data root. A major-version change requires a reviewed backup plus
-`pg_upgrade` or dump/restore into a separate target; it is never an automatic
-deployment step. See the official [PostgreSQL versioning
+A supported existing major is selected from a root `PG_VERSION` (legacy layout)
+or `<major>/docker/PG_VERSION` (the PostgreSQL 18+ versioned layout). A truly
+empty directory, or an empty directory containing only `18/docker`, uses
+PostgreSQL 18. The updater rejects an error such as:
+
+```text
+PostgreSQL persistent state is unsafe: /home/jk/bridge-ph/padang-demo/postgres-data is non-empty but has no valid PG_VERSION; refusing initialization
+```
+
+That message means the path contains unknown or partial state. Preserve it;
+do not delete, move, chmod, chown, repair, or initialize over it. If the
+directory is inaccessible through the rootless Podman namespace, treat that as
+an access or UID-mapping failure. Permission or ownership failures must be
+corrected by the VPS operator only after confirming the directory is the
+intended demo data root. Take and verify a backup/copy before a reviewed
+dump/restore or a separately chosen new data root. A major-version change
+requires a reviewed backup plus `pg_upgrade` or dump/restore into a separate
+target; it is never an automatic deployment step. See the official [PostgreSQL versioning
 policy](https://www.postgresql.org/support/versioning/) and [PostgreSQL
 Official Image](https://hub.docker.com/_/postgres) guidance.
 
@@ -871,6 +883,16 @@ systemctl --user start bridge-ph-padang-backup.timer
 curl --fail-with-body https://delegateops.business/padang
 curl --fail-with-body https://delegateops.business/padang/api/v1/health
 ```
+
+The production DB Quadlet uses the official `postgres:18-alpine` image with
+the parent mount `/var/lib/postgresql` and `PGDATA=/var/lib/postgresql/18/docker`.
+Before starting it, inspect the production root through `podman unshare` and
+confirm that any existing cluster has a supported `PG_VERSION` at the matching
+versioned path. A legacy root `PG_VERSION`, unknown non-empty state, or a
+missing/inaccessible version file is a migration blocker; preserve it and use
+a reviewed backup plus dump/restore or `pg_upgrade` rather than changing the
+Quadlet to force startup. This production template does not perform an
+automatic major migration.
 
 Before those production commands, provision the production Podman secrets with
 the interactive secret script, verify the production Backblaze key is limited

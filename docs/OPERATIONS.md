@@ -309,10 +309,12 @@ containers that it did not create.
 ### Demo PostgreSQL service fails or the public route returns 502
 
 The demo updater selects `postgres:18-alpine` for a clean data root and pins
-the matching supported major (14–18) when `postgres-data/PG_VERSION` already
-exists. It never wipes data or performs an in-place major upgrade. On failure,
-the updater prints the systemd status, user journal, container state, and last
-200 container log lines before exiting.
+the matching supported major (14–18) when a root `PG_VERSION` or versioned
+`<major>/docker/PG_VERSION` already exists. An empty root, or an empty root
+containing only the known `18/docker` directory scaffold, is also safe to
+initialize. It never wipes data or performs an in-place major upgrade. On
+failure, the updater prints the systemd status, user journal, container state,
+and last 200 container log lines before exiting.
 
 Inspect the same evidence manually when needed:
 
@@ -324,23 +326,33 @@ podman inspect bridge-ph-padang-demo-db \
 podman logs --tail 200 bridge-ph-padang-demo-db
 podman unshare stat -c '%F uid=%u mode=%a' -- /home/jk/bridge-ph/padang-demo/postgres-data
 podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
-  -maxdepth 3 -type f -name PG_VERSION -print
+  -maxdepth 4 -print
+podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
+  -maxdepth 4 -type f -name PG_VERSION -print
 podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
+podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/18/docker/PG_VERSION
 cat /home/jk/bridge-ph/padang-demo/config/db-user
 podman secret ls
 ```
+
+For `PostgreSQL persistent state is unsafe: ... is non-empty but has no valid
+PG_VERSION; refusing initialization`, preserve the path and use the read-only
+listing above to decide whether it is a valid legacy root, a valid
+`<major>/docker` cluster, or unknown/partial state. Unknown state requires a
+verified backup and reviewed recovery before another apply.
 
 The updater runs these PostgreSQL state checks through `podman unshare`, so
 files created by the rootless database container under subordinate UID mappings
 remain inspectable without changing ownership. The data root must be a real
 directory owned by the rootless Podman identity in that namespace, readable,
 writable, searchable, and usable by the database container. The updater refuses
-a malformed or unreadable `PG_VERSION`, an unsupported major, a non-empty
+a malformed or unreadable version file, an unsupported major, a non-empty
 directory without valid PostgreSQL state, or a database identity/secret
-mismatch. Do not delete `postgres-data` or change the image to an unversioned
-tag to recover. Preserve the directory, take/verify a backup, and perform a
-reviewed major migration with `pg_upgrade` or dump/restore into a separate
-target. Official references: [PostgreSQL versioning
+mismatch. The exact non-empty-state error means the directory contains unknown
+or partial files; preserve it and do not delete, move, chmod, chown, repair,
+initialize, or switch the image to an unversioned tag. Take/verify a backup,
+then use a reviewed major migration with `pg_upgrade` or dump/restore into a
+separate target. Official references: [PostgreSQL versioning
 policy](https://www.postgresql.org/support/versioning/), [PostgreSQL Official
 Image](https://hub.docker.com/_/postgres), and [Podman Quadlet
 units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html).

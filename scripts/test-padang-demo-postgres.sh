@@ -47,6 +47,19 @@ postgres_prepare_storage "$clean_state"
 [[ "$(postgres_image_for_state)" == docker.io/library/postgres:18-alpine ]] ||
   fail 'clean state image was not pinned to PostgreSQL 18'
 
+scaffold_state="$TEST_ROOT/known-empty-scaffold"
+mkdir -p "$scaffold_state/18/docker"
+postgres_prepare_storage "$scaffold_state"
+[[ "$POSTGRES_MAJOR" == 18 ]] || fail 'known-empty PG18 scaffold selected the wrong major'
+[[ "$POSTGRES_DATA_LAYOUT" == versioned ]] || fail 'known-empty PG18 scaffold was not versioned'
+[[ "$POSTGRES_DATA_EXISTS" == 0 ]] || fail 'known-empty PG18 scaffold was treated as an existing cluster'
+
+partial_scaffold="$TEST_ROOT/partial-scaffold"
+mkdir -p "$partial_scaffold/18/docker"
+printf 'partial\n' >"$partial_scaffold/18/docker/postmaster.opts"
+expect_failure 'partial PG18 scaffold' 'non-empty but has no valid PG_VERSION' \
+  postgres_prepare_storage "$partial_scaffold"
+
 compatible_state="$TEST_ROOT/compatible"
 mkdir -p "$compatible_state"
 printf '17\n' >"$compatible_state/PG_VERSION"
@@ -88,6 +101,19 @@ mkdir -p "$nonempty_state"
 printf 'left-by-operator\n' >"$nonempty_state/README"
 expect_failure 'nonempty malformed state' 'non-empty but has no valid PG_VERSION' \
   postgres_prepare_storage "$nonempty_state"
+
+symlink_state="$TEST_ROOT/symlink"
+mkdir -p "$TEST_ROOT/symlink-target/18/docker"
+ln -s "$TEST_ROOT/symlink-target" "$symlink_state"
+expect_failure 'symlink data root' 'symbolic link' \
+  postgres_prepare_storage "$symlink_state"
+
+ambiguous_state="$TEST_ROOT/ambiguous"
+mkdir -p "$ambiguous_state/18/docker" "$ambiguous_state/17/docker"
+printf '18\n' >"$ambiguous_state/18/docker/PG_VERSION"
+printf '17\n' >"$ambiguous_state/17/docker/PG_VERSION"
+expect_failure 'ambiguous versioned state' 'multiple or unexpected PG_VERSION' \
+  postgres_prepare_storage "$ambiguous_state"
 
 namespace_state="$TEST_ROOT/namespace aware"
 mkdir -p "$namespace_state/17/docker"
@@ -136,4 +162,4 @@ chmod +x "$inaccessible_bin/podman"
     postgres_prepare_storage "$inaccessible_state"
 )
 
-printf '%s\n' 'PostgreSQL clean, legacy/versioned compatible, mismatch, malformed, ownership, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'
+printf '%s\n' 'PostgreSQL clean, known-empty scaffold, legacy/versioned compatible, mismatch, malformed, ownership, symlink, ambiguous, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'

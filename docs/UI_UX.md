@@ -26,8 +26,9 @@
 > **Branding revision (2026-08-14):** The visible brand mark is the exact
 > `photo_2026-08-03_00-36-49.jpg` source at repository root. The frontend serves
 > its byte-identical copy at `frontend/public/assets/padang-logo.jpg` in the
-> desktop sidebar, tablet sidebar treatment, mobile drawer, login/session gate,
-> and metadata. The generic SVG is not an active replacement. Charcoal
+> desktop sidebar, tablet sidebar treatment, compact mobile header, mobile
+> drawer, login/session gate, and metadata. The generic SVG is not an active
+> replacement. Charcoal
 > navigation, warm metallic gold accents, restrained gold surfaces, and
 > accessible deep-gold text are shared across shell, controls, feedback, and
 > data states.
@@ -71,7 +72,8 @@
   warm ivory content background (`#FBFAF7`)
 - Logo asset: `frontend/public/assets/padang-logo.jpg`, copied byte-for-byte
   from the authoritative root JPG; the full crest remains visible on desktop
-  and in the drawer, with a compact crest crop at tablet width
+  and in the drawer, with compact crest crops in the tablet rail and mobile
+  header
 - Active item: restrained gold `2px` left border + light gold text (`#F6D88B`)
 - Hover: charcoal-gold tint background (`#3B301F`)
 - Collapse to 72px icon-only mode from 768px through 1023px; hide the rail and
@@ -293,7 +295,8 @@ Loading, error, unavailable, live-empty, search-empty, and demo-preview states
 use text plus `aria-live`/`role="alert"` where appropriate. Gold is reserved
 for brand context and attention; success, warning, info, and error states keep
 distinct semantic colors and labels so status is never conveyed by color alone.
-Short drawer, hover, and skeleton motion is CSS-local and disabled by
+Short drawer, content-entry, hover/pressed, and skeleton motion is CSS-local,
+uses transform/opacity rather than layout properties, and is disabled by
 `prefers-reduced-motion: reduce`, following the selective interaction boundary
 described in `docs/DESIGN_SYSTEM.md` and inspired by
 [SmoothUI](https://github.com/educlopez/smoothui). No SmoothUI runtime registry

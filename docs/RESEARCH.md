@@ -135,11 +135,13 @@ version for persistent state. PostgreSQL's official versioning policy
 supports each major for five years and recommends staying current on the minor
 release within that major. The current supported default is PostgreSQL 18.
 
-The updater therefore selects `postgres:18-alpine` for an empty demo data root,
-or the matching supported `postgres:<major>-alpine` image after reading an
-existing `PG_VERSION` (supported majors 14–18). It fails closed for an
-unsupported or malformed state, refuses ownership/permission mismatches for
-rootless storage, and never wipes or auto-upgrades a data directory. Because
+The updater therefore selects `postgres:18-alpine` for an empty demo data root
+or a provably empty `18/docker` scaffold, or the matching supported
+`postgres:<major>-alpine` image after reading an existing root or versioned
+`PG_VERSION` (supported majors 14–18). It fails closed for an unsupported,
+malformed, unknown/partial, or ambiguous state, refuses ownership/permission
+mismatches for rootless storage, and never wipes or auto-upgrades a data
+directory. Because
 PostgreSQL files may be owned by subordinate IDs inside a rootless Podman user
 namespace, the updater performs metadata, discovery, and version-file reads via
 `podman unshare`; the direct-host path exists only for the disposable fixture
@@ -147,6 +149,11 @@ container where Podman nesting is unavailable. PostgreSQL 18's official image
 uses versioned `PGDATA`; clean state uses
 `/var/lib/postgresql/18/docker`, while legacy data with `PG_VERSION` at the
 mount root retains the `/var/lib/postgresql/data` layout and matching major.
+An error reporting a non-empty root without `PG_VERSION` is an intentional
+preservation boundary: operators must inspect the root and versioned paths,
+verify a backup, and choose reviewed dump/restore or a separate target before
+retrying. It is never fixed by deleting the directory or changing to a
+floating image tag.
 
 The Quadlet DB unit declares `RequiresMountsFor` for persistent storage and
 does not use `Notify=healthy`; the updater waits for a network-only readiness

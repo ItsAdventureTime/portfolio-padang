@@ -63,6 +63,57 @@ postgres_state_failure() {
   return 1
 }
 
+postgres_print_recovery_hint() {
+  local data_dir="$1"
+
+  cat >&2 <<EOF
+Read-only recovery diagnostics for $data_dir:
+  podman unshare stat -c '%F uid=%u mode=%a' -- "$data_dir"
+  podman unshare find -P "$data_dir" -maxdepth 4 -print
+  podman unshare find -P "$data_dir" -maxdepth 4 -type f -name PG_VERSION -print
+  podman unshare cat -- "$data_dir/PG_VERSION"
+  podman unshare cat -- "$data_dir/18/docker/PG_VERSION"
+
+Preserve this directory. Do not delete, move, chmod, chown, repair, or
+major-upgrade unknown state. Verify a backup, then use a reviewed dump/restore
+or an explicitly chosen separate data root after identifying the state.
+EOF
+}
+
+postgres_state_failure_with_recovery() {
+  local data_dir="$1"
+  shift
+
+  postgres_state_failure "$*" || true
+  postgres_print_recovery_hint "$data_dir"
+  return 1
+}
+
+postgres_known_empty_versioned_scaffold() {
+  local data_dir="$1"
+  local major="$2"
+  local expected_major_dir="$data_dir/$major"
+  local expected_data_dir="$expected_major_dir/docker"
+  local entries entry
+  local entry_count=0
+
+  postgres_inspect test -d "$expected_major_dir" >/dev/null 2>&1 || return 1
+  postgres_inspect test ! -L "$expected_major_dir" >/dev/null 2>&1 || return 1
+  postgres_inspect test -d "$expected_data_dir" >/dev/null 2>&1 || return 1
+  postgres_inspect test ! -L "$expected_data_dir" >/dev/null 2>&1 || return 1
+
+  entries=$(postgres_inspect find -P "$data_dir" -mindepth 1 -maxdepth 3 -print 2>/dev/null) ||
+    return 1
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    ((entry_count += 1))
+    [[ "$entry" == "$expected_major_dir" ||
+      "$entry" == "$expected_data_dir" ]] || return 1
+  done <<<"$entries"
+
+  ((entry_count == 2))
+}
+
 postgres_prepare_storage() {
   local data_dir="$1"
   local create_allowed="${2:-1}"
@@ -86,11 +137,12 @@ postgres_prepare_storage() {
     fi
   fi
 
+  postgres_inspect test ! -L "$data_dir" >/dev/null 2>&1 ||
+    postgres_state_failure "$data_dir is a symbolic link; refusing to inspect redirected state" || return 1
+
   IFS='|' read -r data_type data_uid <<<"$data_metadata"
   [[ "$data_type" == 'directory' ]] ||
     postgres_state_failure "$data_dir is not a real directory" || return 1
-  postgres_inspect test ! -L "$data_dir" >/dev/null 2>&1 ||
-    postgres_state_failure "$data_dir is a symbolic link; refusing to inspect redirected state" || return 1
 
   expected_uid=$(postgres_inspect id -u 2>/dev/null) ||
     postgres_state_failure "could not determine the inspection UID through $inspection_context" || return 1
@@ -146,15 +198,28 @@ postgres_prepare_storage() {
     POSTGRES_DATA_EXISTS=1
     POSTGRES_STATE_VERSION_FILE="$version_file"
   else
-    local first_entry
-    first_entry=$(postgres_inspect find -P "$data_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ||
-      postgres_state_failure "could not inspect entries under $data_dir through $inspection_context; state may be inaccessible" || return 1
-    [[ -z "$first_entry" ]] ||
-      postgres_state_failure "$data_dir is non-empty but has no valid PG_VERSION; refusing initialization" || return 1
-    version="$POSTGRES_DEFAULT_MAJOR"
-    POSTGRES_DATA_LAYOUT=versioned
-    POSTGRES_DATA_EXISTS=0
-    POSTGRES_STATE_VERSION_FILE=
+    if ((nested_count > 1)); then
+      postgres_state_failure_with_recovery "$data_dir" \
+        "multiple or unexpected PG_VERSION files exist under $data_dir" || return 1
+    else
+      local first_entry
+      first_entry=$(postgres_inspect find -P "$data_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ||
+        postgres_state_failure "could not inspect entries under $data_dir through $inspection_context; state may be inaccessible" || return 1
+      if [[ -z "$first_entry" ]]; then
+        version="$POSTGRES_DEFAULT_MAJOR"
+        POSTGRES_DATA_LAYOUT=versioned
+        POSTGRES_DATA_EXISTS=0
+        POSTGRES_STATE_VERSION_FILE=
+      elif postgres_known_empty_versioned_scaffold "$data_dir" "$POSTGRES_DEFAULT_MAJOR"; then
+        version="$POSTGRES_DEFAULT_MAJOR"
+        POSTGRES_DATA_LAYOUT=versioned
+        POSTGRES_DATA_EXISTS=0
+        POSTGRES_STATE_VERSION_FILE=
+      else
+        postgres_state_failure_with_recovery "$data_dir" \
+          "$data_dir is non-empty but has no valid PG_VERSION; refusing initialization" || return 1
+      fi
+    fi
   fi
 
   postgres_major_supported "$version" ||
