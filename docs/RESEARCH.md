@@ -21,6 +21,7 @@ that the application has been built or validated.
 | Fonts/CSP | Self-host fonts with local Fontsource variable packages; keep the CSP policy same-origin and document any Next.js nonce work as implementation follow-up. |
 | Caddy | Preserve the frontend prefix with `handle`; strip only the external API prefix before proxying to the path-neutral API. Route order is explicit. |
 | Podman | Keep image channels floating, omit `AutoUpdate` from application Quadlets, and use the reviewed operator update wrapper while the automatic timer remains disabled. |
+| UI/accessibility | Use WCAG 2.2 as the acceptance baseline for keyboard operation, visible focus, target sizing, and status communication; use Next.js `usePathname` for client-side route state. |
 | Future mobile | TypeScript is supported by React Native; Expo/React Native is the future client direction behind the shared API/OpenAPI boundary. |
 | Security baseline | OWASP ASVS 5.0.0 is the verification baseline for implementation and review. |
 
@@ -31,7 +32,9 @@ Primary references:
 - [Next.js standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
 - [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting)
 - [Next.js fonts](https://nextjs.org/docs/app/getting-started/fonts)
+- [Next.js `usePathname`](https://nextjs.org/docs/app/api-reference/functions/use-pathname)
 - [Fontsource variable fonts](https://fontsource.org/docs/getting-started/variable)
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [Next.js CSP guidance](https://nextjs.org/docs/pages/guides/content-security-policy)
 - [Caddy `reverse_proxy`](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
 - [Caddy `route`](https://caddyserver.com/docs/caddyfile/directives/route)
