@@ -73,6 +73,60 @@ fi
 die() { printf 'padang-demo-remote: %s\n' "$*" >&2; exit 1; }
 log() { printf 'padang-demo-remote: %s\n' "$*"; }
 
+print_quadlet_generator_diagnostics() {
+  local unit="${1:-padang-demo-app.service}"
+  local generator="/usr/lib/systemd/system-generators/podman-system-generator"
+  printf 'padang-demo-remote: Quadlet generator diagnostics for %s\n' "$unit" >&2
+  printf 'padang-demo-remote: renderer mapping: %s/padang-demo-app.container -> padang-demo-app.service; ContainerName=bridge-ph-padang-demo-frontend is the Podman container name\n' "$QUADLET_DIR" >&2
+  printf 'padang-demo-remote: Quadlet files found under %s:\n' "$QUADLET_DIR" >&2
+  find "$QUADLET_DIR" -maxdepth 1 -type f \
+    \( -name '*.container' -o -name '*.network' -o -name '*.timer' \) \
+    -print >&2 || true
+  if [[ -x "$generator" ]]; then
+    printf 'padang-demo-remote: direct Podman generator dry-run for the nested Quadlet directory:\n' >&2
+    QUADLET_UNIT_DIRS="$QUADLET_DIR" "$generator" --user --dryrun >&2 || true
+  else
+    printf 'padang-demo-remote: Podman generator not found at %s\n' "$generator" >&2
+  fi
+  printf 'padang-demo-remote: generated Padang units visible to user systemd:\n' >&2
+  systemctl --user list-unit-files 'padang-demo-*' --no-legend >&2 || true
+  systemctl --user list-unit-files 'bridge-ph-padang-demo-*' --no-legend >&2 || true
+  if command -v podman >/dev/null 2>&1; then
+    podman quadlet list --noheading \
+      --format '{{.Name}} -> {{.UnitName}} ({{.Status}})' >&2 || true
+  fi
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze --user --generators=true verify "$unit" >&2 || true
+  fi
+}
+
+assert_quadlet_units_present() {
+  local unit state
+  local -a expected_units=(
+    "${INTERNAL_NETWORK}-network.service"
+    "${PROXY_NETWORK}-network.service"
+    padang-demo-db.service
+    padang-demo-migrate.service
+    padang-demo-api.service
+    padang-demo-app.service
+    padang-demo-reset.service
+    padang-demo-reset.timer
+  )
+  local -a missing_units=()
+
+  for unit in "${expected_units[@]}"; do
+    state=$(systemctl --user show "$unit" -p LoadState --value 2>/dev/null || true)
+    [[ "$state" == loaded ]] || missing_units+=("$unit (LoadState=${state:-unknown})")
+  done
+
+  if ((${#missing_units[@]})); then
+    printf 'padang-demo-remote: expected generated Quadlet units are missing:\n' >&2
+    printf '  %s\n' "${missing_units[@]}" >&2
+    print_quadlet_generator_diagnostics "${missing_units[0]%% (*}"
+    die "Quadlet generation failed; no application services were started"
+  fi
+}
+
 check_auto_update_timer() {
   local active_state enabled_state
   active_state=$(systemctl --user is-active podman-auto-update.timer 2>/dev/null || true)
@@ -536,8 +590,57 @@ EOF
   log "Caddy legacy, canonical, duplicate, inline/import, handler-only, idempotent, mount, and network fixtures passed"
 }
 
+run_quadlet_fixture_tests() {
+  local script_path="${BASH_SOURCE[0]}"
+  local template_path="$(cd "$(dirname "$script_path")/../quadlets/demo" && pwd -P)/bridge-ph-padang-demo-frontend.container"
+  grep -q 'quadlet_stage_dir/padang-demo-app\.container' "$script_path" || {
+    printf 'padang-demo-remote: dynamic renderer must emit padang-demo-app.container\n' >&2
+    return 1
+  }
+  if grep -q 'quadlet_stage_dir/bridge-ph-padang-demo-frontend\.container' "$script_path"; then
+    printf 'padang-demo-remote: dynamic renderer must not derive the systemd unit filename from ContainerName\n' >&2
+    return 1
+  fi
+  grep -q 'ContainerName=bridge-ph-padang-demo-frontend' "$script_path" || {
+    printf 'padang-demo-remote: dynamic renderer lost the frontend Podman container name\n' >&2
+    return 1
+  }
+  grep -q '^User=1000$' "$script_path" || {
+    printf 'padang-demo-remote: frontend Quadlet must use numeric User=1000\n' >&2
+    return 1
+  }
+  if grep -q '^User=node$' "$script_path"; then
+    printf 'padang-demo-remote: named Quadlet User=node must not be emitted\n' >&2
+    return 1
+  fi
+  grep -q 'assert_quadlet_units_present' "$script_path" || return 1
+  grep -q 'local generator="/usr/lib/systemd/system-generators/podman-system-generator"' "$script_path" || {
+    printf 'padang-demo-remote: Podman generator path is missing\n' >&2
+    return 1
+  }
+  grep -q 'QUADLET_UNIT_DIRS="\$QUADLET_DIR"' "$script_path" || {
+    printf 'padang-demo-remote: direct Podman generator dry-run diagnostic is missing\n' >&2
+    return 1
+  }
+  grep -q 'systemd-analyze --user --generators=true verify' "$script_path" || return 1
+  grep -q '^User=1000$' "$template_path" || {
+    printf 'padang-demo-remote: checked-in frontend template must use numeric User=1000\n' >&2
+    return 1
+  }
+  if grep -q '^User=node$' "$template_path"; then
+    printf 'padang-demo-remote: checked-in frontend template must not use User=node\n' >&2
+    return 1
+  fi
+  log "canonical renderer, frontend UID, and generated-unit preflight fixtures passed"
+}
+
 if [[ "${PADANG_CADDY_FIXTURE_TEST:-0}" == 1 ]]; then
   run_caddy_fixture_tests
+  exit 0
+fi
+
+if [[ "${PADANG_QUADLET_FIXTURE_TEST:-0}" == 1 ]]; then
+  run_quadlet_fixture_tests
   exit 0
 fi
 
@@ -884,7 +987,7 @@ Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 Environment=NEXT_PUBLIC_APP_ENV=demo
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
 Exec=node /app/server.js
-User=node
+User=1000
 HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo/ || exit 1
 HealthInterval=20s
 HealthTimeout=10s
@@ -1231,7 +1334,11 @@ verify_db_identity() {
 }
 
 start_stack() {
-  systemctl --user daemon-reload
+  if ! systemctl --user daemon-reload; then
+    print_quadlet_generator_diagnostics
+    die "user systemd daemon-reload failed; no application services were started"
+  fi
+  assert_quadlet_units_present
   systemctl --user start "${INTERNAL_NETWORK}-network.service" \
     "${PROXY_NETWORK}-network.service"
   if ! systemctl --user start padang-demo-db.service; then

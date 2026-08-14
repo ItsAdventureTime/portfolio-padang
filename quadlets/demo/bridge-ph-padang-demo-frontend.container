@@ -12,6 +12,7 @@ Environment=NODE_ENV=production
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 Environment=NEXT_PUBLIC_APP_ENV=demo
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
+User=1000
 HealthCmd=wget -q -O- http://localhost:3000/padang/demo || exit 1
 HealthInterval=20s
 HealthTimeout=10s

@@ -554,7 +554,10 @@ an undocumented placeholder table.
   apply while `podman-auto-update.timer` is active or enabled.
 - Padang demo Quadlets install under
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/`; persistent
-  state installs under `/home/jk/bridge-ph/padang-demo/`.
+  state installs under `/home/jk/bridge-ph/padang-demo/`. The renderer uses
+  the canonical `padang-demo-app.container` → `padang-demo-app.service`
+  mapping, numeric `User=1000` for the Node frontend, and verifies the
+  generated `padang-demo-*` units immediately after the user-manager reload.
 - The VPS generates and persists the database username in
   `config/db-user`, generates the database password directly into a Podman
   secret, and prompts interactively only for the two Backblaze B2 values.
@@ -563,6 +566,7 @@ an undocumented placeholder table.
   `/home/jk/.config/containers/systemd/caddy/caddy.container`; the staged
   Caddyfile is formatted and validated in disposable Caddy containers before
   replacement and graceful reload.
-- Current local validation: shell syntax, ShellCheck, Caddy format/validate,
-  and demo/production Quadlet generator checks pass. No VPS deployment was
-  performed.
+- Current local validation: shell syntax, Caddy format/validate,
+  frontend UID/generated-unit preflight fixtures, and demo/production Quadlet
+  generator checks pass. ShellCheck is not installed on the macOS control
+  plane. No VPS deployment was performed.

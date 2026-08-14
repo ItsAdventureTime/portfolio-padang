@@ -182,6 +182,13 @@ The minimum implementation gate for the current C1 foundation is:
   and health routes after a demo deployment; the default checker must pass all
   four URLs before a public release covering both environments is called
   working;
+- `bash scripts/test-padang-demo-quadlets.sh` must pass the frontend numeric
+  UID and generated-unit preflight fixtures. The deployment script must not
+  emit a named `User=node` value, and it must verify generated units after
+  `systemctl --user daemon-reload` before starting the stack. The fixture also
+  guards the canonical `padang-demo-app.container` →
+  `padang-demo-app.service` mapping, the nested Quadlet directory, the
+  `ContainerName`/systemd-unit distinction, and direct generator diagnostics;
 - `govulncheck ./...` when the scanner is installed in the Go container.
 
 The PostgreSQL fixture covers clean PostgreSQL 17 legacy state, a known-empty

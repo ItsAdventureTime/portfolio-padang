@@ -29,6 +29,19 @@ This runbook follows the current upstream model for the selected stack:
 - Quadlet `[Install]` relationships describe boot-time activation, but the
   updater explicitly starts generated units after `daemon-reload`; routine
   updates do not run `systemctl enable` on generated container services.
+- The updater verifies every expected generated network, container, and timer
+  unit immediately after `daemon-reload`, before starting PostgreSQL or the
+  application stack. A missing generated unit fails closed and prints the
+  Quadlet files, the direct Podman generator dry-run for the nested directory,
+  visible units, and `systemd-analyze` generator diagnostics.
+- The dynamic demo renderer writes `padang-demo-app.container`, which Quadlet
+  maps to `padang-demo-app.service`. `ContainerName=bridge-ph-padang-demo-
+  frontend` remains the Podman container name used by Caddy and does not name
+  the systemd unit.
+- Quadlet `User=` values are numeric container UIDs. The generated Next.js
+  service uses `User=1000`, matching the official Node image's unprivileged
+  `node` user; `User=node` is not emitted because current Quadlet parsing
+  rejects named values for this field.
 - PostgreSQL persistent state is handled as a compatibility boundary. A clean
   demo data root defaults to PostgreSQL 17; an existing
   `PG_VERSION` selects the matching supported `postgres:<major>-alpine` image.
@@ -270,6 +283,12 @@ WantedBy=default.target
 ### Frontend
 
 **`bridge-ph-padang-demo-frontend.container`**
+
+This checked-in file is a reference template. The live demo renderer writes
+`padang-demo-app.container` under the nested user Quadlet directory, producing
+`padang-demo-app.service`; its `ContainerName` remains the Caddy-facing Podman
+container name.
+
 ```ini
 [Unit]
 Description=Padang ERP Demo - Next.js Frontend
@@ -295,6 +314,7 @@ HealthCmd=wget -q -O- http://localhost:3000/padang/demo || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3
+User=1000
 
 [Service]
 Restart=always
@@ -682,7 +702,10 @@ The remote script:
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
   and container names use the `padang-demo` deployment identity and remain
-  separate from production;
+  separate from production. After reload, it verifies the generated
+  `padang-demo-*` services before starting any application service; a missing
+  unit prints the direct Podman generator dry-run and
+  `systemd-analyze --user --generators=true verify` diagnostics;
 - starts the database and waits for its health and identity checks, runs
   migrations, and passes API/frontend health gates before activating or
   reloading the Caddy route. This preserves the previous public route when an

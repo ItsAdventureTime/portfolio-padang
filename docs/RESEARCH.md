@@ -177,6 +177,38 @@ Primary references:
 - [PostgreSQL Official Image](https://hub.docker.com/_/postgres)
 - [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
 
+### Padang Quadlet Generation Refresh: Frontend Unit Failure (2026-08-15)
+
+The missing `padang-demo-app.service` was a generator failure, not a Caddy or
+PostgreSQL failure. The generated frontend Quadlet used `User=node`, while
+current Podman documentation defines the container `User=` field as a numeric
+UID. The runtime renderer now uses `User=1000`, matching the official Node
+image's documented unprivileged `node` UID, and the checked-in frontend
+template follows the same rule.
+
+The updater now reloads the user systemd manager and verifies the complete set
+of expected generated network, container, and timer units before starting the
+database. On a missing unit it prints the installed Quadlet files, visible
+units, `podman quadlet list`, a scoped
+`QUADLET_UNIT_DIRS=... /usr/lib/systemd/system-generators/podman-system-generator
+--user --dryrun` output, and the upstream-recommended
+`systemd-analyze --user --generators=true verify` diagnostic. This makes
+parser and generator failures fail closed before they can partially restart
+the demo.
+
+The current Podman search path supports recursive Quadlet discovery under the
+user search directory, so the existing `/home/jk/.config/containers/systemd/
+bridge-ph/padang-demo/` layout remains valid. The generated service name still
+comes from the rendered filename: `padang-demo-app.container` produces
+`padang-demo-app.service`, while the Podman container is intentionally named
+`bridge-ph-padang-demo-frontend` for the Caddy upstream.
+
+Primary references:
+
+- [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
+- [Podman Quadlet basic usage and generator diagnostics](https://docs.podman.io/en/latest/markdown/podman-quadlet-basic-usage.7.html)
+- [Official Node.js Docker image guidance](https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md)
+
 ### Luna Reviewer UI Audit Refresh (2026-08-14)
 
 The bounded UI remediation keeps the existing Next.js/React/CSS stack and

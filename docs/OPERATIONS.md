@@ -39,6 +39,31 @@ declare an auto-update policy; the update command is the controlled release
 boundary and refuses to apply while `podman-auto-update.timer` is active or
 enabled.
 
+If the updater reports `Unit padang-demo-app.service not found`, it is a
+Quadlet generation failure, not a frontend health failure. The updater now
+stops before starting the stack and prints the missing unit, Quadlet files,
+visible generated units, and the systemd generator diagnostic. The frontend
+Quadlet must keep a numeric `User=1000` value; the official Node image maps its
+unprivileged `node` user to UID 1000, while `User=node` is not valid for the
+current Quadlet field parser.
+
+For a direct VPS diagnostic, use:
+
+```bash
+systemctl --user daemon-reload
+QUADLET_UNIT_DIRS=/home/jk/.config/containers/systemd/bridge-ph/padang-demo \
+  /usr/lib/systemd/system-generators/podman-system-generator --user --dryrun
+systemd-analyze --user --generators=true verify padang-demo-app.service
+podman quadlet list --noheading
+systemctl --user list-unit-files 'padang-demo-*' --no-legend
+find /home/jk/.config/containers/systemd/bridge-ph/padang-demo \
+  -maxdepth 1 -type f -print
+```
+
+The expected mapping is `padang-demo-app.container` to
+`padang-demo-app.service`; `ContainerName=bridge-ph-padang-demo-frontend` is
+only the Podman container name.
+
 ### Health Check
 
 ```bash
