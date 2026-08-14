@@ -311,9 +311,9 @@ containers that it did not create.
 The demo updater selects `postgres:17-alpine` for a clean data root and pins
 the matching supported major (14–18) when a root `PG_VERSION` or versioned
 `<major>/docker/PG_VERSION` already exists. An empty root, or an empty root
-containing only a proven versioned scaffold from a previous image attempt, is
-also safe to initialize with the PostgreSQL 17 legacy layout. It never wipes
-data or performs an in-place major upgrade. On
+containing only a proven versioned scaffold from a previous image attempt,
+retains the versioned layout and initializes PostgreSQL 17 under `17/docker`.
+It never wipes data or performs an in-place major upgrade. On
 failure, the updater prints the systemd status, user journal, container state,
 and last 200 container log lines before exiting.
 

@@ -648,8 +648,8 @@ The remote script:
     directly into a Podman secret;
   - selects PostgreSQL 17 for a clean data root, or the matching supported
     major from existing `PG_VERSION`; a provably empty versioned scaffold from
-    a previous image attempt is treated as clean and initialized with the
-    PostgreSQL 17 legacy layout. It never auto-upgrades or wipes a data
+    a previous image attempt retains its versioned layout and initializes
+    PostgreSQL 17 under `17/docker`. It never auto-upgrades or wipes a data
     directory. A persisted database identity record and post-start SQL check
     keep the secret and database identity aligned;
 - prompts interactively only for the Backblaze B2 S3 key ID and application key
@@ -751,8 +751,8 @@ podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
 podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
   -maxdepth 4 -type f -name PG_VERSION -print
 podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
-  podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/17/docker/PG_VERSION
-  podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/18/docker/PG_VERSION
+podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/17/docker/PG_VERSION
+podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/18/docker/PG_VERSION
 cat /home/jk/bridge-ph/padang-demo/config/db-user
 podman secret ls
 ```
@@ -761,8 +761,9 @@ A supported existing major is selected from a root `PG_VERSION` (the default
 legacy layout) or `<major>/docker/PG_VERSION` (an explicitly opted-in
 versioned layout). A truly empty directory uses PostgreSQL 17 with
 `/var/lib/postgresql/data`. An empty directory containing only a proven
-versioned scaffold from a previous image attempt is also initialized with the
-PostgreSQL 17 legacy layout. The updater rejects an error such as:
+versioned scaffold from a previous image attempt retains the versioned layout
+and initializes PostgreSQL 17 under `17/docker`. The updater rejects an error
+such as:
 
 ```text
 PostgreSQL persistent state is unsafe: /home/jk/bridge-ph/padang-demo/postgres-data is non-empty but has no valid PG_VERSION; refusing initialization

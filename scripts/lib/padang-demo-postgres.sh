@@ -230,7 +230,7 @@ postgres_prepare_storage() {
         POSTGRES_STATE_VERSION_FILE=
       elif postgres_known_empty_versioned_scaffold_major "$data_dir" >/dev/null; then
         version="$POSTGRES_DEFAULT_MAJOR"
-        POSTGRES_DATA_LAYOUT=legacy
+        POSTGRES_DATA_LAYOUT=versioned
         POSTGRES_DATA_EXISTS=0
         POSTGRES_STATE_VERSION_FILE=
       else

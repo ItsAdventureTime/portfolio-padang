@@ -225,6 +225,22 @@ branding, drawer navigation, and focus restoration. The public VPS data
 directory remains untouched until an operator inspects and reviews its unknown
 contents.
 
+## PostgreSQL 17 Scaffold Startup Correction (2026-08-15)
+
+The first PostgreSQL 17 deployment attempt exposed a compatibility gap: the
+known-empty `18/docker` scaffold was safely recognized but was mounted as
+legacy `/var/lib/postgresql/data`, so `initdb` rejected the non-empty root.
+The selector now retains the proven versioned layout for that case and renders
+`/var/lib/postgresql` with `PGDATA=/var/lib/postgresql/17/docker`. The old
+scaffold is not deleted, moved, repaired, or upgraded. Truly empty roots still
+use the PostgreSQL 17 legacy layout, and existing `PG_VERSION` state continues
+to determine the matching major and layout.
+
+Validation includes the focused fixtures, shell syntax, and an actual
+disposable `postgres:17-alpine` startup with an empty `18/docker` scaffold;
+the new `17/docker/PG_VERSION` was created while the prior scaffold remained
+in place. The VPS persistent directory was not modified during local testing.
+
 ---
 
 ## Specification Overview & Architectural Decisions

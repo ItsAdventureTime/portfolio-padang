@@ -151,7 +151,7 @@ namespace, the updater performs metadata, discovery, and version-file reads via
 container where Podman nesting is unavailable. PostgreSQL 17 clean state uses
 `/var/lib/postgresql/data`; an existing versioned layout is retained only when
 its `PG_VERSION` proves that layout and major. A known-empty versioned scaffold
-is initialized using the PostgreSQL 17 legacy layout.
+retains its versioned layout and initializes PostgreSQL 17 under `17/docker`.
 An error reporting a non-empty root without `PG_VERSION` is an intentional
 preservation boundary: operators must inspect the root and versioned paths,
 verify a backup, and choose reviewed dump/restore or a separate target before

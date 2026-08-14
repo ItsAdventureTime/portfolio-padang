@@ -53,9 +53,10 @@ scaffold_state="$TEST_ROOT/known-empty-scaffold"
 mkdir -p "$scaffold_state/18/docker"
 postgres_prepare_storage "$scaffold_state"
 [[ "$POSTGRES_MAJOR" == 17 ]] || fail 'known-empty scaffold did not select PostgreSQL 17'
-[[ "$POSTGRES_DATA_LAYOUT" == legacy ]] || fail 'known-empty scaffold was not converted to legacy PGDATA'
-[[ "$POSTGRES_PGDATA" == /var/lib/postgresql/data ]] || fail 'known-empty scaffold PGDATA was incorrect'
+[[ "$POSTGRES_DATA_LAYOUT" == versioned ]] || fail 'known-empty scaffold did not retain versioned layout'
+[[ "$POSTGRES_PGDATA" == /var/lib/postgresql/17/docker ]] || fail 'known-empty scaffold PGDATA was incorrect'
 [[ "$POSTGRES_DATA_EXISTS" == 0 ]] || fail 'known-empty scaffold was treated as an existing cluster'
+[[ "$POSTGRES_DATA_VOLUME" == "$scaffold_state:/var/lib/postgresql:Z" ]] || fail 'known-empty scaffold volume was incorrect'
 
 partial_scaffold="$TEST_ROOT/partial-scaffold"
 mkdir -p "$partial_scaffold/18/docker"
@@ -165,4 +166,4 @@ chmod +x "$inaccessible_bin/podman"
     postgres_prepare_storage "$inaccessible_state"
 )
 
-printf '%s\n' 'PostgreSQL 17 clean, known-empty scaffold, legacy/versioned compatible, mismatch, malformed, ownership, symlink, ambiguous, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'
+printf '%s\n' 'PostgreSQL 17 clean, known-empty versioned scaffold, legacy/versioned compatible, mismatch, malformed, ownership, symlink, ambiguous, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'
