@@ -9,6 +9,7 @@ import { useDemoRole } from '@/lib/demo-role-context';
 export type ModuleKey = 'projects' | 'fabrication' | 'procurement' | 'inventory' | 'billing' | 'finance' | 'reports' | 'settings';
 type Row = Record<string, string | number | null | undefined>;
 type ModuleConfig = { title: string; description: string; eyebrow: string; endpoint?: string; columns: Array<[string, string]>; fallback: Row[]; cards: Array<[string, string, string]> };
+type RequestState = 'preview' | 'loading' | 'live' | 'error';
 
 const modules: Record<ModuleKey, ModuleConfig> = {
   projects: {
@@ -62,21 +63,39 @@ function displayValue(value: Row[string]) {
   return String(value).replaceAll('_', ' ');
 }
 
+function readRows(payload: unknown): Row[] {
+  if (typeof payload !== 'object' || payload === null ||
+    !Array.isArray((payload as { data?: unknown }).data) ||
+    !(payload as { data: unknown[] }).data.every((row) =>
+      typeof row === 'object' && row !== null && !Array.isArray(row))) {
+    throw new Error('The API returned an invalid register response.');
+  }
+  return (payload as { data: Row[] }).data;
+}
+
 export function ModuleWorkspace({ module }: { module: ModuleKey }) {
   const config = modules[module];
   const { role } = useDemoRole();
   const [rows, setRows] = useState<Row[]>(config.fallback);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(Boolean(config.endpoint));
+  const [requestState, setRequestState] = useState<RequestState>(config.endpoint ? 'loading' : 'preview');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (!config.endpoint) return;
     let active = true;
-    apiFetch<{ data: Row[] }>(config.endpoint).then((payload) => {
-      if (active && payload.data.length > 0) setRows(payload.data);
-    }).catch(() => undefined).finally(() => active && setLoading(false));
+    apiFetch<unknown>(config.endpoint).then((payload) => {
+      if (!active) return;
+      setRows(readRows(payload));
+      setRequestState('live');
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setRows(config.fallback);
+      setRequestState('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Live data could not be loaded.');
+    });
     return () => { active = false; };
-  }, [config.endpoint, role]);
+  }, [config, role]);
 
   const filtered = useMemo(() => {
     const normalized = query.toLowerCase().trim();
@@ -84,10 +103,19 @@ export function ModuleWorkspace({ module }: { module: ModuleKey }) {
     return rows.filter((row) => Object.values(row).some((value) => String(value ?? '').toLowerCase().includes(normalized)));
   }, [query, rows]);
 
+  const statusCopy = requestState === 'live'
+    ? `${filtered.length} live records in this view.`
+    : requestState === 'loading'
+      ? 'Loading live data; sample rows are shown temporarily.'
+      : requestState === 'error'
+        ? 'Live data is unavailable; showing sample rows.'
+        : 'Sample rows for this foundation preview.';
+
   return <main className="content module-content">
     <div className="module-breadcrumb"><Link href="/">Workspace</Link><ChevronRight size={14} /><span>{config.title}</span></div>
     <section className="page-heading"><div><div className="eyebrow">{config.eyebrow}</div><h1 className="page-title">{config.title}</h1><p className="page-copy">{config.description}</p></div><button className="primary-button" type="button" disabled title="Record creation is not available in this foundation preview"><Plus size={15} /> New record <span className="sr-only">(coming soon)</span></button></section>
+    <div className={`data-status ${requestState === 'error' ? 'data-status-error' : ''}`} role={requestState === 'error' ? 'alert' : 'status'} aria-live="polite"><strong>{requestState === 'live' ? 'Live API data' : 'Foundation preview'}</strong><span>{statusCopy}</span>{errorMessage && <span className="sr-only"> Reason: {errorMessage}</span>}</div>
     <section className="stats-grid" aria-label={`${config.title} summary`}>{config.cards.map(([value, label, meta]) => <article className="stat-card" key={label}><div className="stat-label">{label}</div><div className="stat-value">{value}</div><div className="stat-meta stat-meta-muted">{meta}</div></article>)}</section>
-    <section className="panel" style={{ marginTop: 16 }}><div className="panel-header"><div><h2 className="panel-title">{config.title} register</h2><p className="panel-subtitle">{loading ? 'Syncing the demo dataset…' : `${filtered.length} records in this view`}</p></div><label className="search-field"><Search size={15} /><span className="sr-only">Search {config.title}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search records" /></label></div><div className="table-wrap"><table className="data-table"><thead><tr>{config.columns.map(([, label]) => <th key={label}>{label}</th>)}<th><span className="sr-only">Open</span></th></tr></thead><tbody>{filtered.map((row, index) => <tr key={String(row[config.columns[0][0]] ?? index)}>{config.columns.map(([key]) => <td key={key} className={key.includes('amount') || key.includes('price') || key.includes('cost') ? 'font-mono' : ''}>{displayValue(row[key])}</td>)}<td><button className="icon-button" type="button" disabled aria-label="Open record (coming soon)" title="Record details are not available in this foundation preview"><ArrowUpRight aria-hidden="true" size={15} /></button></td></tr>)}</tbody></table></div>{filtered.length === 0 && <div className="empty-state">No records match your search.</div>}</section>
+    <section className="panel" style={{ marginTop: 16 }} aria-busy={requestState === 'loading'}><div className="panel-header"><div><h2 className="panel-title">{config.title} register</h2><p className="panel-subtitle">{statusCopy}</p></div><label className="search-field"><Search size={15} /><span className="sr-only">Search {config.title}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search records" /></label></div><div className="table-wrap"><table className="data-table"><caption className="sr-only">{config.title} register</caption><thead><tr>{config.columns.map(([, label]) => <th key={label} scope="col">{label}</th>)}<th scope="col"><span className="sr-only">Open</span></th></tr></thead><tbody>{filtered.map((row, index) => <tr key={String(row[config.columns[0][0]] ?? index)}>{config.columns.map(([key]) => <td key={key} className={key.includes('amount') || key.includes('price') || key.includes('cost') ? 'font-mono' : ''}>{displayValue(row[key])}</td>)}<td><button className="icon-button" type="button" disabled aria-label="Open record (coming soon)" title="Record details are not available in this foundation preview"><ArrowUpRight aria-hidden="true" size={15} /></button></td></tr>)}</tbody></table></div>{filtered.length === 0 && <div className="empty-state">No records match your search.</div>}</section>
   </main>;
 }

@@ -285,6 +285,8 @@ build_backend() {
   log "testing and compiling backend in disposable golang:alpine"
   podman run --rm --userns=keep-id \
     --tmpfs /tmp:rw,nosuid,size=2g \
+    -e GOMAXPROCS=2 \
+    -e GOMEMLIMIT=1GiB \
     -e GOCACHE=/tmp/go-build \
     -e GOMODCACHE=/tmp/go-mod \
     -e GOPATH=/tmp/go \

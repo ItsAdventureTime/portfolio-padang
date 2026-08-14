@@ -568,8 +568,9 @@ systemctl --user start bridge-ph-padang-backup.timer
 
 Use `scripts/update-padang-demo.sh` for the deployed demo. It is the
 idempotent operator path: source sync → disposable-container validation/build
-→ migration run → API/frontend restart → health check. Do not manually stop
-and start the demo API/frontend for a normal source update, because `start`
+→ migration run → API/frontend restart → page and API health checks. Do not
+manually stop and start the demo API/frontend for a normal source update,
+because `start`
 does not replace an already-running process.
 
 The updater does not enable `podman-auto-update.timer`; application Quadlets do
@@ -647,9 +648,10 @@ The remote script:
 - runs migrations, preserves the existing demo database by default, and starts
   the 30-minute reset timer; `--seed-demo` is required for an intentional
   destructive reseed; and
-- makes only the required Caddy network and `/padang/demo/api/*` route changes,
-  stages the Caddyfile, formats it with `caddy fmt --overwrite`, validates it
-  with `caddy validate`, then atomically replaces it after a timestamped backup;
+- makes only the required Caddy network and `/padang/demo/*` page/API route
+  changes, stages the Caddyfile, formats it with `caddy fmt --overwrite`,
+  validates it with `caddy validate`, then atomically replaces it after a
+  timestamped backup;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
   `podman run --rm`, with a systemd restart fallback. The database Quadlet reports
   readiness only after its healthcheck passes, so migrations do not race a
@@ -699,7 +701,7 @@ startup occur on the VPS.
 
 ```bash
 # 1. Normal update: sync current source, test/build on the VPS, apply
-#    migrations, restart API/frontend, and verify the public health endpoint.
+#    migrations, restart API/frontend, and verify the public page and API.
 #    Defaults to jk@216.75.75.136:22; no environment variables needed.
 scripts/update-padang-demo.sh
 
@@ -728,10 +730,11 @@ retrying an update; see the public-route troubleshooting section in
 `docs/OPERATIONS.md`.
 
 If the deployment is intentionally pointed at a different SSH endpoint, pass
-the matching public health URL or explicitly skip the public check:
+the matching public page and health URLs or explicitly skip the public check:
 
 ```bash
 scripts/update-padang-demo.sh --host OTHER_HOST --user jk --port 22 \
+  --public-url https://delegateops.business/padang/demo \
   --health-url https://delegateops.business/padang/demo/api/v1/health
 # Or, only when the public route is intentionally unavailable:
 scripts/update-padang-demo.sh --host OTHER_HOST --user jk --port 22 \
@@ -749,9 +752,9 @@ Routine updates do not reseed data. The VPS-side script restarts the migration,
 API, and frontend units so bind-mounted build artifacts are actually loaded;
 `systemctl start` alone would leave an already-running API/frontend on its old
 process. It also reloads and starts the generated reset timer explicitly; it
-does not enable generated units during a routine update. It performs a public
-health check after apply. Use `--skip-health-check` only when DNS/TLS is
-intentionally unavailable during maintenance.
+does not enable generated units during a routine update. It performs public
+page and API health checks after apply. Use `--skip-health-check` only when
+DNS/TLS is intentionally unavailable during maintenance.
 
 After an update, inspect the demo from the VPS if the public health check fails:
 

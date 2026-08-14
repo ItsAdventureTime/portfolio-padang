@@ -50,6 +50,10 @@ and removes its pod when you press Ctrl-C. It is a foundation preview: the
 current module screens are read-only registers, not the completed ERP CRUD and
 approval workflows.
 
+If the helper reports an OOM-killed frontend, increase available Podman VM
+memory or pause unrelated containers before retrying; it never stops containers
+that it did not create.
+
 ## Update the Deployed Demo
 
 From the repository root on macOS, run:
@@ -59,10 +63,11 @@ scripts/update-padang-demo.sh
 ```
 
 The command uses `jk@216.75.75.136:22` by default, preserves demo data, and
-checks `https://delegateops.business/padang/demo/api/v1/health` after an
-apply. Use `--dry-run` to validate without changing Quadlets, secrets, Caddy,
-or runtime data. Use `--seed-demo` only when an intentional synthetic-data
-reset is required. After a successful apply, check both environments with
+checks both `https://delegateops.business/padang/demo` and
+`https://delegateops.business/padang/demo/api/v1/health` after an apply. Use
+`--dry-run` to validate without changing Quadlets, secrets, Caddy, or runtime
+data. Use `--seed-demo` only when an intentional synthetic-data reset is
+required. After a successful apply, check both environments with
 `scripts/check-padang-public-routes.sh`. See `docs/DEPLOYMENT.md` for the full
 runbook.
 

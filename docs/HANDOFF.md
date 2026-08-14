@@ -91,12 +91,39 @@ marks unfinished controls as disabled/read-only. The public route matrix,
 complete ERP workflows, and live browser accessibility verification remain
 release blockers.
 
-The focused container run passed `npm ci`, the offline-font check, and
-TypeScript after these frontend changes. Lint/build retries were killed with
-exit 137 by the shared 2 GiB Podman VM while unrelated containers were using
-memory; rerun those gates with more VM headroom before release. The prior
-offline-font implementation build passed in a disposable `node:lts-alpine`
-container before this bounded UI pass.
+The initial focused container run passed `npm ci`, the offline-font check, and
+TypeScript after these frontend changes; its first lint/build retry was killed
+with exit 137 by the shared 2 GiB Podman VM while unrelated containers were
+using memory. The follow-up gates now pass in a disposable `node:lts-alpine`
+container; the remaining local-helper resource limitation is recorded below.
+
+## Follow-up Remediation (2026-08-14)
+
+The bounded follow-up corrected the remaining misleading and fragile paths:
+
+- module registers validate API response shape and distinguish live API rows,
+  sample preview rows, loading state, and API failure instead of silently
+  presenting fallback data as healthy live data;
+- dashboard and register tables now expose captions/column scopes, and the
+  responsive panel header/status treatment remains usable at narrow widths;
+- the normal demo updater now checks both the demo page and demo API health
+  after apply, with `--public-url` and `--health-url` overrides for custom
+  endpoints;
+- the no-environment-variable local helper validates port ranges, avoids the
+  Podman pod/user-namespace incompatibility, bounds container memory, waits for
+  both services, and reports early container exit/OOM diagnostics.
+
+Validation in disposable Podman containers now passes the backend
+`go test -p 1 ./...`, `go vet -p 1 ./...`, `go mod verify`, and static build;
+the frontend `npm ci`, offline-font check, typecheck, lint, and Webpack builds
+for both `/padang/demo` and `/padang`; shell syntax; and Caddy insertion
+fixtures. The local helper reaches the
+Next.js ready state but the shared 2 GiB VM OOM-kills its frontend while other
+containers are active, so the local end-to-end helper run remains unverified
+until additional VM headroom is available. A compiled runtime smoke attempt was
+also SIGKILL/OOM-killed by that shared VM before serving; the in-app browser
+session remains client-blocked. The public four-route gate remains HTTP 404 at
+both BunnyCDN and direct Caddy origin.
 
 ---
 

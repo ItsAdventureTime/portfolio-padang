@@ -147,8 +147,9 @@ The minimum implementation gate for the current C1 foundation is:
 - both demo and production frontend builds, with `--webpack` when the local
   Podman VM cannot sustain Turbopack;
 - clean PostgreSQL migration up and down against `postgres:alpine`;
-- `bash -n` for operational scripts, `scripts/check-padang-public-routes.sh
-  --help`, and `git diff --check`;
+- `bash -n` for operational scripts, the deployment/local helper `--help`
+  commands, `scripts/check-padang-public-routes.sh --help`, and
+  `git diff --check`;
 - `scripts/check-padang-public-routes.sh` must pass all four URLs before a
   public release is called working;
 - `govulncheck ./...` when the scanner is installed in the Go container.

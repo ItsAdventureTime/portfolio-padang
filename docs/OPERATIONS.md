@@ -20,12 +20,12 @@ scripts/update-padang-demo.sh
 This is the normal update path. It synchronizes the current source to the VPS,
 runs the Go and Next.js checks/builds inside disposable Podman containers,
 applies pending migrations, restarts the demo API/frontend Quadlet services,
-and verifies `https://delegateops.business/padang/demo/api/v1/health`.
+and verifies both the demo page and
+`https://delegateops.business/padang/demo/api/v1/health`.
 It defaults to `jk@216.75.75.136:22`, so no environment variables are needed.
 Use `--host`, `--user`, or `--port` only if the SSH endpoint differs.
-For a non-default endpoint, also pass `--health-url` for the matching public
-demo API health URL, or use `--skip-health-check` during intentional DNS/TLS
-maintenance.
+For a non-default endpoint, pass matching `--public-url` and `--health-url`
+values, or use `--skip-health-check` during intentional DNS/TLS maintenance.
 
 Use `scripts/update-padang-demo.sh --dry-run` to synchronize and build without
 changing Quadlets, secrets, Caddy, or runtime data. Normal updates preserve the
@@ -286,6 +286,11 @@ It starts a no-credential demo API and Next.js dev server in Podman, then
 prints the local page and health URLs. It intentionally does not exercise
 PostgreSQL-backed persistence, production OTP authentication, Backblaze B2,
 or the incomplete ERP workflows.
+
+If it reports that the frontend was OOM-killed, the Podman VM does not have
+enough headroom for the Next.js dev server and its dependency install. Increase
+the VM memory or pause unrelated containers, then retry; the helper never stops
+containers that it did not create.
 
 ### API container not starting
 

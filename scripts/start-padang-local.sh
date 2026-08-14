@@ -14,7 +14,7 @@ usage() {
 Usage: start-padang-local.sh [--web-port PORT] [--api-port PORT]
 
 Starts an ephemeral demo API and Next.js frontend in Podman.
-Open http://127.0.0.1:3000/padang/demo after startup.
+Open http://127.0.0.1:<web-port>/padang/demo after startup.
 Press Ctrl-C to stop and remove the local containers.
 USAGE
 }
@@ -44,11 +44,15 @@ while (($#)); do
 done
 
 for port in "$WEB_PORT" "$API_PORT"; do
-  [[ "$port" =~ ^[1-9][0-9]{2,4}$ ]] || {
+  [[ "$port" =~ ^[1-9][0-9]{0,4}$ ]] && ((10#$port <= 65535)) || {
     printf 'Invalid port: %s\n' "$port" >&2
     exit 2
   }
 done
+[[ "$WEB_PORT" != "$API_PORT" ]] || {
+  printf '%s\n' 'Web and API ports must be different' >&2
+  exit 2
+}
 
 command -v podman >/dev/null 2>&1 || {
   printf '%s\n' 'Podman is required' >&2
@@ -80,31 +84,13 @@ trap cleanup EXIT INT TERM
 
 podman pod create --name "$POD_NAME" --publish "$WEB_PORT:3000" --publish "$API_PORT:8080" >/dev/null
 
-podman run --detach --name "$API_NAME" --pod "$POD_NAME" \
-  --userns=keep-id --tmpfs /tmp:rw,nosuid,size=2g \
-  --env APP_ENV=demo --env EMAIL_PROVIDER=log --env HTTP_ADDR=:8080 \
-  --env GOCACHE=/tmp/go-build --env GOMODCACHE=/tmp/go-mod \
-  --volume "$REPO_ROOT/backend:/src:ro,Z" --workdir /src \
-  docker.io/library/golang:alpine sh -ec \
-  'go run ./cmd/api' >/dev/null
-
-printf 'Waiting for the demo API...\n'
-for ((attempt = 1; attempt <= 30; attempt++)); do
-  if curl --silent --fail --max-time 2 "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null; then
-    break
-  fi
-  if ((attempt == 30)); then
-    podman logs "$API_NAME" >&2 || true
-    printf '%s\n' 'The local demo API did not become healthy.' >&2
-    exit 1
-  fi
-  sleep 1
-done
-
 podman run --detach --name "$FRONTEND_NAME" --pod "$POD_NAME" \
-  --userns=keep-id --tmpfs /tmp:rw,nosuid,size=2g \
+  --memory=1g --memory-swap=1g \
+  --tmpfs /tmp:rw,nosuid,size=2g \
   --env HOME=/tmp/npm-home --env NPM_CONFIG_CACHE=/tmp/npm-cache \
   --env NPM_CONFIG_USERCONFIG=/tmp/npm-config/npmrc \
+  --env NODE_OPTIONS=--max-old-space-size=512 \
+  --env NEXT_TELEMETRY_DISABLED=1 \
   --env NEXT_PUBLIC_APP_ENV=demo \
   --env NEXT_PUBLIC_BASE_PATH=/padang/demo \
   --env NEXT_PUBLIC_API_ORIGIN="http://127.0.0.1:$API_PORT" \
@@ -114,10 +100,61 @@ podman run --detach --name "$FRONTEND_NAME" --pod "$POD_NAME" \
     cd /tmp/padang-frontend
     npm ci --ignore-scripts --no-audit --no-fund
     npm run check:offline-fonts
-    npm run dev -- --hostname 0.0.0.0
+    npm run dev -- --hostname 0.0.0.0 --webpack
   ' >/dev/null
 
-printf '%s\n' 'Padang local demo is starting.'
+printf 'Waiting for the local frontend on port %s...\n' "$WEB_PORT"
+for ((attempt = 1; attempt <= 90; attempt++)); do
+  if curl --silent --fail --location --max-time 2 \
+    "http://127.0.0.1:$WEB_PORT/padang/demo" >/dev/null; then
+    break
+  fi
+  frontend_state=$(podman inspect --format '{{.State.Status}}' "$FRONTEND_NAME" 2>/dev/null || true)
+  if [[ "$frontend_state" == exited || "$frontend_state" == stopped || -z "$frontend_state" ]]; then
+    podman logs "$FRONTEND_NAME" >&2 || true
+    printf 'The local frontend exited before becoming ready (state: %s).\n' \
+      "${frontend_state:-missing}" >&2
+    exit 1
+  fi
+  if ((attempt == 90)); then
+    podman logs "$FRONTEND_NAME" >&2 || true
+    printf '%s\n' 'The local frontend did not become ready.' >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+podman run --detach --name "$API_NAME" --pod "$POD_NAME" \
+  --memory=1g --memory-swap=1g \
+  --tmpfs /tmp:rw,nosuid,size=2g \
+  --env APP_ENV=demo --env EMAIL_PROVIDER=log --env HTTP_ADDR=:8080 \
+  --env GOMAXPROCS=2 --env GOMEMLIMIT=768MiB \
+  --env GOCACHE=/tmp/go-build --env GOMODCACHE=/tmp/go-mod \
+  --volume "$REPO_ROOT/backend:/src:ro,Z" --workdir /src \
+  docker.io/library/golang:alpine sh -ec \
+  'go run ./cmd/api' >/dev/null
+
+printf 'Waiting for the demo API...\n'
+for ((attempt = 1; attempt <= 45; attempt++)); do
+  if curl --silent --fail --max-time 2 "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null; then
+    break
+  fi
+  api_state=$(podman inspect --format '{{.State.Status}}' "$API_NAME" 2>/dev/null || true)
+  if [[ "$api_state" == exited || "$api_state" == stopped || -z "$api_state" ]]; then
+    podman logs "$API_NAME" >&2 || true
+    printf 'The local demo API exited before becoming healthy (state: %s).\n' \
+      "${api_state:-missing}" >&2
+    exit 1
+  fi
+  if ((attempt == 45)); then
+    podman logs "$API_NAME" >&2 || true
+    printf '%s\n' 'The local demo API did not become healthy.' >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+printf '%s\n' 'Padang local demo is ready.'
 printf '  Web:    http://127.0.0.1:%s/padang/demo\n' "$WEB_PORT"
 printf '  Health: http://127.0.0.1:%s/api/v1/health\n' "$API_PORT"
 printf '%s\n' 'Press Ctrl-C to stop the ephemeral Podman pod.'
