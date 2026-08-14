@@ -12,7 +12,7 @@ The public release gate is currently failing with HTTP 404; the full ERP
 workflow surface is not yet implemented.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 8f482aa (`fix(frontend): make font builds offline-safe`)
+LATEST IMPLEMENTATION COMMIT: 3fb9021 (`fix(ux): make foundation preview honest and testable`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
@@ -90,6 +90,13 @@ basePath-aware active navigation and direct API-origin URL construction, and
 marks unfinished controls as disabled/read-only. The public route matrix,
 complete ERP workflows, and live browser accessibility verification remain
 release blockers.
+
+The focused container run passed `npm ci`, the offline-font check, and
+TypeScript after these frontend changes. Lint/build retries were killed with
+exit 137 by the shared 2 GiB Podman VM while unrelated containers were using
+memory; rerun those gates with more VM headroom before release. The prior
+offline-font implementation build passed in a disposable `node:lts-alpine`
+container before this bounded UI pass.
 
 ---
 
