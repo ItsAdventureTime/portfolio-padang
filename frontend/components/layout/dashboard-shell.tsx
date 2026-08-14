@@ -1,11 +1,11 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Boxes, BriefcaseBusiness, CheckCircle2, ChevronRight, ClipboardList, CreditCard, FileBarChart, Hammer, LayoutDashboard, LogOut, Menu, PackageCheck, Settings, X } from 'lucide-react';
 import { ProductionSessionGuard } from '@/components/auth/session-guard';
+import { PadangLogo } from '@/components/brand/padang-brand';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { apiFetch, logout } from '@/lib/api-client';
 import { demoCanAccess, demoPermissions, demoRoleLabel, demoRoles } from '@/lib/demo-role';
@@ -43,8 +43,7 @@ function Navigation({ role, isDemo, onNavigate }: { role: ReturnType<typeof useD
 }
 
 function Brand({ onClick }: { onClick?: () => void }) {
-  const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
-  return <Link className="brand" href="/" aria-label="Padang ERP dashboard" onClick={onClick}><Image src={`${basePath}/assets/padang-logo.svg`} alt="" width={148} height={40} priority /><span className="sr-only">Padang ERP</span></Link>;
+  return <Link className="brand" href="/" aria-label="Padang ERP dashboard" onClick={onClick}><PadangLogo alt="" priority={!onClick} /><span className="sr-only">Padang ERP</span></Link>;
 }
 
 function MobileDrawer({ open, onClose, role, isDemo, triggerRef }: { open: boolean; onClose: () => void; role: ReturnType<typeof useDemoRole>['role']; isDemo: boolean; triggerRef: React.RefObject<HTMLButtonElement | null> }) {

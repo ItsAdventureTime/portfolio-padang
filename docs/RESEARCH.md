@@ -291,9 +291,34 @@ upgrade or restore validation rather than a floating runtime tag.
 - **Scroll-driven animations:** CSS `animation-timeline: scroll()` for subtle reveals.
 - **View Transitions API:** For smooth route transitions in Next.js.
 
-**Design Decision:** Light-only launch theme with white/slate surfaces, accessible
-gold accent, Outfit (display), Inter (body), and JetBrains Mono (financial
-figures). No dark-mode or glassmorphism token set is part of the launch design.
+**Design Decision:** Light-first launch theme with white/warm-ivory content
+surfaces, a charcoal navigation rail, warm metallic gold accents, Outfit
+(display), Inter (body), and JetBrains Mono (financial figures). The charcoal
+rail is navigation chrome, not a user-selectable dark mode; no glassmorphism
+token set is part of the launch design.
+
+### Branding and interaction sources (2026-08-14)
+
+- The authoritative mark is the repository-root JPG
+  `/photo_2026-08-03_00-36-49.jpg`: full charcoal/black and warm metallic-gold
+  crest, PADANG wordmark, DESIGN | CONSTRUCT | SUPPLY, and AAA ACCREDITED
+  CONTRACTOR. `frontend/public/assets/padang-logo.jpg` is a byte-identical
+  delivery copy. The existing generic SVG is retained only as a historical
+  artifact and is not used by the active shell or session surfaces.
+- Palette decisions are derived from the mark: `#1F1E1B` / `#292724` charcoal,
+  `#C9A24D` warm metallic gold, `#E5C778` restrained highlight, `#FFF7E3`
+  soft tint, and `#7D5A16` deep gold for readable light-surface text. Semantic
+  green, amber, blue, and red remain distinct for feedback and status labels.
+- [SmoothUI](https://github.com/educlopez/smoothui) is an inspiration/source
+  for selective responsive, TypeScript-conscious, accessibility-aware polish.
+  The implementation copies no runtime registry or component dependency: local
+  CSS covers the drawer entry, hover lift, and skeleton pulse, and the existing
+  React focus behavior remains authoritative. All effects honor
+  `prefers-reduced-motion`.
+- [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/) is the accessibility baseline for
+  contrast, focus visibility, status communication, keyboard interaction, and
+  mobile drawer behavior. Automated axe/Playwright coverage is still a future
+  gate because those suites are not present in this repository.
 
 ---
 

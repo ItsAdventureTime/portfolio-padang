@@ -144,7 +144,8 @@ The bounded frontend remediation is now implemented in the working tree:
   session gate before rendering. The API cookie Path was widened to `/` so the
   canonical same-origin `/padang` and `/padang/api` routes can use the existing
   refresh-token flow. Demo remains unauthenticated and visibly synthetic.
-- The shared shell uses `frontend/public/assets/padang-logo.svg`, preserves
+- The shared shell uses the byte-identical source copy
+  `frontend/public/assets/padang-logo.jpg`, preserves
   compiled `basePath` links, filters demo navigation by role, shows role
   permission copy, and uses read-only/status affordances for unsupported
   creation and notification actions. Production exposes only the existing API
@@ -162,6 +163,27 @@ The bounded frontend remediation is now implemented in the working tree:
   status changes, and share PHP/date/status formatting and badges. Login now
   handles focus, status/error announcements, retry cooldown, OTP expiry, and
   the existing OTP/refresh/logout capabilities without faking authentication.
+
+## Branding Revision (2026-08-14)
+
+The active frontend branding now uses the exact repository-root source
+`/photo_2026-08-03_00-36-49.jpg`. `frontend/public/assets/padang-logo.jpg` is a
+byte-identical copy for static delivery; the original JPG remains the source of
+truth and is not removed. The shared JPG mark is visible in the desktop/tablet
+sidebar treatment, mobile drawer, login screen, production session gate, and
+metadata/icon treatment. `frontend/public/assets/padang-logo.svg` remains only
+as a historical asset and is not used by new branding surfaces.
+
+The revision derives its tokens from the mark: charcoal `#1F1E1B` / `#292724`,
+warm metallic gold `#C9A24D`, restrained highlight `#E5C778`, soft tint
+`#FFF7E3`, and accessible deep-gold text `#7D5A16`, with semantic feedback
+colors retained for status meaning. Shell navigation, active/hover states,
+buttons, demo banner, panels, form inputs, focus rings, and loading/error/empty
+states use the shared token layer. The existing focus trap, focus restoration,
+keyboard navigation, status announcements, and reduced-motion media rules are
+preserved in line with W3C WCAG 2.2. SmoothUI is an inspiration/source for
+selective local CSS interaction polish only; no SmoothUI runtime registry,
+network dependency, or Motion package was added.
 
 Remaining limits are unchanged: detailed production dashboard widgets, CRUD,
 approval, payment, QBO, report-export, and full browser/axe verification are
@@ -193,7 +215,7 @@ The resolved intake decisions and their detailed explanations are in
 `docs/PLANNING_CLARIFICATIONS.md`. They are normative for implementation
 planning and supersede older contradictory wording in this document.
 
-1. **Brand & UI/UX**: Light Corporate Enterprise UI (Primary launch theme). Clean white (`#FFFFFF`) and slate (`#F8FAFC`) surfaces, crisp data tables, rich gold (`#C8A84B`, `#D4A843`) brand accents derived from the official logo. Typography: Outfit (display), Inter (UI), JetBrains Mono (financial figures). Logo vector SVG to be generated at `frontend/public/assets/padang-logo.svg`.
+1. **Brand & UI/UX**: Light-first Corporate Enterprise UI (Primary launch theme). Clean white/warm-ivory (`#FFFFFF`, `#FBFAF7`) content surfaces, a charcoal navigation rail (`#1F1E1B`), warm metallic gold (`#C9A24D`, `#E5C778`) accents derived from the exact root JPG, and accessible deep-gold text (`#7D5A16`). Typography: Outfit (display), Inter (UI), JetBrains Mono (financial figures). The byte-identical delivery copy is `frontend/public/assets/padang-logo.jpg`; the root `photo_2026-08-03_00-36-49.jpg` remains authoritative.
 2. **Tech Stack**:
    - Backend: latest supported Go release (`golang:alpine`) + Chi. sqlc + pgx for type-safe database queries. golang-migrate for SQL migrations.
    - Frontend: latest supported Next.js App Router release + TypeScript + Tailwind CSS + shadcn/ui + TanStack Query/Table, built with the official floating `node:lts-alpine` image.
@@ -229,8 +251,8 @@ planning and supersede older contradictory wording in this document.
   rclone configured for Backblaze B2's S3-compatible API; the previous
   PostgreSQL-only backup example was invalid.
 - The API is the shared boundary for web and future Expo/React Native clients.
-- The launch design is light-only, with self-hosted Fontsource fonts and light
-  CSP-compatible tokens.
+- The launch design is light-first with charcoal navigation chrome, self-hosted
+  Fontsource fonts, and light CSP-compatible tokens.
 - Demo reset is operator/systemd-only and fails closed on environment/database
   identity checks.
 
@@ -293,14 +315,14 @@ an undocumented placeholder table.
 
 ---
 
-### TASK-003: Next.js Frontend Shell & Design System (Light Corporate)
-- **GOAL:** Initialize Next.js App Router in `frontend/`, configure the latest supported Tailwind CSS release, shadcn/ui, custom light corporate theme, font imports (Outfit, Inter, JetBrains Mono), logo SVG asset, collapsible sidebar, top bar with demo role switcher, and OpenAPI TypeScript generator.
+### TASK-003: Next.js Frontend Shell & Design System (Light-First Corporate)
+- **GOAL:** Initialize Next.js App Router in `frontend/`, configure the latest supported Tailwind CSS release, shadcn/ui, custom light-first corporate theme, font imports (Outfit, Inter, JetBrains Mono), official JPG crest asset, collapsible sidebar, top bar with demo role switcher, and OpenAPI TypeScript generator.
 - **CONTEXT:** Governed by `docs/DESIGN_SYSTEM.md` and `docs/UI_UX.md`.
 - **FILES/AREAS:** `frontend/app/`, `frontend/components/`, `frontend/public/assets/`, `frontend/lib/`, `frontend/types/`
 - **DEPENDENCIES:** TASK-002 (for OpenAPI spec)
 - **CONSTRAINTS:**
-  - Light corporate enterprise aesthetic (crisp white `#FFFFFF`, slate `#F8FAFC`, gold `#C8A84B` / `#D4A843` brand accents).
-  - Generate clean SVG logo from root photo assets at `frontend/public/assets/padang-logo.svg`.
+  - Light-first corporate enterprise aesthetic (crisp white `#FFFFFF`, warm ivory `#FBFAF7`, charcoal rail `#1F1E1B`, gold `#C9A24D` / `#E5C778` brand accents).
+  - Copy the exact root source JPG to `frontend/public/assets/padang-logo.jpg` and use that mark for visible branding; do not replace it with the legacy SVG.
   - Setup `openapi-typescript` script to generate frontend types from backend spec.
   - Support `basePath` configuration (`/padang` prod, `/padang/demo` demo).
   - Build two frontend artifacts from one source revision: `demo-latest` for

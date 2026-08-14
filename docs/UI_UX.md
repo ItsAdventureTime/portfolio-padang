@@ -23,6 +23,15 @@
 > payment, QBO, and report-export
 > workflows remain backend/UI limits and are explicitly labeled unavailable.
 
+> **Branding revision (2026-08-14):** The visible brand mark is the exact
+> `photo_2026-08-03_00-36-49.jpg` source at repository root. The frontend serves
+> its byte-identical copy at `frontend/public/assets/padang-logo.jpg` in the
+> desktop sidebar, tablet sidebar treatment, mobile drawer, login/session gate,
+> and metadata. The generic SVG is not an active replacement. Charcoal
+> navigation, warm metallic gold accents, restrained gold surfaces, and
+> accessible deep-gold text are shared across shell, controls, feedback, and
+> data states.
+
 ## UX Principles
 
 1. **Role-aware surfaces** — Each role sees only what they need. No cognitive clutter.
@@ -58,11 +67,15 @@
 └─────────────────────────────┘
 ```
 
-- Light corporate theme; subtle border and clean background (`#F8FAFC`)
-- Logo asset: `frontend/public/assets/padang-logo.svg` (clean vector generated from official logo photos)
-- Active item: gold `2px` left border + gold text (`#C8A84B`)
-- Hover: subtle gold tint background (`#FEF9C3`)
-- Collapse to 64px icon-only mode on `md` breakpoint
+- Light-first corporate theme with a charcoal navigation rail (`#1F1E1B`) and
+  warm ivory content background (`#FBFAF7`)
+- Logo asset: `frontend/public/assets/padang-logo.jpg`, copied byte-for-byte
+  from the authoritative root JPG; the full crest remains visible on desktop
+  and in the drawer, with a compact crest crop at tablet width
+- Active item: restrained gold `2px` left border + light gold text (`#F6D88B`)
+- Hover: charcoal-gold tint background (`#3B301F`)
+- Collapse to 72px icon-only mode from 768px through 1023px; hide the rail and
+  use the focus-managed drawer below 768px
 
 ### Top Bar
 
@@ -75,6 +88,10 @@
 - Left: breadcrumb navigation (clickable ancestors)
 - Right (demo): role switcher chip (gold)
 - Right (production): notification bell + user avatar dropdown
+
+The login page and production session gate repeat the same JPG mark above the
+status/OTP content. This makes the environment identity visible before a
+session is established as well as inside the authenticated shell.
 
 Production exposes the existing API-backed sign-out action only after session
 verification. Notifications and record creation are rendered as read-only
@@ -272,6 +289,16 @@ Each empty state has:
 | File upload | Progress bar inside upload zone |
 | Report generation | Indeterminate progress bar in page header |
 
+Loading, error, unavailable, live-empty, search-empty, and demo-preview states
+use text plus `aria-live`/`role="alert"` where appropriate. Gold is reserved
+for brand context and attention; success, warning, info, and error states keep
+distinct semantic colors and labels so status is never conveyed by color alone.
+Short drawer, hover, and skeleton motion is CSS-local and disabled by
+`prefers-reduced-motion: reduce`, following the selective interaction boundary
+described in `docs/DESIGN_SYSTEM.md` and inspired by
+[SmoothUI](https://github.com/educlopez/smoothui). No SmoothUI runtime registry
+or network dependency is part of the product.
+
 ---
 
 ## Print / Export UX
@@ -287,7 +314,7 @@ Each empty state has:
 
 ## Demo-Specific UI
 
-- Top bar: orange banner strip: **"DEMO MODE — Data resets every 30 minutes"**
+- Top bar: warm-gold banner strip: **"DEMO MODE — Synthetic preview data — No login required"**
 - Role switcher: prominent gold chip in top bar
 - Demo only: no login screen; lands directly on the dashboard with a
   synthetic identity. Production always starts with the Email OTP flow.

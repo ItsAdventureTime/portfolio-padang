@@ -177,10 +177,12 @@ refresh token. Mobile production auth uses the same rotating token protocol,
 but stores the refresh token only in iOS Keychain or Android Keystore-backed
 secure storage. Access tokens remain memory-only on both clients.
 
-## 8. Light-only design system and CSP
+## 8. Light-first design system and CSP
 
-The launch UI is light-only. Dark-mode tokens and dark glassmorphism examples
-are removed from the design contract.
+The launch UI is light-first: content uses light surfaces and the fixed
+navigation rail/drawer uses charcoal navigation chrome derived from the
+authoritative Padang JPG. This is not a user-selectable dark mode. Dark
+glassmorphism examples are removed from the design contract.
 
 All surfaces, status badges, cards, tables, and navigation use the defined
 light token set. Fonts are loaded from local self-hosted assets (currently the

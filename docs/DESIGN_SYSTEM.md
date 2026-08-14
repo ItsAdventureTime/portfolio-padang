@@ -7,8 +7,15 @@
 **Accreditation:** AAA Accredited Contractor (PCAB)
 
 The visual identity is derived directly from the company logo:
-a shield-shaped monogram ("PC") in deep black with rich gold/champagne tones,
-a gold ribbon banner, and clean bold typography.
+a full charcoal-and-warm-metallic-gold crest with the PADANG wordmark,
+DESIGN | CONSTRUCT | SUPPLY, and AAA ACCREDITED CONTRACTOR.
+
+### Logo source of truth
+
+- Authoritative source: `/photo_2026-08-03_00-36-49.jpg` (the original user-provided 834 × 721 JPG).
+- Bundled web derivative: `frontend/public/assets/padang-logo.jpg`, a byte-identical copy of the source retained for static asset delivery. The original JPG remains the source of truth and must not be deleted or replaced.
+- The legacy `frontend/public/assets/padang-logo.svg` may remain for historical compatibility, but it is not the active brand mark and must not be used in new UI.
+- The source JPG must be visibly used in the desktop sidebar, tablet/sidebar treatment, mobile drawer, login screen, production session gate, and metadata/icon treatment. Do not substitute a generic monogram or wordmark.
 
 ---
 
@@ -16,21 +23,27 @@ a gold ribbon banner, and clean bold typography.
 
 **Light-first Enterprise Corporate. Crisp, Professional, Data-dense.**
 
-- Clean white and subtle slate navigation chrome & surfaces — professional corporate aesthetic
+- Clean white and warm ivory surfaces with a charcoal navigation rail — professional corporate aesthetic
 - Crisp, high-contrast table surfaces for financial data legibility
-- Rich gold accents (`#C8A84B`, `#D4A843`) derived from logo signal PCAB AAA accreditation
+- Warm metallic gold accents (`#C9A24D`, `#E5C778`) derived from the crest and ribbon
 - Micro-animations enhance perceived responsiveness; never distract from data
-- WCAG 2.2 AA minimum contrast on all text
+- WCAG 2.2 AA-conscious contrast, visible keyboard focus, and reduced-motion support
 
 ### Luna audit interaction pattern (2026-08-14)
 
-The frontend uses a small local adaptation of the SmoothUI design principle:
-drawer entry and loading skeletons use short CSS transitions/pulses only when
-`prefers-reduced-motion: no-preference` is active. No SmoothUI package, runtime
-registry, CLI fetch, or motion dependency is used; the existing CSS token and
-React component system is sufficient for these two interactions. Production
-data states are intentionally quiet: loading, live, error, and empty states
-communicate through text and `aria-live`, not decorative effects.
+The frontend uses a small local adaptation of the responsive, typed, accessible
+interaction intent documented by [SmoothUI](https://github.com/educlopez/smoothui):
+drawer entry, button hover lift, table hover feedback, and loading skeletons use
+short local CSS transitions/pulses only when `prefers-reduced-motion:
+no-preference` is active. No SmoothUI package, runtime registry, CLI fetch,
+Motion dependency, or network requirement is used. Production data states are
+intentionally quiet: loading, live, error, and empty states communicate through
+text and `aria-live`, not decorative effects.
+
+The accessibility baseline is [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/):
+semantic labels and status text remain primary, the existing drawer focus trap
+and restoration are preserved, and the double-context focus treatment uses a
+dark gold ring on light surfaces and a light gold ring on the charcoal rail.
 
 The shared `formatPHP`, `formatDate`, `formatStatus`, and `StatusBadge` helpers
 are the canonical register formatting path. Status badges use green for
@@ -42,35 +55,43 @@ states.
 
 ## Color Tokens
 
-### Brand Colors (Gold)
+### Brand Colors (warm metallic gold)
 
 | Token | HSL | Hex | Usage |
 |---|---|---|---|
-| `--color-gold-100` | hsl(44, 100%, 95%) | `#FEF9C3` | Light gold table/badge highlight |
-| `--color-gold-300` | hsl(44, 65%, 72%) | `#E8C97A` | Subtle gold borders/accents |
-| `--color-gold-400` | hsl(44, 62%, 55%) | `#D4A843` | Active state indicator, highlights |
-| `--color-gold-500` | hsl(44, 58%, 48%) | `#C8A84B` | Primary brand gold |
-| `--color-gold-600` | hsl(40, 68%, 38%) | `#A8841E` | Hover state |
-| `--color-gold-700` | hsl(38, 72%, 30%) | `#8B6914` | Deep gold text/icons |
+| `--color-gold-100` | warm tint | `#FFF7E3` | Demo banner, permission and info surfaces |
+| `--color-gold-300` | restrained highlight | `#E5C778` | Focus on charcoal, active indicators, chart highlight |
+| `--color-gold-500` | warm metallic | `#C9A24D` | Brand mark, avatar, progress accents |
+| `--color-gold-700` | accessible deep gold | `#7D5A16` | Text and links on light surfaces |
 
 ### Surface Colors (Light Corporate)
 
 | Token | HSL | Hex | Usage |
 |---|---|---|---|
-| `--color-surface-50` | hsl(210, 40%, 98%) | `#F8FAFC` | Main app background |
-| `--color-surface-100` | hsl(210, 40%, 96%) | `#F1F5F9` | Sidebar, topbar background |
+| `--color-surface-50` | warm ivory | `#FBFAF7` | Main app background |
+| `--color-surface-100` | warm neutral | `#F3F0EA` | Empty states and soft surfaces |
 | `--color-surface-0` | hsl(0, 0%, 100%) | `#FFFFFF` | Card backgrounds, table rows |
-| `--color-surface-200` | hsl(214, 32%, 91%) | `#E2E8F0` | Subtitle/card borders |
-| `--color-surface-300` | hsl(213, 27%, 84%) | `#CBD5E1` | Input borders |
-| `--color-surface-400` | hsl(215, 20%, 65%) | `#94A3B8` | Disabled borders / muted text |
+| `--color-surface-200` | warm line | `#E7E1D6` | Subtitle/card borders |
+| `--color-surface-300` | warm border | `#CFC6B6` | Input and secondary-button borders |
+| `--color-surface-400` | warm muted | `#827B70` | Placeholder and tertiary text |
+
+### Charcoal navigation colors
+
+| Token | Hex | Usage |
+|---|---|---|
+| `--color-charcoal-950` | `#1F1E1B` | Desktop sidebar and mobile drawer |
+| `--color-charcoal-900` | `#292724` | Primary buttons and drawer controls |
+| `--color-charcoal-800` | `#393631` | Hover/raised charcoal surfaces |
+| `--color-charcoal-line` | `#47423A` | Navigation dividers and borders |
+| `--color-charcoal-text` | `#F5F0E7` | Navigation text on charcoal |
 
 ### Text Colors
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--color-text-primary` | `#0F172A` | Primary body text, headings |
-| `--color-text-secondary` | `#475569` | Subheaders, table headers, labels |
-| `--color-text-tertiary` | `#94A3B8` | Placeholders, secondary metadata |
+| `--color-text-primary` | `#262321` | Primary body text, headings |
+| `--color-text-secondary` | `#5C5851` | Subheaders, table headers, labels |
+| `--color-text-tertiary` | `#827B70` | Placeholders, secondary metadata |
 | `--color-text-inverse` | `#FFFFFF` | Text on dark/gold buttons |
 
 ### Semantic Colors
@@ -156,14 +177,15 @@ Based on 4px base unit:
 
 ## Elevation and Surfaces
 
-The launch theme is light-only. Navigation, cards, tables, forms, and stat
-cards use opaque light surfaces. No dark-mode tokens or glassmorphism are part
-of the product contract.
+The launch theme is light-first: content, cards, tables, forms, and stat cards
+use opaque light surfaces, while the sidebar and mobile drawer use the crest's
+charcoal as navigation chrome. This is not a user-selectable dark mode, and no
+glassmorphism is part of the product contract.
 
 ```css
 .navigation-surface {
-  background: var(--color-surface-100);
-  border: 1px solid var(--color-surface-200);
+  background: var(--color-charcoal-950);
+  border: 1px solid var(--color-charcoal-line);
 }
 
 .card-surface {
@@ -198,9 +220,9 @@ of the product contract.
 
 ### Navigation Sidebar
 
-- Width: 256px (expanded), 64px (collapsed — icon-only mode)
-- Opaque light navigation surface with subtle border
-- Logo at top (shield mark + wordmark)
+- Width: 256px (expanded), 72px (collapsed — icon-only mode)
+- Opaque charcoal navigation surface with subtle warm border
+- Official JPG crest at top (shield, PADANG wordmark, tagline, AAA line)
 - Nav items: icon + label; gold left-border indicator on active item
 - Collapse toggle at bottom
 - Role badge chip at bottom (user's current role)
@@ -345,7 +367,7 @@ Critical financial workflows remain usable at 375px (iPhone SE).
 ## Accessibility (WCAG 2.2 AA)
 
 - All interactive elements keyboard-navigable
-- Focus rings: gold outline (`outline: 2px solid var(--color-gold-400); outline-offset: 2px`)
+- Focus rings: accessible deep-gold outline on light surfaces and restrained gold outline on charcoal (`outline: 3px solid var(--focus-ring); outline-offset: 3px`)
 - Contrast: minimum 4.5:1 for body text; 3:1 for large text and UI components
 - All icons have `aria-label` or adjacent visible label
 - Tables have proper `<thead>`, `scope` attributes on `<th>`
@@ -353,3 +375,5 @@ Critical financial workflows remain usable at 375px (iPhone SE).
 - Status badges use both color and text (not color alone)
 - Modal dialogs trap focus; return focus on close
 - Approval confirmation dialogs are `role="alertdialog"`
+- Motion is optional polish only; drawer/skeleton transitions stop for
+  `prefers-reduced-motion: reduce`

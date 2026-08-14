@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ApiRequestError, apiFetch, clearAccessToken } from '@/lib/api-client';
+import { PadangLogo } from '@/components/brand/padang-brand';
 
 type SessionState = 'checking' | 'authenticated' | 'error';
 
@@ -56,6 +57,7 @@ export function ProductionSessionGuard({ children }: { children: React.ReactNode
 
   return <main className="session-gate" aria-live="polite" aria-busy={state === 'checking'}>
     <section className="panel session-gate-panel">
+      <div className="session-brand"><PadangLogo alt="Padang Construction and Supplies Corporation logo" priority /></div>
       {state === 'checking' ? <>
         <div className="eyebrow">Production session</div>
         <h1 className="page-title">Checking your session…</h1>
