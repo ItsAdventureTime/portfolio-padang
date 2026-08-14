@@ -5,7 +5,7 @@
 - **Upstream runtime channels are reviewed, not unattended.** Use official
   mutable channels such as `golang:alpine` and `node:lts-alpine`; PostgreSQL is
   the deliberate exception: the deployment pins the supported major selected
-  from `PG_VERSION` (`18-alpine` for clean state, or the matching supported
+  from `PG_VERSION` (`17-alpine` for clean state, or the matching supported
   existing major) while allowing minor updates within that major.
 - **Application lockfiles remain committed.** They pin the resolved package
   graph required by the constitution; this is separate from floating base
@@ -71,7 +71,7 @@ Next.js artifacts can carry different build-time `basePath` values.
 ### Policy: Mutable channels with a persistent-database exception
 
 > Build and stateless runtime image tags are mutable. The persistent PostgreSQL
-> image is the exception: the deployment uses `postgres:18-alpine` for clean
+> image is the exception: the deployment uses `postgres:17-alpine` for clean
 > demo state or the matching supported major read from `PG_VERSION`. The
 > application does not use unattended Podman auto-update. Keep
 > `podman-auto-update.timer` disabled and record the resolved digest after each
@@ -82,7 +82,7 @@ Next.js artifacts can carry different build-time `basePath` values.
 
 | Image | Tag | Purpose |
 |---|---|---|
-| `docker.io/library/postgres` | `18-alpine` by default; existing supported `PG_VERSION` major when present | PostgreSQL runtime; major pinned to persistent data |
+| `docker.io/library/postgres` | `17-alpine` by default; existing supported `PG_VERSION` major when present | PostgreSQL runtime; major pinned to persistent data |
 | `ghcr.io/itsadventuretime/padang-erp-backup` | `latest` | PostgreSQL dump + B2/S3 backup utility |
 | `ghcr.io/itsadventuretime/padang-erp-api` | `latest` | Go API (built via Containerfile) |
 | `ghcr.io/itsadventuretime/padang-erp-api` | `demo-latest` | Go API demo channel |
@@ -95,7 +95,7 @@ Next.js artifacts can carry different build-time `basePath` values.
 |---|---|---|
 | `docker.io/library/golang` | `alpine` | Compile Go binary (no version pin; latest stable) |
 | `docker.io/library/node` | `lts-alpine` | Build Next.js app (tracks active LTS) |
-| `docker.io/library/postgres` | `18-alpine` | Migration testing in CI/local (`podman run --rm`) |
+| `docker.io/library/postgres` | `17-alpine` | Migration testing in CI/local (`podman run --rm`) |
 
 > **Before using any image:** verify digest using `podman pull <image>@sha256:<digest>` or `podman inspect`.
 > Record sha256 below. Never assume a tag maps to the same digest as a previous pull.
@@ -106,7 +106,7 @@ Next.js artifacts can carry different build-time `basePath` values.
 # Update this section after each approved pull or manual update
 # Format: image:tag@sha256:digest | date | notes
 
-docker.io/library/postgres:18-alpine@sha256:TBD | pending | Clean-state default; record the resolved digest after deployment
+docker.io/library/postgres:17-alpine@sha256:TBD | pending | Clean-state default; record the resolved digest after deployment
 docker.io/library/golang:alpine@sha256:787328cefd7937073af18fc4b3a725f47e011ffdde9c2908239a25cae6b2f02b | 2026-08-12 | C1 validation pull
 docker.io/library/node:lts-alpine@sha256:0e6f1567e269207c28295276928277a030139cbc5a0fb7d5bd2674f0401a9082 | 2026-08-12 | C1 validation pull
 docker.io/library/alpine:latest@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18 | 2026-08-12 | C1 runtime/backup validation pull
@@ -151,7 +151,7 @@ with demo restricted to `padang/demo/` and production restricted to `padang/`.
 | Component | EOL / Support End |
 |---|---|
 | Go | Follow the current supported Go release; Go has no LTS channel |
-| PostgreSQL | Supported majors receive five years of fixes; deployment defaults to 18 and preserves an existing supported major |
+| PostgreSQL | Supported majors receive five years of fixes; deployment defaults to 17 and preserves an existing supported major |
 | Next.js | Follow the current supported release and its support policy |
 | Node.js (Next.js runtime) | Official Active or Maintenance LTS only |
 | Fedora CoreOS | Rolling; always-current stream |

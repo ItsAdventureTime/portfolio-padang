@@ -11,7 +11,7 @@
 - Audit log: append-only `audit_log` table; no UPDATE or DELETE on this table
 - File attachments: polymorphic `attachments` table (`entity_type`, `entity_id`)
 - Official PostgreSQL Alpine image with a persistent-major compatibility guard;
-  clean demo state defaults to `postgres:18-alpine`, existing state uses the
+  clean demo state defaults to `postgres:17-alpine`, existing state uses the
   matching supported `PG_VERSION` major; migration tool: golang-migrate
 
 ---

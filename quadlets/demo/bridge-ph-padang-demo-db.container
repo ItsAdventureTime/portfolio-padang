@@ -5,11 +5,11 @@ Requires=bridge-ph-padang-demo.network
 RequiresMountsFor=/home/jk/bridge-ph/padang-demo/postgres-data
 
 [Container]
-Image=docker.io/library/postgres:18-alpine
+Image=docker.io/library/postgres:17-alpine
 ContainerName=bridge-ph-padang-demo-db
 Network=bridge-ph-padang-demo.network
-Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql:Z
-Environment=PGDATA=/var/lib/postgresql/18/docker
+Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql/data:Z
+Environment=PGDATA=/var/lib/postgresql/data
 Environment=POSTGRES_DB=padang_demo
 Environment=POSTGRES_USER=padang_demo_user
 Environment=POSTGRES_PASSWORD_FILE=/run/secrets/db-password

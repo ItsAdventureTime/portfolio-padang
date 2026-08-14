@@ -17,7 +17,7 @@ The ERP stores:
 
 **PostgreSQL from the official Alpine image, with the major version treated as
 part of persistent database state.** Clean Padang demo state defaults to
-`postgres:18-alpine`; an existing cluster selects its supported major from
+`postgres:17-alpine`; an existing cluster selects its supported major from
 `PG_VERSION` (currently 14–18). A deployment must fail closed on an unsupported
 or malformed state rather than silently selecting a newer major. Major upgrades
 require a reviewed `pg_upgrade` or dump/restore operation.

@@ -98,7 +98,7 @@ Key units requiring tests:
 ### Integration Tests
 
 Tool: `testcontainers-go` (spins up the selected supported PostgreSQL Alpine
-major in Docker/Podman; clean fixtures use PostgreSQL 18)
+major in Docker/Podman; clean fixtures use PostgreSQL 17)
 Location: `backend/internal/repository/*_integration_test.go`
 
 Run: `go test ./... -tags=integration`
@@ -172,7 +172,7 @@ The minimum implementation gate for the current C1 foundation is:
   `npm run lint`;
 - both demo and production frontend builds, with `--webpack` when the local
   Podman VM cannot sustain Turbopack;
-- clean PostgreSQL migration up and down against `postgres:18-alpine`;
+- clean PostgreSQL migration up and down against `postgres:17-alpine`;
 - `bash -n` for operational scripts, the deployment/local helper `--help`
   commands, `scripts/check-padang-public-routes.sh --help`, the disposable
   Caddy route fixtures (`bash scripts/test-deploy-padang-demo-caddy.sh`), the
@@ -184,10 +184,11 @@ The minimum implementation gate for the current C1 foundation is:
   working;
 - `govulncheck ./...` when the scanner is installed in the Go container.
 
-The PostgreSQL fixture covers clean state, the known-empty PostgreSQL 18
-`18/docker` scaffold, supported legacy and versioned `PGDATA` layouts,
-malformed/unsupported/ambiguous state, symlink and ownership failures, and
-partial non-empty state. It also supplies a fake `podman unshare` command to
+The PostgreSQL fixture covers clean PostgreSQL 17 legacy state, a known-empty
+versioned scaffold left by a previous image attempt, supported legacy and
+versioned `PGDATA` layouts, malformed/unsupported/ambiguous state, symlink and
+ownership failures, and partial non-empty state. It also supplies a fake
+`podman unshare` command to
 verify that state metadata, `PG_VERSION` discovery, and version reads use the
 rootless namespace when available, while preserving the direct-host fallback
 inside the disposable fixture container. An inaccessible namespace probe must

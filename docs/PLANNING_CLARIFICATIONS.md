@@ -34,7 +34,7 @@ The upstream runtime policy is:
 |---|---|
 | Node.js build/runtime | Official `node:lts-alpine` floating tag |
 | Go build image | Official `golang:alpine` floating tag; Go has no LTS channel |
-| PostgreSQL | `postgres:18-alpine` for clean demo state; persistent deployments select the matching supported `PG_VERSION` major and require reviewed upgrade/restore work |
+| PostgreSQL | `postgres:17-alpine` for clean demo state; persistent deployments select the matching supported `PG_VERSION` major and require reviewed upgrade/restore work |
 | Next.js | Latest supported release selected by the project package manifest; no major number in container tags |
 | OS/base image digest | Inspect and record the resolved digest at release time; persistent PostgreSQL is the explicit versioned-tag exception |
 

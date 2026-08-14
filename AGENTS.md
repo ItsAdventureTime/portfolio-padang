@@ -77,7 +77,7 @@ padang-bridge-dashboard/
 | API | REST/JSON + OpenAPI 3.1 |
 | Frontend | Next.js App Router (LTS) + TypeScript |
 | UI library | shadcn/ui + Tailwind CSS |
-| Database | Supported PostgreSQL major; demo clean state defaults to `18-alpine` and persistent state matches `PG_VERSION` |
+| Database | PostgreSQL 17 Alpine for clean state; existing persistent state matches `PG_VERSION` |
 | File storage | Backblaze B2 (`bridge-ph` bucket) |
 | Email | Resend (adapter pattern; future Azure) |
 | Auth | Passwordless Email OTP + RS256 JWT |

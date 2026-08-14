@@ -17,6 +17,7 @@ if [[ "${1:-}" != --in-container ]]; then
     'apk add --no-cache bash >/dev/null && exec bash /src/scripts/test-padang-demo-postgres.sh --in-container'
 fi
 
+POSTGRES_DEFAULT_MAJOR=17
 source "$SCRIPT_DIR/lib/padang-demo-postgres.sh"
 
 TEST_ROOT=$(mktemp -d)
@@ -42,17 +43,19 @@ expect_failure() {
 clean_state="$TEST_ROOT/clean"
 mkdir -p "$clean_state"
 postgres_prepare_storage "$clean_state"
-[[ "$POSTGRES_MAJOR" == 18 ]] || fail 'clean state did not select PostgreSQL 18'
-[[ "$POSTGRES_DATA_LAYOUT" == versioned ]] || fail 'clean state did not use versioned PGDATA'
-[[ "$(postgres_image_for_state)" == docker.io/library/postgres:18-alpine ]] ||
-  fail 'clean state image was not pinned to PostgreSQL 18'
+[[ "$POSTGRES_MAJOR" == 17 ]] || fail 'clean state did not select PostgreSQL 17'
+[[ "$POSTGRES_DATA_LAYOUT" == legacy ]] || fail 'clean state did not use legacy PGDATA'
+[[ "$POSTGRES_PGDATA" == /var/lib/postgresql/data ]] || fail 'clean state PGDATA was incorrect'
+[[ "$(postgres_image_for_state)" == docker.io/library/postgres:17-alpine ]] ||
+  fail 'clean state image was not pinned to PostgreSQL 17'
 
 scaffold_state="$TEST_ROOT/known-empty-scaffold"
 mkdir -p "$scaffold_state/18/docker"
 postgres_prepare_storage "$scaffold_state"
-[[ "$POSTGRES_MAJOR" == 18 ]] || fail 'known-empty PG18 scaffold selected the wrong major'
-[[ "$POSTGRES_DATA_LAYOUT" == versioned ]] || fail 'known-empty PG18 scaffold was not versioned'
-[[ "$POSTGRES_DATA_EXISTS" == 0 ]] || fail 'known-empty PG18 scaffold was treated as an existing cluster'
+[[ "$POSTGRES_MAJOR" == 17 ]] || fail 'known-empty scaffold did not select PostgreSQL 17'
+[[ "$POSTGRES_DATA_LAYOUT" == legacy ]] || fail 'known-empty scaffold was not converted to legacy PGDATA'
+[[ "$POSTGRES_PGDATA" == /var/lib/postgresql/data ]] || fail 'known-empty scaffold PGDATA was incorrect'
+[[ "$POSTGRES_DATA_EXISTS" == 0 ]] || fail 'known-empty scaffold was treated as an existing cluster'
 
 partial_scaffold="$TEST_ROOT/partial-scaffold"
 mkdir -p "$partial_scaffold/18/docker"
@@ -162,4 +165,4 @@ chmod +x "$inaccessible_bin/podman"
     postgres_prepare_storage "$inaccessible_state"
 )
 
-printf '%s\n' 'PostgreSQL clean, known-empty scaffold, legacy/versioned compatible, mismatch, malformed, ownership, symlink, ambiguous, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'
+printf '%s\n' 'PostgreSQL 17 clean, known-empty scaffold, legacy/versioned compatible, mismatch, malformed, ownership, symlink, ambiguous, non-empty-state, namespace-aware, and inaccessible-state fixtures passed.'

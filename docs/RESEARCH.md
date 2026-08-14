@@ -128,27 +128,30 @@ Primary Caddy references:
 - [Caddy `import` directive](https://caddyserver.com/docs/caddyfile/directives/import)
 - [Caddy configuration concepts](https://caddyserver.com/docs/caddyfile/concepts)
 
-### Demo PostgreSQL Persistence Refresh: Current Maintainer Guidance (2026-08-14)
+### Demo PostgreSQL Persistence Refresh: Current Maintainer Guidance (2026-08-15)
 
 The demo deployment no longer lets a floating PostgreSQL tag choose a major
 version for persistent state. PostgreSQL's official versioning policy
 supports each major for five years and recommends staying current on the minor
-release within that major. The current supported default is PostgreSQL 18.
+release within that major. The selected clean-state default is PostgreSQL 17
+Alpine. PostgreSQL 17 and below use the official image's legacy
+`/var/lib/postgresql/data` mount by default; the versioned parent mount is an
+explicit opt-in for newer image layouts.
 
-The updater therefore selects `postgres:18-alpine` for an empty demo data root
-or a provably empty `18/docker` scaffold, or the matching supported
-`postgres:<major>-alpine` image after reading an existing root or versioned
-`PG_VERSION` (supported majors 14–18). It fails closed for an unsupported,
+The updater therefore selects `postgres:17-alpine` for an empty demo data root
+or a provably empty versioned scaffold left by a prior image attempt, or the
+matching supported `postgres:<major>-alpine` image after reading an existing
+root or versioned `PG_VERSION` (supported majors 14–18). It fails closed for an unsupported,
 malformed, unknown/partial, or ambiguous state, refuses ownership/permission
 mismatches for rootless storage, and never wipes or auto-upgrades a data
 directory. Because
 PostgreSQL files may be owned by subordinate IDs inside a rootless Podman user
 namespace, the updater performs metadata, discovery, and version-file reads via
 `podman unshare`; the direct-host path exists only for the disposable fixture
-container where Podman nesting is unavailable. PostgreSQL 18's official image
-uses versioned `PGDATA`; clean state uses
-`/var/lib/postgresql/18/docker`, while legacy data with `PG_VERSION` at the
-mount root retains the `/var/lib/postgresql/data` layout and matching major.
+container where Podman nesting is unavailable. PostgreSQL 17 clean state uses
+`/var/lib/postgresql/data`; an existing versioned layout is retained only when
+its `PG_VERSION` proves that layout and major. A known-empty versioned scaffold
+is initialized using the PostgreSQL 17 legacy layout.
 An error reporting a non-empty root without `PG_VERSION` is an intentional
 preservation boundary: operators must inspect the root and versioned paths,
 verify a backup, and choose reviewed dump/restore or a separate target before
@@ -275,7 +278,7 @@ sqlc, and the selected container/runtime channels
 | SQLite | ❌ Not suitable for multi-user concurrent ERP |
 
 PostgreSQL has no Node-style LTS channel. Clean demo state uses
-`postgres:18-alpine`; persistent state selects the matching supported major from
+`postgres:17-alpine`; persistent state selects the matching supported major from
 `PG_VERSION` and records the resolved digest. Major changes require reviewed
 upgrade or restore validation rather than a floating runtime tag.
 

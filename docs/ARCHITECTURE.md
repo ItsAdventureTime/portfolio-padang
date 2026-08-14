@@ -58,7 +58,7 @@ External services (reached from API container via outbound HTTPS):
 
 | Component | Technology | Notes |
 |---|---|---|
-| RDBMS | PostgreSQL | Official Alpine image; persistent deployments pin the major to `PG_VERSION` (demo clean default: `postgres:18-alpine`) |
+| RDBMS | PostgreSQL | Official Alpine image; persistent deployments pin the major to `PG_VERSION` (demo clean default: `postgres:17-alpine`) |
 | Connection pooling | PgBouncer (optional) | Evaluate if connection count becomes a concern |
 
 ### Infrastructure

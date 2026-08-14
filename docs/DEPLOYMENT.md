@@ -30,7 +30,7 @@ This runbook follows the current upstream model for the selected stack:
   updater explicitly starts generated units after `daemon-reload`; routine
   updates do not run `systemctl enable` on generated container services.
 - PostgreSQL persistent state is handled as a compatibility boundary. A clean
-  demo data root defaults to the current supported major (18); an existing
+  demo data root defaults to PostgreSQL 17; an existing
   `PG_VERSION` selects the matching supported `postgres:<major>-alpine` image.
   Unsupported, malformed, unreadable, non-empty-invalid, or rootless-unwritable
   state fails closed without deleting or upgrading data.
@@ -202,11 +202,11 @@ Requires=bridge-ph-padang-demo.network
 RequiresMountsFor=/home/jk/bridge-ph/padang-demo/postgres-data
 
 [Container]
-Image=docker.io/library/postgres:18-alpine
+Image=docker.io/library/postgres:17-alpine
 ContainerName=bridge-ph-padang-demo-db
 Network=bridge-ph-padang-demo.network
-Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql:Z
-Environment=PGDATA=/var/lib/postgresql/18/docker
+Volume=/home/jk/bridge-ph/padang-demo/postgres-data:/var/lib/postgresql/data:Z
+Environment=PGDATA=/var/lib/postgresql/data
 
 Environment=POSTGRES_DB=padang_demo
 Environment=POSTGRES_USER=padang_demo_user
@@ -314,7 +314,7 @@ Requires=bridge-ph-padang-demo-migrate.service
 RequiresMountsFor=/home/jk/bridge-ph/padang-demo/source/seed /home/jk/bridge-ph/padang-demo/source/scripts
 
 [Container]
-Image=docker.io/library/postgres:18-alpine
+Image=docker.io/library/postgres:17-alpine
 ContainerName=bridge-ph-padang-demo-reset
 Network=bridge-ph-padang-demo.network
 
@@ -646,8 +646,10 @@ The remote script:
     no identity record exists, and every case is verified against PostgreSQL;
     the database password is generated inside a disposable Alpine container
     directly into a Podman secret;
-  - selects PostgreSQL 18 for a clean data root, or the matching supported
-    major from existing `PG_VERSION`; it never auto-upgrades or wipes a data
+  - selects PostgreSQL 17 for a clean data root, or the matching supported
+    major from existing `PG_VERSION`; a provably empty versioned scaffold from
+    a previous image attempt is treated as clean and initialized with the
+    PostgreSQL 17 legacy layout. It never auto-upgrades or wipes a data
     directory. A persisted database identity record and post-start SQL check
     keep the secret and database identity aligned;
 - prompts interactively only for the Backblaze B2 S3 key ID and application key
@@ -705,7 +707,7 @@ existing supplied Caddyfile must use the authoritative `/padang/demo/*`
 route.
 
 Runtime Quadlets use the supported-major official `postgres:<major>-alpine`
-(18 for clean state, existing supported `PG_VERSION` major otherwise),
+(17 for clean state, existing supported `PG_VERSION` major otherwise),
 `node:lts-alpine`,
 `alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts
 are bind-mounted from the deployment data directory; no persistent build image
@@ -749,15 +751,18 @@ podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
 podman unshare find -P /home/jk/bridge-ph/padang-demo/postgres-data \
   -maxdepth 4 -type f -name PG_VERSION -print
 podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/PG_VERSION
-podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/18/docker/PG_VERSION
+  podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/17/docker/PG_VERSION
+  podman unshare cat -- /home/jk/bridge-ph/padang-demo/postgres-data/18/docker/PG_VERSION
 cat /home/jk/bridge-ph/padang-demo/config/db-user
 podman secret ls
 ```
 
-A supported existing major is selected from a root `PG_VERSION` (legacy layout)
-or `<major>/docker/PG_VERSION` (the PostgreSQL 18+ versioned layout). A truly
-empty directory, or an empty directory containing only `18/docker`, uses
-PostgreSQL 18. The updater rejects an error such as:
+A supported existing major is selected from a root `PG_VERSION` (the default
+legacy layout) or `<major>/docker/PG_VERSION` (an explicitly opted-in
+versioned layout). A truly empty directory uses PostgreSQL 17 with
+`/var/lib/postgresql/data`. An empty directory containing only a proven
+versioned scaffold from a previous image attempt is also initialized with the
+PostgreSQL 17 legacy layout. The updater rejects an error such as:
 
 ```text
 PostgreSQL persistent state is unsafe: /home/jk/bridge-ph/padang-demo/postgres-data is non-empty but has no valid PG_VERSION; refusing initialization
@@ -884,15 +889,15 @@ curl --fail-with-body https://delegateops.business/padang
 curl --fail-with-body https://delegateops.business/padang/api/v1/health
 ```
 
-The production DB Quadlet uses the official `postgres:18-alpine` image with
-the parent mount `/var/lib/postgresql` and `PGDATA=/var/lib/postgresql/18/docker`.
-Before starting it, inspect the production root through `podman unshare` and
-confirm that any existing cluster has a supported `PG_VERSION` at the matching
-versioned path. A legacy root `PG_VERSION`, unknown non-empty state, or a
-missing/inaccessible version file is a migration blocker; preserve it and use
-a reviewed backup plus dump/restore or `pg_upgrade` rather than changing the
-Quadlet to force startup. This production template does not perform an
-automatic major migration.
+The production DB Quadlet uses the official `postgres:17-alpine` image with
+the legacy mount `/var/lib/postgresql/data` and
+`PGDATA=/var/lib/postgresql/data`. Before starting it, inspect the production
+root through `podman unshare` and confirm that any existing cluster has a
+supported `PG_VERSION`. A versioned layout, unsupported major, unknown
+non-empty state, or a missing/inaccessible version file is a migration blocker;
+preserve it and use a reviewed backup plus dump/restore or `pg_upgrade` rather
+than changing the Quadlet to force startup. This production template does not
+perform an automatic major migration.
 
 Before those production commands, provision the production Podman secrets with
 the interactive secret script, verify the production Backblaze key is limited

@@ -198,9 +198,9 @@ deployment HTTP 404 state described above.
 
 The Luna deployment finding is addressed in the shared repository. The demo
 updater now prepares and validates the rootless persistent data directory,
-selects PostgreSQL 18 for clean state or a provably empty `18/docker` scaffold,
-or the matching supported major from an existing root or versioned
-`PG_VERSION`, and fails closed for unsupported, malformed, unreadable,
+selects PostgreSQL 17 for clean state or a provably empty versioned scaffold
+from a previous image attempt, or the matching supported major from an existing
+root or versioned `PG_VERSION`, and fails closed for unsupported, malformed,
 unknown/partial, ambiguous, symlinked, or ownership/permission-incompatible
 state. It never wipes or auto-upgrades data. The database identity record and
 post-start role/database/password check prevent persisted user/secret drift. DB
@@ -238,7 +238,7 @@ planning and supersede older contradictory wording in this document.
    - Backend: latest supported Go release (`golang:alpine`) + Chi. sqlc + pgx for type-safe database queries. golang-migrate for SQL migrations.
    - Frontend: latest supported Next.js App Router release + TypeScript + Tailwind CSS + shadcn/ui + TanStack Query/Table, built with the official floating `node:lts-alpine` image.
    - RDBMS: official PostgreSQL Alpine image with persistent-major guarding;
-     clean demo state uses `postgres:18-alpine`, while existing state matches
+     clean demo state uses `postgres:17-alpine`, while existing state matches
      `PG_VERSION`.
    - File Storage: Backblaze B2 (`bridge-ph` bucket, prefix `padang/demo/` for demo, `padang/` for prod). Shared keys stored in separate Podman secrets per environment (`bridge-ph-padang-{env}-b2-key-id`, `bridge-ph-padang-{env}-b2-application-key`).
    - Email: Resend Go SDK with swappable adapter pattern (`EMAIL_PROVIDER=resend`) in production; demo uses the log adapter and does not send email.
@@ -299,7 +299,7 @@ Codex must implement the application sequentially following the ordered tasks be
    - Up and down migrations execute without errors against the selected
      supported PostgreSQL major.
   - `sqlc generate` generates type-safe Go structs and query functions cleanly.
-- **REQUIRED TESTS:** Ephemeral Podman test running `golang-migrate` up and down against a clean `postgres:18-alpine` container.
+- **REQUIRED TESTS:** Ephemeral Podman test running `golang-migrate` up and down against a clean `postgres:17-alpine` container.
 - **DEFINITION OF DONE:** Migration files committed, `sqlc` configured and generating Go code, up/down test verified cleanly.
 
 TASK-001 also includes the complete operational data-model addendum in

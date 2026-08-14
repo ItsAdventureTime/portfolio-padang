@@ -5,7 +5,7 @@ Requires=bridge-ph-padang-demo-db.service
 RequiresMountsFor=/home/jk/bridge-ph/padang-demo/source/seed /home/jk/bridge-ph/padang-demo/source/scripts
 
 [Container]
-Image=docker.io/library/postgres:18-alpine
+Image=docker.io/library/postgres:17-alpine
 ContainerName=bridge-ph-padang-demo-reset
 Network=bridge-ph-padang-demo.network
 Environment=APP_ENV=demo

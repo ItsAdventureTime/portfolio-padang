@@ -5,7 +5,7 @@
 # This file is sourced by the VPS deployment script and by its disposable
 # fixture test. It never upgrades, deletes, moves, or repairs database files.
 
-: "${POSTGRES_DEFAULT_MAJOR:=18}"
+: "${POSTGRES_DEFAULT_MAJOR:=17}"
 
 postgres_major_supported() {
   case "$1" in
@@ -65,6 +65,7 @@ postgres_state_failure() {
 
 postgres_print_recovery_hint() {
   local data_dir="$1"
+  local versioned_major="${POSTGRES_DEFAULT_MAJOR:-17}"
 
   cat >&2 <<EOF
 Read-only recovery diagnostics for $data_dir:
@@ -72,7 +73,7 @@ Read-only recovery diagnostics for $data_dir:
   podman unshare find -P "$data_dir" -maxdepth 4 -print
   podman unshare find -P "$data_dir" -maxdepth 4 -type f -name PG_VERSION -print
   podman unshare cat -- "$data_dir/PG_VERSION"
-  podman unshare cat -- "$data_dir/18/docker/PG_VERSION"
+  podman unshare cat -- "$data_dir/$versioned_major/docker/PG_VERSION"
 
 Preserve this directory. Do not delete, move, chmod, chown, repair, or
 major-upgrade unknown state. Verify a backup, then use a reviewed dump/restore
@@ -112,6 +113,23 @@ postgres_known_empty_versioned_scaffold() {
   done <<<"$entries"
 
   ((entry_count == 2))
+}
+
+postgres_known_empty_versioned_scaffold_major() {
+  local data_dir="$1"
+  local major
+  local match_count=0
+  local match_major=
+
+  for major in 14 15 16 17 18; do
+    if postgres_known_empty_versioned_scaffold "$data_dir" "$major"; then
+      ((match_count += 1))
+      match_major="$major"
+    fi
+  done
+
+  ((match_count == 1)) || return 1
+  printf '%s\n' "$match_major"
 }
 
 postgres_prepare_storage() {
@@ -207,12 +225,12 @@ postgres_prepare_storage() {
         postgres_state_failure "could not inspect entries under $data_dir through $inspection_context; state may be inaccessible" || return 1
       if [[ -z "$first_entry" ]]; then
         version="$POSTGRES_DEFAULT_MAJOR"
-        POSTGRES_DATA_LAYOUT=versioned
+        POSTGRES_DATA_LAYOUT=legacy
         POSTGRES_DATA_EXISTS=0
         POSTGRES_STATE_VERSION_FILE=
-      elif postgres_known_empty_versioned_scaffold "$data_dir" "$POSTGRES_DEFAULT_MAJOR"; then
+      elif postgres_known_empty_versioned_scaffold_major "$data_dir" >/dev/null; then
         version="$POSTGRES_DEFAULT_MAJOR"
-        POSTGRES_DATA_LAYOUT=versioned
+        POSTGRES_DATA_LAYOUT=legacy
         POSTGRES_DATA_EXISTS=0
         POSTGRES_STATE_VERSION_FILE=
       else

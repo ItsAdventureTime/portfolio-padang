@@ -19,7 +19,7 @@ The VPS host (Fedora CoreOS, rootless Podman) should not have Go, Node.js, or an
 | Compile Go binary | `podman run --rm -v ./backend:/app:Z -w /app docker.io/library/golang:alpine go build -o dist/api ./cmd/api/` |
 | Build Next.js | `podman run --rm -v ./frontend:/app:Z -w /app docker.io/library/node:lts-alpine sh -c "npm ci && npm run build"` |
 | Run sqlc | `podman run --rm -v ./backend:/app:Z -w /app docker.io/sqlc/sqlc generate` |
-| Run migrations (local) | `podman run --rm -v ./backend/migrations:/migrations:Z docker.io/library/postgres:18-alpine ... ` |
+| Run migrations (local) | `podman run --rm -v ./backend/migrations:/migrations:Z docker.io/library/postgres:17-alpine ... ` |
 | Run tests (Go) | `podman run --rm -v ./backend:/app:Z -w /app docker.io/library/golang:alpine go test ./...` |
 
 ## OCI Image Approach for Deployable Images
@@ -79,7 +79,7 @@ pinned**. Persistent PostgreSQL is the explicit major-version exception:
 - `golang:alpine` — latest stable Go with Alpine
 - `node:lts-alpine` — latest active LTS Node.js with Alpine
 - `alpine:latest` — latest Alpine for final runtime stage
-- `postgres:18-alpine` for clean demo state; existing persistent state uses the
+- `postgres:17-alpine` for clean demo state; existing persistent state uses the
   matching supported `PG_VERSION` major and never changes major implicitly
 
 Quadlet `.container` files intentionally omit `AutoUpdate=registry`. Image tags

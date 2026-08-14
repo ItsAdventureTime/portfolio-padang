@@ -484,7 +484,7 @@ podman info --format '{{.Host.CgroupsVersion}}' | grep -qx 'v2' || die "rootless
 systemctl --user show-environment >/dev/null 2>&1 || die "user systemd bus is unavailable"
 check_auto_update_timer
 [[ -d "$SOURCE_ROOT/backend" && -d "$SOURCE_ROOT/frontend" ]] || die "source tree is incomplete"
-POSTGRES_DEFAULT_MAJOR=18
+POSTGRES_DEFAULT_MAJOR=17
 source "$SOURCE_ROOT/scripts/lib/padang-demo-postgres.sh"
 [[ "$DB_USER" =~ ^[a-z_][a-z0-9_]{2,30}$ ]] || die "stored database username is invalid"
 
