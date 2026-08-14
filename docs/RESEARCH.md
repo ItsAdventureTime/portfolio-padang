@@ -166,6 +166,8 @@ journal, container inspection, and container log diagnostics on failure.
 Primary references:
 
 - [PostgreSQL versioning policy](https://www.postgresql.org/support/versioning/)
+- [Docker Official Image PGDATA guidance](https://github.com/docker-library/docs/blob/master/postgres/README.md#pgdata)
+- [PostgreSQL 17 upgrade documentation](https://www.postgresql.org/docs/17/upgrading.html)
 - [PostgreSQL Official Image](https://hub.docker.com/_/postgres)
 - [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
 
