@@ -360,6 +360,14 @@ policy](https://www.postgresql.org/support/versioning/), [PostgreSQL Official
 Image](https://hub.docker.com/_/postgres), and [Podman Quadlet
 units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html).
 
+The demo uses its persisted `DB_USER` as the PostgreSQL superuser. The official
+image creates the configured `POSTGRES_USER`; it does not guarantee a separate
+database role named `postgres`. Therefore, `role "postgres" does not exist`
+from an old diagnostic is a deployment-check bug, not evidence that the cluster
+must be recreated. The updater now verifies the persisted role and database
+through the configured user and never changes the data root to repair this
+condition.
+
 ### Demo not resetting
 
 1. Check timer: `systemctl --user list-timers padang-demo-reset.timer`
@@ -398,17 +406,20 @@ scripts/update-padang-demo.sh
 
 If an existing inline managed Padang route is present, the script preserves it.
 Exactly one complete route owner is required: inline or imported. Duplicate
-imports, inline-plus-import configurations, incomplete canonical/legacy routes,
-and imports outside `delegateops.business` are rejected before any Quadlet files
-are installed. The assembled Caddyfile and handler are validated in a
+managed Padang imports inside `delegateops.business` are canonicalized to one
+import; inline-plus-import configurations, incomplete canonical/legacy routes,
+and imports outside `delegateops.business` are rejected before Caddy/handler
+files or the Caddy edge Quadlet are installed. The assembled Caddyfile and
+handler are validated in a
 disposable Caddy container before runtime files are changed.
 
 ### Caddy reports `matcher is defined more than once`
 
 This indicates that an inline Padang route and an imported Padang handler (or
-two imported handlers) are expanding in the same `delegateops.business` site.
-Do not delete a route blindly. Inspect the route owner and let the updater fail
-closed until only one complete owner remains:
+two complete handler bodies) are expanding in the same `delegateops.business`
+site. The updater removes only repeated copies of its exact managed import; it
+does not remove inline handlers or unrelated imports. Inspect the route owner
+and let the updater fail closed until only one complete owner remains:
 
 ```bash
 grep -nE 'padang_demo|padang/demo|padang-demo.handlers' \

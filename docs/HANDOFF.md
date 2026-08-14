@@ -57,19 +57,23 @@ documented `padang-demo.handlers.Caddyfile` import inside the
 `delegateops.business` site block, supports the older marker and generic
 `handle { ... }` fallback, and recognizes canonical direct-path plus legacy
 named-matcher/upstream route forms. Exactly one complete Padang route owner is
-allowed: inline or imported. Duplicate imports, inline-plus-import layouts,
-incomplete routes, and imports outside the site block fail closed.
+allowed: inline or imported. Repeated copies of the exact managed import are
+normalized to one; inline-plus-import layouts, incomplete routes, and imports
+outside the site block fail closed.
 
 The generated handler uses direct path matchers for the root redirect and the
 documented `bridge-ph-padang-demo-api` / `bridge-ph-padang-demo-frontend`
-container names. Caddy validates the staged main file and handler before
-Quadlets or timestamped backups are changed. A handler-only change triggers a
+container names. Caddy validates the staged main file and handler before the
+Caddyfile, handler, or Caddy Quadlet is replaced. A handler-only change triggers a
 graceful Caddy reload; a proxy-network change triggers a restart. Fixtures cover
 canonical, legacy, duplicate, inline/import, idempotent, handler-only, and
 unsafe layouts. The public route checker now accepts `--demo-only` for the
 demo-only release gate; its default remains the four-route demo plus production
-gate. A new proxy network is staged before the deferred Caddy restart, avoiding
-a generated Caddy unit that references a network Quadlet not yet installed.
+gate. The updater verifies the supplied Caddy Quadlet mount
+`/home/jk/caddy/conf:/etc/caddy:ro,Z` and a single
+`bridge-ph-padang-demo-proxy.network` entry before changing it, stages the
+network before restarting Caddy, and restores the Caddy/handler/Quadlet files
+if reload or activation fails.
 
 ## Offline Font Build Remediation (2026-08-14)
 
@@ -204,8 +208,9 @@ root or versioned `PG_VERSION`, and fails closed for unsupported, malformed,
 unknown/partial, ambiguous, symlinked, or ownership/permission-incompatible
 state; data-root ownership is valid for the rootless namespace UID (normally 0)
 or UID 70, the `postgres` user in official `postgres:14-18-alpine` images. It
-never wipes or auto-upgrades data. The database identity record and
-post-start role/database/password check prevent persisted user/secret drift. DB
+never wipes or auto-upgrades data. The database identity record and post-start
+configured-user role/database/password check prevent persisted user/secret drift;
+the check does not assume a separate PostgreSQL role named `postgres` exists. DB
 Quadlets declare `RequiresMountsFor`, avoid `Notify=healthy`, and print service
 status, journal, container state, and container logs on startup failure.
 Disposable fixtures cover clean, known-empty scaffold, compatible,

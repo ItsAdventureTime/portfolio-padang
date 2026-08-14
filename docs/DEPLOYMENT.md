@@ -692,7 +692,10 @@ The remote script:
 - makes only the required Caddy network and `/padang/demo/*` page/API route
   changes, stages the Caddyfile, formats it with `caddy fmt --overwrite`,
   validates it with `caddy validate`, then atomically replaces it after a
-  timestamped backup;
+  timestamped backup. If the existing `delegateops.business` block contains
+  the same managed Padang handler import more than once, it canonicalizes that
+  exact duplicate to one import; inline-plus-import, incomplete, or foreign
+  route owners still fail closed;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
   `podman run --rm`, with a systemd restart fallback. The updater explicitly
   waits for the database healthcheck and then verifies the
@@ -733,6 +736,11 @@ fallback marker or generic `handle { ... }` fallback, or if the
 user/systemd/Podman prerequisites are unavailable. Set `CADDY_QUADLET`
 explicitly only when the VPS uses a different caddy Quadlet path. A dry run
 does not create or change Caddy handler files, the Caddyfile, or Quadlets.
+The supplied Caddy Quadlet must mount
+`/home/jk/caddy/conf:/etc/caddy:ro,Z` exactly once and must contain at most one
+`Network=bridge-ph-padang-demo-proxy.network` entry; the updater adds that
+network only when it is absent and restores the previous Caddy files if
+activation fails.
 
 ### PostgreSQL startup recovery
 

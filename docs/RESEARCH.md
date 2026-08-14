@@ -118,7 +118,9 @@ exactly one complete owner, either an inline route or an imported handler. The
 generated handler uses direct path matchers for the root redirect, keeps API and
 frontend routing in mutually exclusive `handle` blocks, validates the staged
 configuration before installation, and reloads Caddy when only the handler
-changes.
+changes. Repeated copies of the exact managed handler import are reduced to one
+inside the site block; inline-plus-import, incomplete, or out-of-site owners are
+still rejected.
 
 Primary Caddy references:
 
@@ -126,6 +128,7 @@ Primary Caddy references:
 - [Caddy `handle` directive](https://caddyserver.com/docs/caddyfile/directives/handle)
 - [Caddy `handle_path` directive](https://caddyserver.com/docs/caddyfile/directives/handle_path)
 - [Caddy `import` directive](https://caddyserver.com/docs/caddyfile/directives/import)
+- [Caddy directive ordering](https://caddyserver.com/docs/caddyfile/directives)
 - [Caddy configuration concepts](https://caddyserver.com/docs/caddyfile/concepts)
 
 ### Demo PostgreSQL Persistence Refresh: Current Maintainer Guidance (2026-08-15)
@@ -162,8 +165,9 @@ floating image tag.
 
 The Quadlet DB unit declares `RequiresMountsFor` for persistent storage and
 does not use `Notify=healthy`; the updater waits for a network-only readiness
-check, verifies the role/database/password identity, and prints systemd,
-journal, container inspection, and container log diagnostics on failure.
+check, verifies the configured `POSTGRES_USER` role/database/password identity
+(rather than assuming a `postgres` role exists), and prints systemd, journal,
+container inspection, and container log diagnostics on failure.
 
 Primary references:
 
