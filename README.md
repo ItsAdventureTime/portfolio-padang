@@ -38,14 +38,17 @@ QuickBooks Online (QBO) remains the official accounting system of record. This E
 ### Quick Start (development containers)
 
 ```sh
-# Check Podman machine
-podman machine status
-
-# Start if stopped
-podman machine start
-
-# See docs/DEPLOYMENT.md for full dev container setup
+# Start an ephemeral demo API and Next.js frontend in Podman
+scripts/start-padang-local.sh
 ```
+
+Open `http://127.0.0.1:3000/padang/demo` and check
+`http://127.0.0.1:8080/api/v1/health`. If either port is already in use, pass
+`--web-port 3100 --api-port 8180`. The helper keeps the API and frontend
+runtime inside disposable Podman containers, uses no credentials or database,
+and removes its pod when you press Ctrl-C. It is a foundation preview: the
+current module screens are read-only registers, not the completed ERP CRUD and
+approval workflows.
 
 ## Update the Deployed Demo
 
@@ -59,7 +62,13 @@ The command uses `jk@216.75.75.136:22` by default, preserves demo data, and
 checks `https://delegateops.business/padang/demo/api/v1/health` after an
 apply. Use `--dry-run` to validate without changing Quadlets, secrets, Caddy,
 or runtime data. Use `--seed-demo` only when an intentional synthetic-data
-reset is required. See `docs/DEPLOYMENT.md` for the full runbook.
+reset is required. After a successful apply, check both environments with
+`scripts/check-padang-public-routes.sh`. See `docs/DEPLOYMENT.md` for the full
+runbook.
+
+The public route check is currently a release gate: the last end-to-end audit
+found HTTP 404 responses from both BunnyCDN and the direct VPS Caddy origin.
+Do not treat a GitHub push or a successful local build as a public deployment.
 
 ---
 

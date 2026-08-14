@@ -7,8 +7,9 @@ CURRENT PHASE: C1 — implementation and containerized validation
 STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
 remediation, documentation updates, deployment-update workflow, containerized
 validation, frontend npm cache remediation, Caddy route insertion remediation,
-and offline font build remediation are complete; demo/production deployment is
-not authorized in C1.
+offline font build remediation, and bounded route/UX remediation are complete.
+The public release gate is currently failing with HTTP 404; the full ERP
+workflow surface is not yet implemented.
 BRANCH: main
 BASE COMMIT: bbdd803
 LATEST IMPLEMENTATION COMMIT: 8f482aa (`fix(frontend): make font builds offline-safe`)
@@ -68,6 +69,27 @@ JetBrains Mono now come from Fontsource variable packages installed by
 `frontend` check `npm run check:offline-fonts` verifies the layout import and
 package/lockfile metadata. The VPS build still needs npm registry access (or a
 configured npm cache) to install dependencies, but no Google Fonts access.
+
+## End-to-End Review and Bounded Remediation (2026-08-14)
+
+The Luna reviewer audited startup, workflows, API/UI alignment, navigation,
+responsive/accessibility concerns, and visual consistency. The app is not
+release-ready:
+
+- `https://delegateops.business/padang/demo`, `/padang`, and both documented
+  health URLs returned HTTP 404 from BunnyCDN;
+- a direct `--resolve` request to `216.75.75.136` also returned HTTP 404 from
+  Caddy, so the public route failure is not only a CDN symptom;
+- the frontend currently provides a dashboard and generic read-only module
+  registers; dedicated CRUD, approval, payment, QBO, and reporting workflows
+  remain future implementation work.
+
+This pass adds `scripts/check-padang-public-routes.sh` and
+`scripts/start-padang-local.sh`, makes unknown module slugs return 404, fixes
+basePath-aware active navigation and direct API-origin URL construction, and
+marks unfinished controls as disabled/read-only. The public route matrix,
+complete ERP workflows, and live browser accessibility verification remain
+release blockers.
 
 ---
 

@@ -2,8 +2,8 @@ import { getDemoRole } from './demo-role';
 
 export type ApiError = { code: string; message: string; details?: unknown };
 
-const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN ?? '';
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? '').replace(/\/+$/, '');
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
 let accessToken: string | null = null;
 
 export function setAccessToken(token: string) {
@@ -20,7 +20,10 @@ function demoRole() {
 
 function urlFor(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${apiOrigin}${basePath}${normalizedPath}`;
+  // A direct API origin already points at the API root. The compiled basePath
+  // is only part of the URL when the API is routed through the web origin.
+  const routePrefix = apiOrigin ? '' : basePath;
+  return `${apiOrigin}${routePrefix}${normalizedPath}`;
 }
 
 async function refreshAccessToken(): Promise<string | null> {

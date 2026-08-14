@@ -32,6 +32,14 @@ This runbook follows the current upstream model for the selected stack:
 - If deployment is later moved into GitHub Actions, use a protected GitHub
   environment, restricted deployment branches, required approval, and a
   concurrency group so production deployments cannot overlap.
+- From the macOS control plane, use `scripts/start-padang-local.sh` for a
+  disposable demo preview and `scripts/check-padang-public-routes.sh` for the
+  public release gate. Both commands use built-in defaults; no exported
+  environment variables are required.
+- The local helper supplies `NEXT_PUBLIC_API_ORIGIN` internally for the direct
+  API port. When that value is set, the frontend does not prepend the compiled
+  `/padang/demo` or `/padang` base path; the deployed same-origin Caddy route
+  remains the default when the origin is empty.
 
 References: [Podman Quadlet documentation](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html),
 [Podman auto-update](https://docs.podman.io/en/stable/markdown/podman-auto-update.1.html),
@@ -707,6 +715,17 @@ scripts/update-padang-demo.sh --host 216.75.75.136 --user jk --port 22
 #    guarded seed service. Never use for a routine code update.
 scripts/update-padang-demo.sh --seed-demo
 ```
+
+After an apply, run the four-route public gate from the same checkout:
+
+```bash
+scripts/check-padang-public-routes.sh
+```
+
+It expects HTTP 200 from both page routes and both API health routes. If the
+check returns 404, compare the CDN response with the direct VPS origin before
+retrying an update; see the public-route troubleshooting section in
+`docs/OPERATIONS.md`.
 
 If the deployment is intentionally pointed at a different SSH endpoint, pass
 the matching public health URL or explicitly skip the public check:

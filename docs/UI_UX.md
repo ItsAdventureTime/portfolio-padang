@@ -1,5 +1,12 @@
 # UI_UX.md — Padang ERP Lite
 
+> **Implementation status (2026-08-14):** This document remains the target UX
+> contract. The current C1 frontend implements the shell, dashboard, and
+> read-only module registers only. CRUD, approval, payment, QBO, and reporting
+> flows below are not yet release-verified. Until those flows exist, unfinished
+> controls must be disabled or labeled as coming soon rather than implying a
+> completed action path.
+
 ## UX Principles
 
 1. **Role-aware surfaces** — Each role sees only what they need. No cognitive clutter.

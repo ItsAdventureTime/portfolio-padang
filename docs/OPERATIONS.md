@@ -242,6 +242,51 @@ npm run check:offline-fonts
 This check verifies that `layout.tsx` has no `next/font/google` import and that
 both package metadata and the lockfile contain all three local font packages.
 
+### Public page or health route returns HTTP 404
+
+Run the public matrix from the repository root:
+
+```bash
+scripts/check-padang-public-routes.sh
+```
+
+The check expects HTTP 200 from the demo page, production page, and both API
+health URLs. A 404 from BunnyCDN means the CDN pull zone is not serving the
+configured origin or path. A 404 from the direct origin means the VPS Caddy
+configuration has not installed the matching route or the expected Quadlets
+are not serving it. Compare both layers without changing state:
+
+```bash
+curl -k -I --resolve delegateops.business:443:216.75.75.136 \
+  https://delegateops.business/padang/demo
+```
+
+Inspect the Caddy and user services on the VPS before retrying a deployment:
+
+```bash
+systemctl --user status caddy.service
+systemctl --user status padang-demo-app.service padang-demo-api.service
+```
+
+The 2026-08-14 end-to-end audit observed HTTP 404 from both public BunnyCDN
+URLs and the direct Caddy origin. This remains unresolved until the route
+matrix passes; do not report the public app as working meanwhile.
+
+### Starting a local working preview
+
+Use the repository helper instead of exporting application variables manually:
+
+```bash
+scripts/start-padang-local.sh
+# If the default ports are busy:
+scripts/start-padang-local.sh --web-port 3100 --api-port 8180
+```
+
+It starts a no-credential demo API and Next.js dev server in Podman, then
+prints the local page and health URLs. It intentionally does not exercise
+PostgreSQL-backed persistence, production OTP authentication, Backblaze B2,
+or the incomplete ERP workflows.
+
 ### API container not starting
 
 1. Check logs: `journalctl --user -u bridge-ph-padang-api.service -n 50`
