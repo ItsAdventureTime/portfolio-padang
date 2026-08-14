@@ -12,7 +12,7 @@ The public release gate is currently failing with HTTP 404; the full ERP
 workflow surface is not yet implemented.
 BRANCH: main
 BASE COMMIT: bbdd803
-LATEST IMPLEMENTATION COMMIT: 83c2f4f (`fix(deploy): make Padang Caddy route installation idempotent`)
+LATEST IMPLEMENTATION COMMIT: 70e1967 (`fix(deploy): guard persistent demo PostgreSQL state`)
 REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
