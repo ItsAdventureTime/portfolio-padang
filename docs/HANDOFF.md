@@ -285,6 +285,28 @@ Production backup activation follows the same placement with
 `/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer`. No VPS
 deployment, SSH operation, commit, or push is part of this remediation.
 
+## Reset Timer FragmentPath Alias Remediation (2026-08-15)
+
+The first post-placement validation produced a Fedora CoreOS false-negative:
+systemd exposed the correctly installed reset timer as the canonical
+`/var/home/jk/...` path while the updater's trusted logical path remained
+`/home/jk/...`. The remote assertion now uses `realpath -e` and accepts only
+the exact configured logical path or its exact canonical realpath. It fails
+closed when canonicalization fails and rejects arbitrary links, other-user,
+relative, empty, missing, or wrong paths while retaining `LoadState=loaded` and
+`Unit=padang-demo-reset.service` checks. Failure diagnostics print both logical
+and canonical expected paths; `systemd-analyze --user unit-paths` is the
+documented discovery diagnostic.
+
+The existing Quadlet fixture executes logical/canonical acceptance, hostile
+alias rejection, wrong-target rejection, and unloaded-timer rejection using a
+temporary symlink fixture, without requiring a live systemd manager. Timer
+placement regression remains enforced: no `.timer` source is allowed under the
+Quadlet directories. Focused local validation passed with
+`/opt/homebrew/bin/podman info`, `bash -n scripts/*.sh`,
+`scripts/test-padang-demo-quadlets.sh`, and `git diff --check`. No VPS
+deployment, SSH operation, commit, or push was performed.
+
 ---
 
 ## Specification Overview & Architectural Decisions

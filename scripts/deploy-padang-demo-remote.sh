@@ -131,23 +131,160 @@ assert_quadlet_units_present() {
   fi
 }
 
+reset_timer_fragment_path_matches() {
+  local fragment="${1:-}"
+  local logical_path="${2:-}"
+  local canonical_path
+
+  [[ -n "$fragment" && -n "$logical_path" ]] || return 1
+  canonical_path=$(realpath -e -- "$logical_path" 2>/dev/null) || return 1
+  [[ "$fragment" == "$logical_path" || "$fragment" == "$canonical_path" ]]
+}
+
 assert_reset_timer_present() {
-  local state target fragment
+  local state target fragment canonical_timer_path
   local -a missing_details=()
   state=$(systemctl --user show padang-demo-reset.timer -p LoadState --value 2>/dev/null || true)
   [[ "$state" == loaded ]] || missing_details+=("padang-demo-reset.timer (LoadState=${state:-unknown})")
   target=$(systemctl --user show padang-demo-reset.timer -p Unit --value 2>/dev/null || true)
   [[ "$target" == padang-demo-reset.service ]] || missing_details+=("padang-demo-reset.timer target (Unit=${target:-unknown})")
   fragment=$(systemctl --user show padang-demo-reset.timer -p FragmentPath --value 2>/dev/null || true)
-  [[ "$fragment" == "$RESET_TIMER_PATH" ]] || missing_details+=("padang-demo-reset.timer path (FragmentPath=${fragment:-unknown})")
+  canonical_timer_path=$(realpath -e -- "$RESET_TIMER_PATH" 2>/dev/null || true)
+  reset_timer_fragment_path_matches "$fragment" "$RESET_TIMER_PATH" ||
+    missing_details+=("padang-demo-reset.timer path (FragmentPath=${fragment:-unknown})")
 
   if ((${#missing_details[@]})); then
     printf 'padang-demo-remote: expected standard systemd user timer is missing or misconfigured:\n' >&2
     printf '  %s\n' "${missing_details[@]}" >&2
-    printf 'padang-demo-remote: expected timer file: %s\n' "$RESET_TIMER_PATH" >&2
+    printf 'padang-demo-remote: expected logical timer path: %s\n' "$RESET_TIMER_PATH" >&2
+    printf 'padang-demo-remote: expected canonical timer path: %s\n' "${canonical_timer_path:-unavailable}" >&2
     systemctl --user cat padang-demo-reset.timer >&2 || true
     die "reset timer validation failed; no application services were started"
   fi
+}
+
+run_reset_timer_path_fixture_tests() {
+  local fixture_root host_realpath fixture_timer_path canonical_timer_path
+  local tmp_fragment other_user_fragment relative_fragment missing_fragment
+  local fixture_cleanup_command
+  local fixture_state='loaded'
+  local fixture_target='padang-demo-reset.service'
+  local fixture_fragment
+  local rejected_fragment
+  local -a rejected_fragments
+
+  host_realpath=$(command -v realpath) || {
+    printf 'padang-demo-remote: realpath is required for the path matcher fixture\n' >&2
+    return 1
+  }
+  fixture_root=$(mktemp -d "${TMPDIR:-/tmp}/padang-reset-timer.XXXXXX")
+  printf -v fixture_cleanup_command 'rm -rf -- %q' "$fixture_root"
+  trap "$fixture_cleanup_command" RETURN
+
+  # macOS realpath does not expose GNU realpath -e; this fixture shim keeps the
+  # production call and its existing-path semantics portable on the control plane.
+  realpath() {
+    if [[ "${1:-}" == -e ]]; then
+      shift
+    fi
+    if [[ "${1:-}" == -- ]]; then
+      shift
+    fi
+    [[ $# -eq 1 && -e "$1" ]] || return 1
+    "$host_realpath" "$1"
+  }
+
+  mkdir -p "$fixture_root/home" \
+    "$fixture_root/var/home/jk/.config/systemd/user" \
+    "$fixture_root/var/home/jk-other/.config/systemd/user" \
+    "$fixture_root/tmp"
+  ln -s "$fixture_root/var/home/jk" "$fixture_root/home/jk"
+  fixture_timer_path="$fixture_root/home/jk/.config/systemd/user/padang-demo-reset.timer"
+  : > "$fixture_timer_path"
+  canonical_timer_path=$(realpath -e -- "$fixture_timer_path")
+  tmp_fragment="$fixture_root/tmp/padang-demo-reset.timer"
+  ln -s "$fixture_timer_path" "$tmp_fragment"
+  other_user_fragment="$fixture_root/var/home/jk-other/.config/systemd/user/padang-demo-reset.timer"
+  ln -s "$fixture_timer_path" "$other_user_fragment"
+  relative_fragment="${fixture_timer_path#"$fixture_root/"}"
+  missing_fragment="$fixture_root/var/home/jk/.config/systemd/user/missing.timer"
+
+  reset_timer_fragment_path_matches "$fixture_timer_path" "$fixture_timer_path" || {
+    printf 'padang-demo-remote: logical timer path was rejected by the fixture\n' >&2
+    return 1
+  }
+  reset_timer_fragment_path_matches "$canonical_timer_path" "$fixture_timer_path" || {
+    printf 'padang-demo-remote: canonical timer path was rejected by the fixture\n' >&2
+    return 1
+  }
+
+  rejected_fragments=(
+    "$tmp_fragment"
+    "$other_user_fragment"
+    "$relative_fragment"
+    ""
+    "$missing_fragment"
+  )
+  for rejected_fragment in "${rejected_fragments[@]}"; do
+    if reset_timer_fragment_path_matches "$rejected_fragment" "$fixture_timer_path"; then
+      printf 'padang-demo-remote: rejected timer path unexpectedly matched: %s\n' "${rejected_fragment:-empty}" >&2
+      return 1
+    fi
+  done
+  if reset_timer_fragment_path_matches "$fixture_timer_path" "$missing_fragment"; then
+    printf 'padang-demo-remote: missing expected timer path unexpectedly canonicalized\n' >&2
+    return 1
+  fi
+
+  systemctl() {
+    case "$*" in
+      '--user show padang-demo-reset.timer -p LoadState --value')
+        printf '%s\n' "$fixture_state"
+        ;;
+      '--user show padang-demo-reset.timer -p Unit --value')
+        printf '%s\n' "$fixture_target"
+        ;;
+      '--user show padang-demo-reset.timer -p FragmentPath --value')
+        printf '%s\n' "$fixture_fragment"
+        ;;
+      '--user cat padang-demo-reset.timer')
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  fixture_fragment="$fixture_timer_path"
+  if ! (RESET_TIMER_PATH="$fixture_timer_path"; assert_reset_timer_present); then
+    printf 'padang-demo-remote: valid logical timer assertion failed in fixture\n' >&2
+    return 1
+  fi
+  fixture_fragment="$canonical_timer_path"
+  if ! (RESET_TIMER_PATH="$fixture_timer_path"; assert_reset_timer_present); then
+    printf 'padang-demo-remote: valid canonical timer assertion failed in fixture\n' >&2
+    return 1
+  fi
+  fixture_fragment="$tmp_fragment"
+  if (RESET_TIMER_PATH="$fixture_timer_path"; assert_reset_timer_present >/dev/null 2>&1); then
+    printf 'padang-demo-remote: temporary symlink unexpectedly passed timer assertion\n' >&2
+    return 1
+  fi
+  fixture_fragment="$canonical_timer_path"
+  fixture_target='wrong.service'
+  if (RESET_TIMER_PATH="$fixture_timer_path"; assert_reset_timer_present >/dev/null 2>&1); then
+    printf 'padang-demo-remote: wrong timer target unexpectedly passed assertion\n' >&2
+    return 1
+  fi
+  fixture_target='padang-demo-reset.service'
+  fixture_state='not-found'
+  if (RESET_TIMER_PATH="$fixture_timer_path"; assert_reset_timer_present >/dev/null 2>&1); then
+    printf 'padang-demo-remote: unloaded timer unexpectedly passed assertion\n' >&2
+    return 1
+  fi
+
+  log "reset timer logical/canonical path matcher fixtures passed"
 }
 
 check_auto_update_timer() {
@@ -662,6 +799,10 @@ run_quadlet_fixture_tests() {
     return 1
   }
   grep -q 'systemd-analyze --user --generators=true verify' "$script_path" || return 1
+  grep -q 'realpath -e' "$script_path" || {
+    printf 'padang-demo-remote: secure timer path canonicalization is missing\n' >&2
+    return 1
+  }
   grep -q 'SYSTEMD_USER_DIR="/home/jk/.config/systemd/user"' "$script_path" || {
     printf 'padang-demo-remote: standard systemd user directory is missing\n' >&2
     return 1
@@ -742,6 +883,7 @@ run_quadlet_fixture_tests() {
     printf 'padang-demo-remote: checked-in frontend template must not use WorkDir=\n' >&2
     return 1
   fi
+  run_reset_timer_path_fixture_tests
   log "canonical renderer, frontend UID, working-directory, and generated-unit preflight fixtures passed"
 }
 
@@ -761,7 +903,7 @@ fi
 [[ "$QUADLET_DIR" == /home/jk/.config/containers/systemd/bridge-ph/padang-demo ]] || die "Quadlet directory guard failed"
 [[ "$SYSTEMD_USER_DIR" == /home/jk/.config/systemd/user ]] || die "systemd user directory guard failed"
 
-for command_name in podman systemctl awk sed grep find install cmp journalctl stat; do
+for command_name in podman systemctl awk sed grep find install cmp journalctl stat realpath; do
   command -v "$command_name" >/dev/null 2>&1 || die "$command_name is required"
 done
 

@@ -230,6 +230,31 @@ Primary references:
 - [Podman Quadlet basic usage and generator diagnostics](https://docs.podman.io/en/latest/markdown/podman-quadlet-basic-usage.7.html)
 - [Official Node.js Docker image guidance](https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md)
 
+### Reset Timer FragmentPath Validation Incident (2026-08-15)
+
+The first post-placement demo update produced a validation false-negative:
+the timer was correctly installed and targeted `padang-demo-reset.service`,
+but Fedora CoreOS reported `FragmentPath=/var/home/jk/...` while the updater's
+trusted logical path was `/home/jk/...`. Literal equality rejected this valid
+systemd alias before any application service started.
+
+The approved fix keeps the fixed `/home/jk` configuration and strict path
+guards. It canonicalizes the configured logical timer path with `realpath -e`
+and accepts only the exact logical path or the exact canonical result. A
+canonicalization failure fails closed; links under `/tmp`, other-user paths,
+relative/empty/missing values, and unrelated aliases are rejected even when
+they resolve to the same inode. Diagnostics print both expected forms, and
+`systemd-analyze --user unit-paths` documents the systemd search-path check.
+
+The shell fixture executes both accepted forms using a temporary `/home` to
+`/var/home` symlink, then rejects temporary/other-user/relative/empty/missing
+paths and wrong-target/unloaded timer states without a live systemd manager.
+
+Primary references:
+
+- [systemd-analyze documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd-analyze.html)
+- [GNU coreutils `realpath`](https://www.gnu.org/software/coreutils/manual/html_node/realpath-invocation.html)
+
 ### Luna Reviewer UI Audit Refresh (2026-08-14)
 
 The bounded UI remediation keeps the existing Next.js/React/CSS stack and

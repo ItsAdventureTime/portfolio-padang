@@ -57,6 +57,8 @@ systemctl --user daemon-reload
 QUADLET_UNIT_DIRS=/home/jk/.config/containers/systemd/bridge-ph/padang-demo \
   /usr/lib/systemd/system-generators/podman-system-generator --user --dryrun
 systemd-analyze --user --generators=true verify padang-demo-app.service
+systemd-analyze --user unit-paths
+realpath -e -- /home/jk/.config/systemd/user/padang-demo-reset.timer
 podman quadlet list
 systemctl --user list-unit-files 'padang-demo-*' --no-legend
 find /home/jk/.config/containers/systemd/bridge-ph/padang-demo \
@@ -71,7 +73,12 @@ The expected mapping is `padang-demo-app.container` to
 only the Podman container name. The reset container remains in the Quadlet
 directory, but `padang-demo-reset.timer` must resolve from
 `/home/jk/.config/systemd/user/padang-demo-reset.timer`; a `.timer` file under
-the Quadlet directory is not a supported Quadlet source.
+the Quadlet directory is not a supported Quadlet source. The `/home/jk/...`
+value is the trusted logical path. On Fedora CoreOS, `FragmentPath` may instead
+be the exact canonical `/var/home/jk/...` path; compare it with `realpath -e`
+of the logical path. Do not accept a `/tmp` link, another user's path, a
+relative/empty/missing value, or any alias merely because it resolves to the
+same inode. `realpath -e` failure is a validation failure.
 
 ### Health Check
 
@@ -412,6 +419,13 @@ condition.
 2. Verify placement/target: `systemctl --user show padang-demo-reset.timer -p FragmentPath -p Unit`
 3. Check last run: `journalctl --user -u padang-demo-reset.service -n 20`
 4. Manual trigger: `systemctl --user start padang-demo-reset.service`
+
+For placement failures, treat `/home/jk/.config/systemd/user/padang-demo-reset.timer`
+as the logical expected path and compare `FragmentPath` with
+`realpath -e --` of that path. Fedora CoreOS may show the exact
+`/var/home/jk/...` canonical result. Use `systemd-analyze --user unit-paths` to
+inspect the user-manager search path; canonicalization failure or an unrelated
+link remains a validation failure.
 
 ### Backup failure
 

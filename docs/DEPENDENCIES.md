@@ -125,7 +125,11 @@ units, not Quadlet sources; install them under
 `/home/jk/.config/systemd/user/`, separate from the recursive Quadlet directory.
 The demo reset timer is `padang-demo-reset.timer` and the production backup
 timer is `bridge-ph-padang-backup.timer`; activate either with
-`systemctl --user enable --now <timer>` after `daemon-reload`.
+`systemctl --user enable --now <timer>` after `daemon-reload`. The remote
+updater requires `realpath` with GNU `realpath -e` semantics to validate the
+trusted logical timer path against systemd's canonical `FragmentPath`; keep
+this command available in the Fedora CoreOS image. `systemd-analyze --user
+unit-paths` is the path-search diagnostic when a timer is not discovered.
 
 References: [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
 and [Podman Quadlet basic usage and generator diagnostics](https://docs.podman.io/en/latest/markdown/podman-quadlet-basic-usage.7.html).

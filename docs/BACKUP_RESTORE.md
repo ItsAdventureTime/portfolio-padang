@@ -137,7 +137,11 @@ systemctl --user list-timers bridge-ph-padang-backup.timer
 
 The `.timer` suffix is standard systemd user-unit syntax, not a supported
 Quadlet source suffix. Do not copy the timer into the production Quadlet
-directory.
+directory. `/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer` is the
+trusted logical path; Fedora CoreOS may report its exact canonical
+`/var/home/jk/...` equivalent in `FragmentPath`. Use `realpath -e --` on the
+logical path and accept only the logical or exact canonical result when
+diagnosing placement; do not treat arbitrary links as equivalent.
 
 ---
 

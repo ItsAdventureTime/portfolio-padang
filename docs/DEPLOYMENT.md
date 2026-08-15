@@ -35,12 +35,22 @@ This runbook follows the current upstream model for the selected stack:
   `/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer`; only
   `.container` and `.network` files belong under
   `/home/jk/.config/containers/systemd/bridge-ph/`.
+- The `/home/jk/...` timer locations are trusted logical paths. Fedora CoreOS
+  may expose the same user home as `/var/home/jk/...` in systemd's
+  `FragmentPath`; the updater accepts only the exact logical path or the exact
+  `realpath -e` canonical path of that configured logical path. If
+  canonicalization fails, validation fails closed. `/tmp` links, other-user
+  paths, relative paths, empty values, and missing paths are not accepted even
+  when they resolve to the same file.
 - The updater verifies every expected generated network and container unit plus
   the normal systemd reset timer immediately after `daemon-reload`, before
   starting PostgreSQL or the application stack. A missing generated unit or
   mislocated timer fails closed and prints the Quadlet files, the direct Podman
   generator dry-run for the nested directory, visible units, and
-  `systemd-analyze` generator diagnostics.
+  `systemd-analyze` generator diagnostics. For path troubleshooting, also run
+  `systemd-analyze --user unit-paths` and
+  `realpath -e -- /home/jk/.config/systemd/user/padang-demo-reset.timer`;
+  failure diagnostics print both the logical and canonical expected paths.
 - The dynamic demo renderer writes `padang-demo-app.container`, which Quadlet
   maps to `padang-demo-app.service`. `ContainerName=bridge-ph-padang-demo-
   frontend` remains the Podman container name used by Caddy and does not name
