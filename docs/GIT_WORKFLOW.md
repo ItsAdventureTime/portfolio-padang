@@ -92,6 +92,19 @@ Verify the local signature without exposing private key material:
 git log -1 --show-signature --format=fuller
 ```
 
+The commit author and committer email must also belong to the authenticated
+GitHub account. A valid local signature alone does not make GitHub show
+`Verified`; GitHub must associate both the signing key and commit identity.
+Check the identity without printing the account's email list:
+
+```sh
+gh api user/emails \
+  --jq 'any(.[]; .email == "<configured-commit-email>" and .verified == true)'
+```
+
+If the result is `false`, stop and correct the local identity through the
+approved credential process before committing. Never print or copy tokens.
+
 ## Update GitHub over HTTPS
 
 The remote update sequence is:
@@ -119,9 +132,12 @@ git status --short --branch
 ```
 
 The GitHub API verification result must report `verified=true` for a signed
-commit. `gh auth setup-git` authenticates the HTTPS transport; it does not
-create a commit signature. Commit signing and transport authentication are
-separate checks.
+commit. If it reports `verified=false` with `reason=no_user`, inspect the
+author/committer email and signing-key association before declaring the update
+complete; do not rewrite shared history merely to replace a signature.
+`gh auth setup-git` authenticates the HTTPS transport; it does not create a
+commit signature. Commit signing, account identity, and transport
+authentication are separate checks.
 
 ## Current branch consolidation
 
