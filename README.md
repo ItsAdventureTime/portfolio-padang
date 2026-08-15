@@ -71,8 +71,11 @@ The command uses `jk@216.75.75.136:22` by default, preserves demo data, and
 checks both `https://delegateops.business/padang/demo` and
 `https://delegateops.business/padang/demo/api/v1/health` after an apply. Use
 `--dry-run` to validate without changing Quadlets, secrets, Caddy, or runtime
-data. Use `--seed-demo` only when an intentional synthetic-data reset is
-required. After a successful demo apply, run
+data. Before the SSH sync, it builds the Linux/amd64 API and the
+`/padang/demo` standalone frontend inside the Docker Sandbox and uploads the
+prepared artifacts; the VPS does not compile or install Node/Go dependencies.
+Use `--seed-demo` only when an intentional synthetic-data reset is required.
+After a successful demo apply, run
 `scripts/check-padang-public-routes.sh --demo-only`; use the default checker
 once production is deployed as well. See `docs/DEPLOYMENT.md` for the full
 runbook.

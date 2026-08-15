@@ -91,6 +91,16 @@ frontend artifacts because `/padang/demo` and `/padang` are compiled into
 The Go API remains the shared API for the web client and future iOS/Android
 clients; see ADR-011.
 
+## Deployment Build Boundary
+
+The demo release is built locally through the configured Docker Sandbox:
+`scripts/build-padang-demo-local.sh` runs via `jk-sbx-project exec` and writes
+the ignored `build/padang-demo/` Linux/amd64 API and standalone Next.js demo
+artifacts. `scripts/update-padang-demo.sh` synchronizes that release separately
+from source. The VPS deployment script performs artifact/checksum validation,
+Quadlet/Caddy staging, and runtime activation only; rootless Podman remains the
+VPS runtime and is not used for local compilation or tests.
+
 ---
 
 ## Phase Status

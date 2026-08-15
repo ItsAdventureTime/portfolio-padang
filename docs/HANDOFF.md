@@ -34,6 +34,25 @@ maintenance updates are allowed only when explicitly user-authorized and
 reviewed. SSH is reserved for the separately documented VPS deployment
 transport; it is not a GitHub remote or Git credential path.
 
+## Local Artifact Deployment Revision (2026-08-16)
+
+The normal demo deployment model has changed: compilation, package installation,
+tests, lint, and release assembly happen locally inside the project Docker
+Sandbox. `scripts/build-padang-demo-local.sh` produces the ignored
+`build/padang-demo/` release directory with a Linux/amd64 API binary, a
+standalone Next.js demo server, static assets, and
+`release-manifest.txt`. The manifest records the source revision, target,
+`/padang/demo` base path, and SHA-256 checksums.
+
+`scripts/update-padang-demo.sh` and `scripts/deploy-padang-demo.sh` invoke that
+builder through `jk-sbx-project exec`, synchronize the source and release
+artifacts separately to `jk@216.75.75.136:22`, and then call the VPS-side
+deployment script. The VPS script no longer runs Go or Node builds. It validates
+the local release, stages Quadlets and Caddy routing, and uses rootless Podman
+only for the deployed runtime, migrations, secrets, and remote configuration
+checks. The VPS must remain Linux/amd64 unless the release target and runtime
+contract are deliberately changed together.
+
 ## C1 Review and Remediation Record
 
 The Luna reviewer identified authentication race conditions, stale production
@@ -94,12 +113,13 @@ if reload or activation fails.
 ## Offline Font Build Remediation (2026-08-14)
 
 The frontend no longer imports fonts through `next/font/google`, which caused
-VPS `next build` failures when Google Fonts was unreachable. Outfit, Inter, and
-JetBrains Mono now come from Fontsource variable packages installed by
-`npm ci`; the existing CSS font-role variables remain unchanged. The focused
+the earlier `next build` failures when Google Fonts was unreachable. Outfit,
+Inter, and JetBrains Mono now come from Fontsource variable packages installed
+by `npm ci`; the existing CSS font-role variables remain unchanged. The focused
 `frontend` check `npm run check:offline-fonts` verifies the layout import and
-package/lockfile metadata. The VPS build still needs npm registry access (or a
-configured npm cache) to install dependencies, but no Google Fonts access.
+package/lockfile metadata. The local Docker Sandbox build still needs npm
+registry access (or a configured cache), but the VPS deployment does not run
+`npm ci` or contact Google Fonts.
 
 ## End-to-End Review and Bounded Remediation (2026-08-14)
 
@@ -601,7 +621,9 @@ an undocumented placeholder table.
 1. Read `AGENTS.md`, `docs/PROJECT_CONSTITUTION.md`, and `docs/HANDOFF.md` before starting.
 2. Implement tasks sequentially from **TASK-001** through **TASK-009**.
 3. Do not modify architectural boundaries, database DDL principles, or security models without architect approval.
-4. Execute runtime tests using `podman run --rm` per the macOS execution policy.
+4. Execute project runtimes, builds, and tests through `jk-sbx-project exec` in
+   the Docker Sandbox per the macOS execution policy. Use Podman only for the
+   remote VPS runtime.
 5. Create feature branches (`feat/task-001-db-migrations`, etc.) for implementation commits.
 6. Record exact verification results for each task.
 
@@ -611,10 +633,10 @@ an undocumented placeholder table.
 
 - **Phase A1 Status:** COMPLETE, with planning clarification addendum applied.
 - **Current instruction:** **GO: CODEX C1** is active. Implement sequentially,
-  validate runtime/build/test work only in disposable Podman containers, and do
-  not deploy to the VPS during C1. Update this handoff with exact results before
-  committing and pushing the working branch; the reviewed C1 history is now
-  consolidated on `main`.
+  validate runtime/build/test work through the Docker Sandbox, and do not deploy
+  to the VPS without explicit authorization. Update this handoff with exact
+  results before committing and pushing the working branch; the reviewed C1
+  history is now consolidated on `main`.
 
 ## C1 Implementation and Validation Log
 
@@ -638,9 +660,10 @@ an undocumented placeholder table.
 
 ## Automated Padang Demo Deployment Workflow
 
-- macOS performs only the synchronized-source upload and remote handoff;
-  compilation, tests, package installation, and runtime startup occur on the
-  VPS in disposable `podman run --rm` containers.
+- macOS invokes the Docker Sandbox release builder, uploads source and prepared
+  artifacts separately, and performs the remote handoff; compilation, tests,
+  and package installation do not occur on the VPS. Runtime startup remains on
+  the VPS through rootless Podman Quadlets.
 - The default deployment endpoint is `jk@216.75.75.136:22`; the public demo
   route remains `https://delegateops.business/padang/demo`.
 - Routine updates use `scripts/update-padang-demo.sh` and preserve demo data;

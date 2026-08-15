@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 readonly REMOTE_ROOT="/home/jk/bridge-ph/padang-demo"
 readonly REMOTE_SOURCE="${REMOTE_ROOT}/source"
+readonly REMOTE_BUILD="${REMOTE_ROOT}/build"
 readonly REMOTE_SCRIPT="${REMOTE_SOURCE}/scripts/deploy-padang-demo-remote.sh"
 readonly DEFAULT_VPS_HOST="216.75.75.136"
 readonly DEFAULT_VPS_USER="jk"
@@ -13,6 +14,7 @@ readonly DEFAULT_PUBLIC_HEALTH_URL="https://delegateops.business/padang/demo/api
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "${SCRIPT_DIR}/.." && pwd -P)
 readonly REPO_ROOT
+readonly LOCAL_BUILD_ROOT="${REPO_ROOT}/build/padang-demo"
 
 VPS_HOST="${VPS_HOST:-${REMOTE_HOST:-$DEFAULT_VPS_HOST}}"
 VPS_USER="${VPS_USER:-${REMOTE_USER:-$DEFAULT_VPS_USER}}"
@@ -38,9 +40,11 @@ Custom SSH targets require --public-url URL and --health-url URL, or
 --skip-health-check, on apply.
 Options may also be supplied as VPS_HOST, VPS_USER, and VPS_PORT.
 REMOTE_HOST, REMOTE_USER, and SSH_PORT remain accepted for compatibility.
-The Padang demo repository is synchronized to /home/jk/bridge-ph/padang-demo/source,
-then the source-side remote deployment script is invoked. The official URL is
-https://delegateops.business/padang/demo.
+The release is built locally inside the project's Docker Sandbox, then the
+source and prepared Linux/amd64 artifacts are synchronized to
+/home/jk/bridge-ph/padang-demo. The VPS only stages artifacts, Quadlets,
+secrets, and Caddy routing before activating its rootless Podman runtime. The
+official URL is https://delegateops.business/padang/demo.
 
 Normal apply updates preserve demo data. --seed-demo is an explicit destructive
 operation that reseeds the demo database and must not be used for routine code
@@ -83,10 +87,21 @@ validate_public_url() {
 
 validate_local_tools() {
   local tool
-  for tool in ssh rsync; do
+  for tool in jk-sbx-project ssh rsync; do
     command -v "$tool" >/dev/null 2>&1 ||
-      die "$tool is required on macOS"
+      die "$tool is required"
   done
+}
+
+build_local_artifacts() {
+  printf 'Building release artifacts in the Docker Sandbox...\n'
+  (cd -- "$REPO_ROOT" && jk-sbx-project exec bash scripts/build-padang-demo-local.sh)
+  [[ -x "$LOCAL_BUILD_ROOT/backend/padang-api" ]] ||
+    die "local build did not produce the backend artifact"
+  [[ -f "$LOCAL_BUILD_ROOT/frontend/server.js" ]] ||
+    die "local build did not produce the frontend artifact"
+  [[ -f "$LOCAL_BUILD_ROOT/release-manifest.txt" ]] ||
+    die "local build did not produce a release manifest"
 }
 
 find_credential_file() {
@@ -243,6 +258,17 @@ RSYNC=(
   --exclude='id_ecdsa'
   --exclude='id_ed25519'
 )
+ARTIFACT_RSYNC=(
+  rsync
+  --archive
+  --compress
+  --delete-delay
+  --human-readable
+  --itemize-changes
+  --exclude='.DS_Store'
+)
+
+build_local_artifacts
 
 printf 'Preparing remote source directory: %s:%s\n' "$SSH_TARGET" \
   "$REMOTE_SOURCE"
@@ -253,12 +279,17 @@ if [[ "$DEPLOY_MODE" == --apply && "$HEALTH_CHECK" == 1 ]]; then
 else
   printf 'Public demo page and health checks: skipped\n'
 fi
-"${SSH[@]}" "mkdir -p -- '$REMOTE_SOURCE'"
+"${SSH[@]}" "mkdir -p -- '$REMOTE_SOURCE' '$REMOTE_BUILD'"
 
 printf 'Synchronizing repository to %s:%s/ ...\n' "$SSH_TARGET" \
   "$REMOTE_SOURCE"
 "${RSYNC[@]}" -e "ssh -p $VPS_PORT" "$REPO_ROOT/" \
   "${SSH_TARGET}:${REMOTE_SOURCE}/"
+
+printf 'Synchronizing locally built release artifacts to %s:%s/ ...\n' \
+  "$SSH_TARGET" "$REMOTE_BUILD"
+"${ARTIFACT_RSYNC[@]}" -e "ssh -p $VPS_PORT" "$LOCAL_BUILD_ROOT/" \
+  "${SSH_TARGET}:${REMOTE_BUILD}/"
 
 printf 'Invoking VPS-side deployment (%s) ...\n' "$DEPLOY_MODE"
 remote_command=(bash -- "$REMOTE_SCRIPT" "$DEPLOY_MODE")

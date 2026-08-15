@@ -26,11 +26,11 @@ From the repository root on macOS, run:
 scripts/update-padang-demo.sh
 ```
 
-This is the normal remote update path. It synchronizes the current source to
-the VPS, runs the Go and Next.js checks/builds inside disposable Podman
-containers on the VPS,
-applies pending migrations, restarts the demo API/frontend Quadlet services,
-and verifies both the demo page and
+This is the normal remote update path. It builds the Linux/amd64 Go API and
+`/padang/demo` Next.js standalone artifacts inside the local Docker Sandbox,
+synchronizes the source and release artifacts to the VPS, validates their
+manifest/checksums remotely, applies pending migrations, restarts the demo
+API/frontend Quadlet services, and verifies both the demo page and
 `https://delegateops.business/padang/demo/api/v1/health`.
 It defaults to `jk@216.75.75.136:22`, so no environment variables are needed.
 Use `--host`, `--user`, or `--port` only if the SSH endpoint differs.
@@ -50,7 +50,9 @@ artifact build. Standard `.timer` units are kept separately under
 `padang-demo-reset.timer` and the production backup timer is
 `bridge-ph-padang-backup.timer`. Application Quadlets do not declare an
 auto-update policy; the update command is the controlled release boundary and
-refuses to apply while `podman-auto-update.timer` is active or enabled.
+refuses to apply while `podman-auto-update.timer` is active or enabled. Podman
+is used only for the VPS runtime and remote Caddy/configuration checks; local
+builds and fixtures run through the Docker Sandbox.
 
 If the updater reports `Unit padang-demo-app.service not found`, it is a
 Quadlet generation failure, not a frontend health failure. The incident was
@@ -290,7 +292,7 @@ Record significant operational events below.
 ### Frontend build reports `mkdir '/src/.npm'`
 
 This means npm tried to write its user state under the read-only `/src` source
-mount. The remote builder configures `HOME=/tmp/npm-home`,
+mount. The local Docker Sandbox builder configures `HOME=/tmp/npm-home`,
 `NPM_CONFIG_CACHE=/tmp/npm-cache`, and `NPM_CONFIG_USERCONFIG=/tmp/npm-config/npmrc`;
 its `/tmp` filesystem and npm directories are disposable, so no host cache
 cleanup is required.
@@ -304,21 +306,20 @@ scripts/update-padang-demo.sh
 ```
 
 For an initial deployment, use the corresponding `scripts/deploy-padang-demo.sh`
-command. If the log still names `/src/.npm`, the updated remote script was not
-synchronized; rerun from the current repository checkout. Do not make `/src`
-writable or delete source files to recover.
+command. If the log still names `/src/.npm`, rerun the local builder from the
+current repository checkout; do not make `/src` writable or delete source files
+to recover.
 
 ### Frontend build reports Google Fonts fetch timeouts
 
 The frontend uses local Fontsource variable packages, so `next build` must not
 contact `fonts.googleapis.com` or `fonts.gstatic.com`. If a build log still
-reports `next/font/google` or Google Fonts retries, the VPS is building stale
-source or the source synchronization is incomplete. From the repository root,
-run the focused check before retrying the update:
+reports `next/font/google` or Google Fonts retries, the local sandbox is using
+stale source or the source checkout is incomplete. From the repository root,
+run the focused check inside the sandbox before retrying the update:
 
 ```bash
-cd frontend
-npm run check:offline-fonts
+jk-sbx-project exec bash -lc 'cd frontend && npm run check:offline-fonts'
 ```
 
 This check verifies that `layout.tsx` has no `next/font/google` import and that

@@ -66,6 +66,41 @@ Primary references:
 - [GitHub CLI `gh api`](https://cli.github.com/manual/gh_api)
 - [GitHub signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
 
+### Local Artifact Deployment Refresh (2026-08-16)
+
+The deployment boundary now follows the installed Docker Sandbox model. Docker's
+current Sandbox guidance describes an isolated workspace with its own Docker
+engine, while the workspace can remain shared for source edits and intentional
+outputs. The project therefore runs the release builder through
+`jk-sbx-project exec`; the builder uses Docker, not local Podman, and exports
+only `build/padang-demo/`.
+
+The local release script follows the current Docker build guidance by keeping
+source mounts read-only, using disposable build/cache paths, pulling the
+builder images at build time, and separating build work from the runtime
+artifact. It runs the Go tests/vet/module verification and Next.js
+dependency/font/typecheck/lint/build gates, cross-compiles the API for
+Linux/amd64, and writes a manifest with artifact checksums. The VPS script
+validates that manifest and the checksums before changing Quadlets or starting
+the rootless Podman runtime. This prevents a dependency install, compiler, or
+frontend build from being silently performed on the VPS.
+
+Next.js self-hosting guidance recommends a reverse proxy and documents the
+standalone output path; this remains compatible with the Caddy path route and
+the compiled `/padang/demo` `basePath`. Go's reproducible-build guidance also
+supports explicit target settings and `-trimpath`; the release builder records
+the target and source revision so an operator can identify what was uploaded.
+
+Primary references:
+
+- [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/)
+- [Docker Sandbox get started](https://docs.docker.com/ai/sandboxes/get-started/)
+- [Docker build best practices](https://docs.docker.com/build/building/best-practices/)
+- [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/)
+- [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting)
+- [Next.js standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
+- [Go reproducible builds](https://go.dev/blog/rebuild)
+
 ### C1 Implementation Refresh: Current Maintainer Guidance
 
 The implementation uses Backblaze B2 as the storage provider. The S3 client

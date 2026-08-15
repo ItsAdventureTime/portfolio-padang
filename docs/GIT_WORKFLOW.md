@@ -40,6 +40,18 @@ or GitHub authentication is unavailable; do not create or print credentials.
 - VPS deployment SSH is separate from GitHub: the demo updater connects to
   `jk@216.75.75.136:22`; GitHub updates still use the HTTPS `origin` above.
 
+## Deployment build boundary
+
+The Padang demo updater builds locally before it opens the VPS deployment
+connection. `scripts/build-padang-demo-local.sh` runs through
+`jk-sbx-project exec`, creates the ignored `build/padang-demo/` Linux/amd64
+release, and writes a checksum-backed release manifest. The wrapper uploads
+that artifact directory separately from the source tree. The VPS script only
+validates/stages the release and activates its rootless Podman runtime; it does
+not run Go or Node compilation. `scripts/update-padang-demo.sh --dry-run`
+therefore exercises both local artifact generation and remote artifact
+validation without changing runtime services.
+
 GitHub supports HTTPS and SSH remote URLs. This project selects HTTPS, and
 GitHub CLI's `gh auth setup-git --hostname github.com` configures Git to use
 the CLI credential helper for the authenticated host. Do not print or copy

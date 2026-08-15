@@ -16,7 +16,9 @@
 - Digests: verification pending containerized implementation validation; record
   the resolved digest after each approved pull or release.
 - Update digests after each approved manual pull or deployment.
-- All builds happen inside `podman run --rm`; no compiler or Node.js installed on the VPS host.
+- Demo release builds happen inside Docker through the configured Docker
+  Sandbox; no compiler or Node.js is installed on the VPS host. Rootless Podman
+  remains the VPS runtime for Quadlets and service operations.
 
 ---
 
@@ -89,15 +91,17 @@ Next.js artifacts can carry different build-time `basePath` values.
 | `ghcr.io/itsadventuretime/padang-erp-frontend` | `latest` | Next.js production frontend (`/padang`) |
 | `ghcr.io/itsadventuretime/padang-erp-frontend` | `demo-latest` | Next.js demo frontend (`/padang/demo`) |
 
-### Build Images (used in `podman run --rm` build pipeline only; NOT in Quadlets)
+### Build Images (used by the Docker Sandbox builder only; NOT in Quadlets)
 
 | Image | Tag | Purpose |
 |---|---|---|
-| `docker.io/library/golang` | `alpine` | Compile Go binary (no version pin; latest stable) |
-| `docker.io/library/node` | `lts-alpine` | Build Next.js app (tracks active LTS) |
-| `docker.io/library/postgres` | `17-alpine` | Migration testing in CI/local (`podman run --rm`) |
+| `docker.io/library/golang` | `alpine` | Compile Go binary in `jk-sbx-project exec` (no version pin; latest stable) |
+| `docker.io/library/node` | `lts-alpine` | Build Next.js app in `jk-sbx-project exec` (tracks active LTS) |
+| `docker.io/library/postgres` | `17-alpine` | Migration testing in the Docker Sandbox |
 
-> **Before using any image:** verify digest using `podman pull <image>@sha256:<digest>` or `podman inspect`.
+> **Before using any builder image:** verify the digest using Docker inside the
+> Docker Sandbox (`jk-sbx-project exec docker image inspect ...`) and record it
+> below. VPS runtime image inspection remains a Podman operation.
 > Record sha256 below. Never assume a tag maps to the same digest as a previous pull.
 
 ### Digest Record
@@ -107,9 +111,10 @@ Next.js artifacts can carry different build-time `basePath` values.
 # Format: image:tag@sha256:digest | date | notes
 
 docker.io/library/postgres:17-alpine@sha256:TBD | pending | Clean-state default; record the resolved digest after deployment
-docker.io/library/golang:alpine@sha256:787328cefd7937073af18fc4b3a725f47e011ffdde9c2908239a25cae6b2f02b | 2026-08-12 | C1 validation pull
-docker.io/library/node:lts-alpine@sha256:0e6f1567e269207c28295276928277a030139cbc5a0fb7d5bd2674f0401a9082 | 2026-08-12 | C1 validation pull
-docker.io/library/alpine:latest@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18 | 2026-08-12 | C1 runtime/backup validation pull
+docker.io/library/golang:alpine@sha256:70b46548e42db77e0966aaf3619fd068734dc6c77584d526b91126504fd95816 | 2026-08-16 | Docker Sandbox local release builder
+docker.io/library/node:lts-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 | 2026-08-16 | Docker Sandbox local release builder
+docker.io/library/alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b | 2026-08-16 | Docker Sandbox fixture/runtime validation
+docker.io/library/caddy:alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 | 2026-08-16 | Docker Sandbox Caddy fixture validation
 docker.io/migrate/migrate:latest@sha256:0925c4b49497fa212e18c35df5f49c07ad12337a650b5e992d34807d02ffe6cd | 2026-08-12 | C1 migration validation pull
 ghcr.io/itsadventuretime/padang-erp-backup:latest@sha256:TBD | pending | Dedicated backup utility release image
 ```

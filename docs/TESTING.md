@@ -172,8 +172,11 @@ The minimum implementation gate for the current C1 foundation is:
   and `go mod verify`;
 - frontend `npm ci`, `npm run check:offline-fonts`, `npm run typecheck`, and
   `npm run lint`;
+- `jk-sbx-project exec bash scripts/build-padang-demo-local.sh` must produce a
+  Linux/amd64 API binary, a standalone `/padang/demo` frontend, and a release
+  manifest whose checksums match both runtime artifacts;
 - both demo and production frontend builds, with `--webpack` when the local
-  Podman VM cannot sustain Turbopack;
+  Docker Sandbox cannot sustain Turbopack;
 - clean PostgreSQL migration up and down against `postgres:17-alpine`;
 - `bash -n` for operational scripts, the deployment/local helper `--help`
   commands, `scripts/check-padang-public-routes.sh --help`, the disposable
@@ -216,32 +219,21 @@ proxy-network cardinality. The database identity
 check must connect as the persisted configured `POSTGRES_USER`; it must not
 assume that an OS `postgres` user implies a PostgreSQL role named `postgres`.
 
-Example backend check:
+The supported demo release check is the same command used by the deployment
+wrapper:
 
 ```sh
-podman run --rm \
-  -v "$PWD/backend:/src:ro" -w /src \
-  -e GOMAXPROCS=2 -e GOMEMLIMIT=1GiB \
-  docker.io/library/golang:alpine sh -c \
-  'go test -p 1 ./... && go vet -p 1 ./... && \
-   CGO_ENABLED=0 go build -trimpath -o /tmp/padang-api ./cmd/api && \
-   go mod verify'
+jk-sbx-project exec bash scripts/build-padang-demo-local.sh
 ```
 
-Example frontend check (copying the read-only source into container-local
-storage prevents `node_modules` and `.next` from being written to the host):
+The builder uses Docker within the project sandbox. It mounts source read-only,
+copies the frontend to disposable container-local storage before `npm ci`, and
+exports only `build/padang-demo/`. The backend is cross-compiled with
+`CGO_ENABLED=0`, `GOOS=linux`, and `GOARCH=amd64`; the frontend is compiled with
+`NEXT_PUBLIC_BASE_PATH=/padang/demo`.
 
-```sh
-podman run --rm \
-  -v "$PWD/frontend:/src:ro" -v "$PWD/frontend/types:/export:rw" \
-  -w /src docker.io/library/node:lts-alpine sh -c \
-   'cp -a /src /tmp/frontend && cd /tmp/frontend && \
-    npm ci --ignore-scripts --no-audit --no-fund && \
-    npm run check:offline-fonts && \
-    npm run typecheck && npm run lint'
-```
-
-For each base path, run the build in the same container-local copy:
+For the separate production artifact, run the equivalent build in the same
+sandbox/container-local pattern:
 
 ```sh
 NEXT_TELEMETRY_DISABLED=1 NEXT_PRIVATE_BUILD_WORKER=1 \
@@ -256,9 +248,11 @@ Repeat with `NEXT_PUBLIC_APP_ENV=production` and
 The current C1 repository does not yet contain the Playwright, Vitest,
 `golangci-lint`, or testcontainers suites described below. Those are planned
 quality gates, not commands to report as passed until their files and scripts
-exist. Use `scripts/start-padang-local.sh` for a no-credential local demo
-preview, but do not treat it as evidence for persistence, production auth, or
-the unimplemented ERP workflows.
+exist. `scripts/start-padang-local.sh` is a legacy Podman-specific preview
+helper and is outside the Docker Sandbox release path; use
+`scripts/build-padang-demo-local.sh` for the current local release gate. A
+successful build is not evidence for persistence, production auth, or the
+unimplemented ERP workflows.
 
 ---
 
@@ -330,23 +324,21 @@ Steps:
 # Host control-plane checks
 jk-sbx-project status
 git diff --check
-bash -n scripts/secrets-setup.sh
-bash scripts/test-deploy-padang-demo-caddy.sh
-bash scripts/check-padang-public-routes.sh --demo-only
 
-# Backend: run inside the Docker Sandbox
-jk-sbx-project exec bash -lc 'cd backend && go test -p 1 ./...'
-jk-sbx-project exec bash -lc 'cd backend && go vet -p 1 ./... && go mod verify'
+# Operational scripts and fixtures inside the Docker Sandbox
+jk-sbx-project exec bash -lc 'bash -n scripts/*.sh'
+jk-sbx-project exec bash scripts/test-deploy-padang-demo-caddy.sh
+jk-sbx-project exec bash scripts/check-padang-public-routes.sh --demo-only
+jk-sbx-project exec bash scripts/build-padang-demo-local.sh
+
+# Backend and release artifact gates run through the canonical local builder
+jk-sbx-project exec bash scripts/build-padang-demo-local.sh
 
 # Go vulnerability scan (when govulncheck is installed in the image)
 jk-sbx-project exec bash -lc 'cd backend && govulncheck ./...'
 
-# Inside the copied frontend directory in node:lts-alpine; see the C1 profile
-# above for the complete read-only mount and container-local copy pattern.
-npm run generate:types
-npm run typecheck
-npm run lint
-npm run build -- --webpack
+# The canonical builder also runs npm ci, offline-fonts, typecheck, lint, and
+# the demo Webpack build in node:lts-alpine inside the Docker Sandbox.
 
 # Inside the same container for dependency auditing
 npm audit --audit-level=high
@@ -364,7 +356,8 @@ All implemented checks must pass before merging to `main`:
 
 - [ ] `go test -p 1 ./...` in Docker Sandbox — all current Go tests pass
 - [ ] `go vet -p 1 ./...` in Docker Sandbox — no vet errors
-- [ ] `CGO_ENABLED=0 go build ./cmd/api` in Docker Sandbox — compiles without error
+- [ ] `scripts/build-padang-demo-local.sh` in Docker Sandbox — produces the
+      Linux/amd64 backend, standalone demo frontend, and matching manifest
 - [ ] `go mod verify` in Docker Sandbox — module checksums verify
 - [ ] `npm run typecheck` — no TypeScript errors
 - [ ] `npm run lint` — no lint errors

@@ -9,6 +9,7 @@ SOURCE_ROOT="$APP_ROOT/source"
 BUILD_ROOT="$APP_ROOT/build"
 FRONTEND_BUILD="$BUILD_ROOT/frontend"
 BACKEND_BUILD="$BUILD_ROOT/backend"
+RELEASE_MANIFEST="$BUILD_ROOT/release-manifest.txt"
 DB_NAME="padang_demo"
 DB_USER_FILE="$APP_ROOT/config/db-user"
 DB_IDENTITY_FILE="$APP_ROOT/config/db-identity"
@@ -39,6 +40,11 @@ Usage: deploy-padang-demo-remote.sh [--apply|--dry-run] [--seed-demo]
 
 Normal apply updates preserve the existing demo database. --seed-demo is an
 explicit destructive operation that truncates and reseeds demo data.
+
+The caller must stage a locally built Linux/amd64 release under
+/home/jk/bridge-ph/padang-demo/build before invoking this script. This VPS-side
+script validates and runs those artifacts; it does not compile Go or build the
+frontend.
 USAGE
 }
 
@@ -638,8 +644,11 @@ caddy_quadlet_network_count() {
 
 caddy_fixture_validate() {
   local fixture_dir="$1"
-  podman run --rm \
-    -v "$fixture_dir:/stage:Z" \
+  local fixture_engine="${PADANG_FIXTURE_ENGINE:-docker}"
+  command -v "$fixture_engine" >/dev/null 2>&1 ||
+    die "Caddy fixture engine is unavailable: $fixture_engine"
+  "$fixture_engine" run --rm \
+    --mount "type=bind,src=$fixture_dir,dst=/stage" \
     docker.io/library/caddy:alpine \
     sh -ec 'caddy fmt --overwrite /stage/Caddyfile && caddy fmt --overwrite /stage/padang-demo.handlers.Caddyfile && caddy validate --config /stage/Caddyfile --adapter caddyfile' >/dev/null
 }
@@ -930,6 +939,15 @@ run_quadlet_fixture_tests() {
     printf 'padang-demo-remote: invalid Quadlet WorkDir= key must not be emitted\n' >&2
     return 1
   fi
+  grep -q 'validate_release_artifacts' "$script_path" || {
+    printf 'padang-demo-remote: local release artifact validation is missing\n' >&2
+    return 1
+  }
+  if grep -Fqx 'build_backend() {' "$script_path" ||
+    grep -Fqx 'build_frontend() {' "$script_path"; then
+    printf 'padang-demo-remote: remote build logic must not be present\n' >&2
+    return 1
+  fi
   if grep -q -- "$unsupported_quadlet_option" "$script_path"; then
     printf 'padang-demo-remote: podman quadlet list must not use the unsupported heading flag\n' >&2
     return 1
@@ -1048,7 +1066,7 @@ fi
 [[ "$QUADLET_DIR" == /home/jk/.config/containers/systemd/bridge-ph/padang-demo ]] || die "Quadlet directory guard failed"
 [[ "$SYSTEMD_USER_DIR" == /home/jk/.config/systemd/user ]] || die "systemd user directory guard failed"
 
-for command_name in podman systemctl awk sed grep find install cmp journalctl stat realpath; do
+for command_name in podman systemctl awk sed grep find install cmp journalctl stat realpath sha256sum uname; do
   command -v "$command_name" >/dev/null 2>&1 || die "$command_name is required"
 done
 
@@ -1066,9 +1084,6 @@ fi
 if grep -RIlE --exclude-dir=.git 'BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|AKIA[0-9A-Z]{16}|re_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}' "$SOURCE_ROOT" >/dev/null 2>&1; then
   die "source contains a credential-like value"
 fi
-
-mkdir -p "$BUILD_ROOT"
-chmod 0750 "$BUILD_ROOT"
 
 ensure_db_secret() {
   if podman secret inspect "$DB_SECRET" >/dev/null 2>&1; then
@@ -1196,56 +1211,45 @@ write_db_identity() {
     die "could not install database identity record"
 }
 
-build_backend() {
-  rm -rf "$BACKEND_BUILD"
-  mkdir -p "$BACKEND_BUILD"
-  log "testing and compiling backend in disposable golang:alpine"
-  podman run --rm --userns=keep-id \
-    --tmpfs /tmp:rw,nosuid,size=2g \
-    -e GOMAXPROCS=2 \
-    -e GOMEMLIMIT=1GiB \
-    -e GOCACHE=/tmp/go-build \
-    -e GOMODCACHE=/tmp/go-mod \
-    -e GOPATH=/tmp/go \
-    -v "$SOURCE_ROOT/backend:/src:ro,Z" \
-    -v "$BACKEND_BUILD:/out:Z" \
-    -w /src docker.io/library/golang:alpine sh -ec '
-      go mod download
-      go test -p 1 ./...
-      go vet -p 1 ./...
-      go mod verify
-      CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/padang-api ./cmd/api
-    '
-  test -x "$BACKEND_BUILD/padang-api" || die "backend compilation did not produce an executable"
-}
+validate_release_artifacts() {
+  local manifest_value backend_sha frontend_sha
+  case "$(uname -m)" in
+    x86_64|amd64) ;;
+    *) die "VPS architecture is not compatible with the Linux/amd64 release: $(uname -m)" ;;
+  esac
+  [[ -d "$BUILD_ROOT" ]] || die "local release artifact directory is missing: $BUILD_ROOT"
+  [[ -x "$BACKEND_BUILD/padang-api" ]] ||
+    die "local release is missing executable backend artifact: $BACKEND_BUILD/padang-api"
+  [[ -f "$FRONTEND_BUILD/server.js" ]] ||
+    die "local release is missing frontend server artifact: $FRONTEND_BUILD/server.js"
+  [[ -d "$FRONTEND_BUILD/.next/static" ]] ||
+    die "local release is missing Next.js static assets: $FRONTEND_BUILD/.next/static"
+  [[ -f "$RELEASE_MANIFEST" ]] ||
+    die "local release manifest is missing: $RELEASE_MANIFEST"
 
-build_frontend() {
-  rm -rf "$FRONTEND_BUILD"
-  mkdir -p "$FRONTEND_BUILD"
-  log "installing dependencies and building frontend in disposable node:lts-alpine"
-  podman run --rm --userns=keep-id \
-    --tmpfs /tmp:rw,nosuid,size=2g \
-    -e HOME=/tmp/npm-home \
-    -e NPM_CONFIG_CACHE=/tmp/npm-cache \
-    -e NPM_CONFIG_USERCONFIG=/tmp/npm-config/npmrc \
-    -v "$SOURCE_ROOT/frontend:/src:ro,Z" \
-    -v "$FRONTEND_BUILD:/out:Z" \
-    -w /src docker.io/library/node:lts-alpine sh -ec '
-      rm -rf /tmp/npm-home /tmp/npm-cache /tmp/npm-config /tmp/padang-frontend
-      mkdir -p /tmp/npm-home /tmp/npm-cache /tmp/npm-config /tmp/padang-frontend
-      cp -a /src/. /tmp/padang-frontend/
-      cd /tmp/padang-frontend
-      npm ci --ignore-scripts --no-audit --no-fund \
-        --cache /tmp/npm-cache --userconfig /tmp/npm-config/npmrc
-      npm run check:offline-fonts
-      NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run typecheck
-      NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run lint
-      NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=/padang/demo NEXT_PUBLIC_APP_ENV=demo npm run build -- --webpack
-      cp -a public .next/standalone/public
-      cp -a .next/static .next/standalone/.next/static
-      cp -a .next/standalone/. /out/
-    '
-  test -f "$FRONTEND_BUILD/server.js" || die "frontend build did not produce server.js"
+  manifest_value() {
+    awk -F= -v key="$1" '
+      $1 == key { print substr($0, index($0, "=") + 1); found = 1 }
+      END { if (!found) exit 1 }
+    ' "$RELEASE_MANIFEST"
+  }
+
+  [[ "$(manifest_value format)" == padang-demo-release-v1 ]] ||
+    die "release manifest format is unsupported"
+  [[ "$(manifest_value target_os)" == linux ]] ||
+    die "release target OS must be linux"
+  [[ "$(manifest_value target_arch)" == amd64 ]] ||
+    die "release target architecture must be amd64"
+  [[ "$(manifest_value frontend_base_path)" == /padang/demo ]] ||
+    die "release frontend base path must be /padang/demo"
+
+  backend_sha=$(sha256sum "$BACKEND_BUILD/padang-api" | awk '{print $1}')
+  frontend_sha=$(sha256sum "$FRONTEND_BUILD/server.js" | awk '{print $1}')
+  [[ "$backend_sha" == "$(manifest_value backend_sha256)" ]] ||
+    die "backend artifact checksum does not match release manifest"
+  [[ "$frontend_sha" == "$(manifest_value frontend_server_sha256)" ]] ||
+    die "frontend artifact checksum does not match release manifest"
+  log "validated local Linux/amd64 release artifacts from $RELEASE_MANIFEST"
 }
 
 write_quadlets() {
@@ -1828,11 +1832,10 @@ record_image_digests() {
 
 ensure_db_secret
 ensure_external_secret
-build_backend
-build_frontend
+validate_release_artifacts
 
 if [[ "$MODE" == --dry-run ]]; then
-  log "dry-run complete; build artifacts and build directories changed only; no Quadlets, secrets, or Caddy files changed"
+  log "dry-run complete; local release artifacts validated; no Quadlets, secrets, or Caddy files changed"
   exit 0
 fi
 

@@ -1,8 +1,12 @@
-# ADR-009: Containerized Build Strategy (podman run --rm)
+# ADR-009: Containerized Build Strategy (Historical)
 
 **Date:** 2026-08-12  
-**Status:** Accepted  
+**Status:** Superseded by ADR-014 for local release builds
 **Deciders:** Google Antigravity (Architect); client preference
+
+> Historical note: this ADR records the earlier disposable-Podman build plan.
+> The current local execution and release boundary is the Docker Sandbox and
+> is defined by ADR-014. Rootless Podman remains the VPS runtime.
 
 ## Context
 

@@ -5,14 +5,15 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
 
 if [[ "${1:-}" != --in-container ]]; then
-  command -v podman >/dev/null 2>&1 || {
-    printf '%s\n' 'podman is required for this test' >&2
+  command -v docker >/dev/null 2>&1 || {
+    printf '%s\n' 'docker is required for this test' >&2
     exit 2
   }
-  # The fixture installs bash with apk; keep the container's root user inside
-  # Podman's private rootless namespace, then test ownership failures explicitly.
-  exec podman run --rm \
-    -v "$REPO_ROOT:/src:ro,Z" \
+  # The fixture installs bash with apk inside the Docker Sandbox. The nested
+  # test still supplies a fake podman command where namespace semantics are
+  # specifically under test.
+  exec docker run --rm \
+    --mount "type=bind,src=$REPO_ROOT,dst=/src,readonly" \
     -w /src docker.io/library/alpine:latest sh -ec \
     'apk add --no-cache bash >/dev/null && exec bash /src/scripts/test-padang-demo-postgres.sh --in-container'
 fi

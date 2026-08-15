@@ -138,9 +138,11 @@ ranges used by the UI.
 Font files are therefore supplied by `npm ci` and bundled from local
 dependencies during `next build`. The build must not import `next/font/google`
 or use a runtime CSS `@import` from Google; browsers make no request to Google
-and the CSP can remain same-origin. A VPS still needs npm registry access (or
-an equivalent populated npm cache) to install dependencies, but the Next.js
-build itself does not need `fonts.googleapis.com` or `fonts.gstatic.com`.
+and the CSP can remain same-origin. The local Docker Sandbox build still needs
+npm registry access (or an equivalent populated npm cache) to install
+dependencies, but the VPS artifact deployment does not run npm and the
+Next.js build itself does not need `fonts.googleapis.com` or
+`fonts.gstatic.com`.
 
 ### Type Scale
 

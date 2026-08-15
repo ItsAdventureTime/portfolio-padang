@@ -26,6 +26,15 @@ This runbook follows the current upstream model for the selected stack:
 - The local wrapper keeps connection settings as command-line defaults rather
   than requiring manually exported environment variables. Secrets remain
   Podman secrets and are never written to the wrapper configuration.
+- The release boundary is local: `scripts/deploy-padang-demo.sh` invokes
+  `scripts/build-padang-demo-local.sh` through `jk-sbx-project exec`. The
+  Docker Sandbox runs the Go tests/vet/build and Next.js dependency,
+  typecheck, lint, and demo build; the backend artifact targets Linux/amd64.
+- The wrapper synchronizes the source tree and the ignored release directory
+  `build/padang-demo/` separately. The VPS deployment script validates the
+  release manifest and checksums, then only stages artifacts, Quadlets,
+  secrets, and Caddy routing. Rootless Podman remains the VPS runtime, not the
+  local build environment.
 - Quadlet `[Install]` relationships describe boot-time activation, but the
   updater explicitly starts generated units after `daemon-reload`; routine
   updates do not run `systemctl enable` on generated container services.
@@ -77,12 +86,13 @@ This runbook follows the current upstream model for the selected stack:
 - If deployment is later moved into GitHub Actions, use a protected GitHub
   environment, restricted deployment branches, required approval, and a
   concurrency group so production deployments cannot overlap.
-- From the macOS control plane, use `scripts/start-padang-local.sh` for a
-  disposable demo preview and
-  `scripts/check-padang-public-routes.sh --demo-only` for the demo release
-  gate. The checker defaults to both demo and production routes once both
-  environments are deployed. Both commands use built-in defaults; no exported
-  environment variables are required.
+- From the macOS control plane, use
+  `scripts/build-padang-demo-local.sh` through `jk-sbx-project exec` for the
+  local release gate and `scripts/check-padang-public-routes.sh --demo-only`
+  after deployment. The older `scripts/start-padang-local.sh` remains a
+  Podman-specific preview helper and is not part of the Docker Sandbox release
+  path. The checker defaults to both demo and production routes once both
+  environments are deployed. No exported environment variables are required.
 - The local helper supplies `NEXT_PUBLIC_API_ORIGIN` internally for the direct
   API port. When that value is set, the frontend does not prepend the compiled
   `/padang/demo` or `/padang` base path; the deployed same-origin Caddy route
@@ -634,9 +644,10 @@ Caddy restart so Caddy never starts with a reference to a missing network unit.
 
 ## Deployment Procedure (initial)
 
-The supported demo bootstrap/update path is the local wrapper. It synchronizes
-the source to the VPS, builds and validates it in disposable Podman
-containers, renders the current Quadlets, and starts the demo stack:
+The supported demo bootstrap/update path is the local wrapper. It builds and
+validates a Linux/amd64 release in the Docker Sandbox, synchronizes the source
+and release artifacts to the VPS, validates the artifact manifest there,
+renders the current Quadlets, and starts the demo stack:
 
 ```bash
 # macOS, from the repository root; defaults to jk@216.75.75.136:22
@@ -671,8 +682,9 @@ systemctl --user enable --now bridge-ph-padang-backup.timer
 ## Update Procedure
 
 Use `scripts/update-padang-demo.sh` for the deployed demo. It is the
-idempotent operator path: source sync → disposable-container validation/build
-→ migration run → API/frontend restart → page and API health checks. Do not
+idempotent operator path: local Docker Sandbox build → source/artifact sync →
+VPS artifact validation → migration run → API/frontend restart → page and API
+health checks. Do not
 manually stop and start the demo API/frontend for a normal source update,
 because `start`
 does not replace an already-running process.
@@ -707,11 +719,20 @@ at `/padang/demo`:
 scripts/deploy-padang-demo.sh --host 216.75.75.136 --user jk --port 22
 ```
 
-The macOS side performs no compilation, package installation, or application
-execution. It uses `rsync` to upload the source tree to
-`/home/jk/bridge-ph/padang-demo/source/`, excluding Git metadata, dependency
-directories, build output, `.env` files, and credential-looking files, then
-hands control to `scripts/deploy-padang-demo-remote.sh` on the VPS.
+The macOS control plane invokes `jk-sbx-project exec` to run
+`scripts/build-padang-demo-local.sh`. That build uses Docker inside the
+project's sandbox, keeps dependency/build state disposable, runs the backend
+quality gates, cross-compiles a Linux/amd64 API binary, and builds the demo
+frontend with `NEXT_PUBLIC_BASE_PATH=/padang/demo`. It writes the ignored
+release directory `build/padang-demo/`, including `release-manifest.txt` and
+artifact checksums.
+
+The wrapper then uses `rsync` to upload the source tree to
+`/home/jk/bridge-ph/padang-demo/source/` and the prepared release artifacts to
+`/home/jk/bridge-ph/padang-demo/build/`. Source synchronization excludes Git
+metadata, dependency directories, build output, `.env` files, and
+credential-looking files. It then hands control to
+`scripts/deploy-padang-demo-remote.sh` on the VPS.
 
 The remote script:
 
@@ -746,20 +767,17 @@ The remote script:
   if a future client performs `ListBuckets` or `HeadBucket` with a
   bucket-restricted key, grant `listAllBucketNames` only for that integration
   and document the justification;
-- runs Go tests/vet/compilation in `podman run --rm golang:alpine`, with the
-  source mounted read-only and Go's build/module/workspace caches on a
-  disposable `/tmp` tmpfs;
-- runs the Next.js typecheck/lint/build in `podman run --rm node:lts-alpine`
-  with the source mounted read-only, a disposable `/tmp` tmpfs, and npm's
-  `HOME`, cache, and user config all under `/tmp`; it sets
-  `NEXT_PUBLIC_BASE_PATH=/padang/demo`;
-- installs the frontend's Fontsource variable packages with `npm ci`, so the
-  Next.js build gets Outfit, Inter, and JetBrains Mono from local package files
-  and does not require access to Google Fonts; it runs
-  `npm run check:offline-fonts` before the typecheck/lint/build gate. The
-  frontend build still needs
-  npm registry access unless the disposable builder is supplied a populated
-  npm cache;
+- verifies the synchronized `build/padang-demo/release-manifest.txt`, the
+  Linux/amd64 target, the `/padang/demo` frontend base path, and SHA-256
+  checksums for the API and standalone Next.js server. A missing, stale, or
+  tampered artifact fails closed before Quadlets or application services are
+  changed;
+- keeps all Go and Node build work off the VPS. The local builder uses
+  `golang:alpine` and `node:lts-alpine` through the Docker Sandbox, mounts the
+  source read-only, uses disposable cache/tmpfs paths, runs `npm ci`, the
+  offline-font check, typecheck, lint, and Webpack build, and exports only the
+  standalone runtime artifacts. The VPS needs no compiler, npm registry
+  access, or package installation for a routine deployment;
 - installs runtime Quadlets in
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
@@ -803,12 +821,11 @@ route.
 
 Runtime Quadlets use the supported-major official `postgres:<major>-alpine`
 (17 for clean state, existing supported `PG_VERSION` major otherwise),
-`node:lts-alpine`,
-`alpine:latest`, `migrate:latest`, and `caddy:alpine` channels. Build artifacts
-are bind-mounted from the deployment data directory; no persistent build image
-or host compiler is required. `--dry-run` uploads and compiles the source and
-may create or replace only the remote build directory and its artifacts. It
-does not create secrets, create Quadlets, change runtime data, or change Caddy.
+`node:lts-alpine`, `alpine:latest`, `migrate:latest`, and `caddy:alpine`
+channels. Build artifacts are bind-mounted from the deployment data directory;
+the VPS has no persistent compiler or build step. `--dry-run` builds locally,
+uploads the source and release artifacts, and validates them remotely without
+creating secrets, creating Quadlets, changing runtime data, or changing Caddy.
 An apply run records resolved image references in
 `/home/jk/bridge-ph/padang-demo/config/image-digests.txt`.
 
@@ -816,8 +833,9 @@ An apply run records resolved image references in
 current stack deliberately keeps the Go API and Next.js server as separate
 runtime artifacts, because the frontend is compiled with the `/padang/demo`
 `basePath`; the identity does not collapse those components into one image or
-introduce a persistent build image. All compilation still happens on the VPS
-inside disposable `podman run --rm` build containers.
+introduce a persistent build image. Compilation and package installation happen
+in the local Docker Sandbox; the VPS only runs the prepared artifacts through
+its rootless Podman Quadlets.
 
 The first deployment requires an existing `/home/jk/caddy/conf/Caddyfile` and
 `/home/jk/.config/containers/systemd/caddy/caddy.container`. The remote script
@@ -888,18 +906,18 @@ These commands update the deployed demo route at `/padang/demo`. Do not use
 the demo updater for the production route at `/padang`; production promotion
 requires a separate approved runbook and production-specific secrets.
 
-Run these commands from the repository root on macOS. The macOS wrapper only
-performs the source sync and remote handoff; compilation and application
-startup occur on the VPS.
+Run these commands from the repository root on macOS. The wrapper builds the
+release inside the Docker Sandbox, syncs source and artifacts, and performs the
+remote handoff; application startup still occurs on the VPS.
 
 ```bash
-# 1. Normal update: sync current source, test/build on the VPS, apply
-#    migrations, restart API/frontend, and verify the public page and API.
+# 1. Normal update: build locally in the Docker Sandbox, sync source/artifacts,
+#    apply migrations, restart API/frontend, and verify the public page/API.
 #    Defaults to jk@216.75.75.136:22; no environment variables needed.
 scripts/update-padang-demo.sh
 
-# 2. Optional preflight: synchronize and build/test without changing
-#    Quadlets, runtime data, Caddy, or secrets.
+# 2. Optional preflight: build/synchronize/validate without changing Quadlets,
+#    runtime data, Caddy, or secrets.
 scripts/update-padang-demo.sh --dry-run
 
 # 3. Explicitly use the default SSH endpoint (the same values are used when

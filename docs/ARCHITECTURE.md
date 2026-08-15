@@ -66,7 +66,7 @@ External services (reached from API container via outbound HTTPS):
 | Component | Technology |
 |---|---|
 | Containerization | Rootless Podman + Podman Quadlets (operator-triggered updates) |
-| Build strategy | All builds via `podman run --rm`; multi-stage Containerfiles; no host toolchain required |
+| Build strategy | Local Docker Sandbox release build via `jk-sbx-project exec`; Linux/amd64 artifacts and checksum manifest are uploaded to the VPS; rootless Podman remains runtime-only |
 | Image tags | Official floating channels for build/stateless runtimes; persistent PostgreSQL major is selected from `PG_VERSION`; resolved digests recorded for audit |
 | Ingress | Existing Caddy (path-based routing; proxy-network pattern) |
 | OS | Fedora CoreOS (latest stable) |
@@ -310,8 +310,9 @@ See `docs/adr/` for all ADRs.
 | ADR-006 | Provider-neutral email adapter pattern |
 | ADR-007 | Path-based routing for demo vs production |
 | ADR-008 | Email OTP as production authentication method |
-| ADR-009 | Containerized build strategy (podman run --rm) |
+| ADR-009 | Historical containerized build strategy; superseded for local releases |
 | ADR-010 | Environment-specific Next.js build artifacts |
 | ADR-011 | API-first web and mobile clients |
 | ADR-012 | Complete operational data model |
 | ADR-013 | Dedicated database and file backup utility |
+| ADR-014 | Docker Sandbox local release artifacts |
