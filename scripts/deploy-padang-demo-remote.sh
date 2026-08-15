@@ -92,8 +92,7 @@ print_quadlet_generator_diagnostics() {
   systemctl --user list-unit-files 'padang-demo-*' --no-legend >&2 || true
   systemctl --user list-unit-files 'bridge-ph-padang-demo-*' --no-legend >&2 || true
   if command -v podman >/dev/null 2>&1; then
-    podman quadlet list --noheading \
-      --format '{{.Name}} -> {{.UnitName}} ({{.Status}})' >&2 || true
+    podman quadlet list >&2 || true
   fi
   if command -v systemd-analyze >/dev/null 2>&1; then
     systemd-analyze --user --generators=true verify "$unit" >&2 || true
@@ -593,6 +592,7 @@ EOF
 run_quadlet_fixture_tests() {
   local script_path="${BASH_SOURCE[0]}"
   local template_path="$(cd "$(dirname "$script_path")/../quadlets/demo" && pwd -P)/bridge-ph-padang-demo-frontend.container"
+  local unsupported_quadlet_option='--no''heading'
   grep -q 'quadlet_stage_dir/padang-demo-app\.container' "$script_path" || {
     printf 'padang-demo-remote: dynamic renderer must emit padang-demo-app.container\n' >&2
     return 1
@@ -613,6 +613,18 @@ run_quadlet_fixture_tests() {
     printf 'padang-demo-remote: named Quadlet User=node must not be emitted\n' >&2
     return 1
   fi
+  grep -q '^WorkingDir=/app$' "$script_path" || {
+    printf 'padang-demo-remote: frontend Quadlet must use WorkingDir=/app\n' >&2
+    return 1
+  }
+  if grep -q '^WorkDir=' "$script_path"; then
+    printf 'padang-demo-remote: invalid Quadlet WorkDir= key must not be emitted\n' >&2
+    return 1
+  fi
+  if grep -q -- "$unsupported_quadlet_option" "$script_path"; then
+    printf 'padang-demo-remote: podman quadlet list must not use the unsupported heading flag\n' >&2
+    return 1
+  fi
   grep -q 'assert_quadlet_units_present' "$script_path" || return 1
   grep -q 'local generator="/usr/lib/systemd/system-generators/podman-system-generator"' "$script_path" || {
     printf 'padang-demo-remote: Podman generator path is missing\n' >&2
@@ -631,7 +643,15 @@ run_quadlet_fixture_tests() {
     printf 'padang-demo-remote: checked-in frontend template must not use User=node\n' >&2
     return 1
   fi
-  log "canonical renderer, frontend UID, and generated-unit preflight fixtures passed"
+  grep -q '^WorkingDir=/app$' "$template_path" || {
+    printf 'padang-demo-remote: checked-in frontend template must use WorkingDir=/app\n' >&2
+    return 1
+  }
+  if grep -q '^WorkDir=' "$template_path"; then
+    printf 'padang-demo-remote: checked-in frontend template must not use WorkDir=\n' >&2
+    return 1
+  fi
+  log "canonical renderer, frontend UID, working-directory, and generated-unit preflight fixtures passed"
 }
 
 if [[ "${PADANG_CADDY_FIXTURE_TEST:-0}" == 1 ]]; then
@@ -980,7 +1000,7 @@ RequiresMountsFor=$FRONTEND_BUILD
 Image=docker.io/library/node:lts-alpine
 ContainerName=bridge-ph-padang-demo-frontend
 Network=$PROXY_NETWORK.network
-WorkDir=/app
+WorkingDir=/app
 Volume=$FRONTEND_BUILD:/app:ro,Z
 Environment=NODE_ENV=production
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo

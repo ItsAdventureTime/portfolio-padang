@@ -40,12 +40,12 @@ boundary and refuses to apply while `podman-auto-update.timer` is active or
 enabled.
 
 If the updater reports `Unit padang-demo-app.service not found`, it is a
-Quadlet generation failure, not a frontend health failure. The updater now
-stops before starting the stack and prints the missing unit, Quadlet files,
-visible generated units, and the systemd generator diagnostic. The frontend
-Quadlet must keep a numeric `User=1000` value; the official Node image maps its
-unprivileged `node` user to UID 1000, while `User=node` is not valid for the
-current Quadlet field parser.
+Quadlet generation failure, not a frontend health failure. The incident was
+caused by the generated frontend Quadlet using `WorkDir=/app`; the supported
+key is `WorkingDir=/app`. The updater now stops before starting the stack and
+prints the missing unit, Quadlet files, visible generated units, and the
+systemd generator diagnostic. The frontend Quadlet also keeps a numeric
+`User=1000` value, matching the official Node image's unprivileged `node` UID.
 
 For a direct VPS diagnostic, use:
 
@@ -54,7 +54,7 @@ systemctl --user daemon-reload
 QUADLET_UNIT_DIRS=/home/jk/.config/containers/systemd/bridge-ph/padang-demo \
   /usr/lib/systemd/system-generators/podman-system-generator --user --dryrun
 systemd-analyze --user --generators=true verify padang-demo-app.service
-podman quadlet list --noheading
+podman quadlet list
 systemctl --user list-unit-files 'padang-demo-*' --no-legend
 find /home/jk/.config/containers/systemd/bridge-ph/padang-demo \
   -maxdepth 1 -type f -print

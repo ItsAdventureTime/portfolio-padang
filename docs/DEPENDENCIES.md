@@ -114,6 +114,17 @@ docker.io/migrate/migrate:latest@sha256:0925c4b49497fa212e18c35df5f49c07ad12337a
 ghcr.io/itsadventuretime/padang-erp-backup:latest@sha256:TBD | pending | Dedicated backup utility release image
 ```
 
+### Podman Quadlet Compatibility
+
+The rootless VPS runtime uses the deployed Podman Quadlet parser as its
+compatibility baseline. The frontend unit must use `WorkingDir=/app`; the
+similar-looking `WorkDir=/app` key is rejected by that generator. For failure
+diagnostics, use the bare `podman quadlet list`: the VPS Podman version rejects
+the optional `--noheading` flag.
+
+References: [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
+and [Podman Quadlet basic usage and generator diagnostics](https://docs.podman.io/en/latest/markdown/podman-quadlet-basic-usage.7.html).
+
 ---
 
 ## Backblaze B2

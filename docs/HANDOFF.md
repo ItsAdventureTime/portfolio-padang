@@ -249,6 +249,24 @@ disposable `postgres:17-alpine` startup with an empty `18/docker` scaffold;
 the new `17/docker/PG_VERSION` was created while the prior scaffold remained
 in place. The VPS persistent directory was not modified during local testing.
 
+## Quadlet Frontend Generator Incident Remediation (2026-08-15)
+
+The Luna Reviewer follow-up identified the missing `padang-demo-app.service`
+as a Quadlet generator failure caused by the generated frontend key
+`WorkDir=/app`. The renderer and checked-in frontend reference now use the
+supported `WorkingDir=/app` key. The earlier `User=node` attribution was
+incorrect; the numeric `User=1000` setting remains in place for the official
+Node image's unprivileged user. The generator diagnostic now uses the VPS-
+compatible bare `podman quadlet list` command instead of the rejected
+`--noheading` form.
+
+The Quadlet fixture now asserts the working-directory key, rejects `WorkDir=`
+and the unsupported listing flag, and checks both the dynamic renderer and
+reference template. Focused validation passed: `bash -n scripts/*.sh`,
+`scripts/test-padang-demo-quadlets.sh`, and `git diff --check`. Podman was
+available for containerized execution checks. No VPS deployment or SSH
+operation was performed.
+
 ---
 
 ## Specification Overview & Architectural Decisions

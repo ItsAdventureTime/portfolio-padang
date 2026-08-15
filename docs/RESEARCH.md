@@ -180,11 +180,12 @@ Primary references:
 ### Padang Quadlet Generation Refresh: Frontend Unit Failure (2026-08-15)
 
 The missing `padang-demo-app.service` was a generator failure, not a Caddy or
-PostgreSQL failure. The generated frontend Quadlet used `User=node`, while
-current Podman documentation defines the container `User=` field as a numeric
-UID. The runtime renderer now uses `User=1000`, matching the official Node
-image's documented unprivileged `node` UID, and the checked-in frontend
-template follows the same rule.
+PostgreSQL failure. The earlier attribution to `User=node` was incorrect: the
+runtime renderer and checked-in frontend template use numeric `User=1000`,
+matching the official Node image's documented unprivileged `node` UID. The
+actual invalid field was `WorkDir=/app`; Podman Quadlet uses `WorkingDir=/app`
+for the container working directory. The runtime renderer and checked-in
+frontend template now use the supported key.
 
 The updater now reloads the user systemd manager and verifies the complete set
 of expected generated network, container, and timer units before starting the
@@ -195,6 +196,12 @@ units, `podman quadlet list`, a scoped
 `systemd-analyze --user --generators=true verify` diagnostic. This makes
 parser and generator failures fail closed before they can partially restart
 the demo.
+
+The current VPS Podman version also rejects the optional `--noheading` flag on
+`podman quadlet list`; the diagnostic therefore uses the compatible bare
+command and does not assume newer output-format options. This is a deployment
+compatibility constraint for the VPS baseline, not a claim that every Podman
+release exposes identical listing flags.
 
 The current Podman search path supports recursive Quadlet discovery under the
 user search directory, so the existing `/home/jk/.config/containers/systemd/

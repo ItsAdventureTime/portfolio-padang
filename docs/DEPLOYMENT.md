@@ -42,6 +42,9 @@ This runbook follows the current upstream model for the selected stack:
   service uses `User=1000`, matching the official Node image's unprivileged
   `node` user; `User=node` is not emitted because current Quadlet parsing
   rejects named values for this field.
+- The generated Next.js service sets `WorkingDir=/app`, matching the mounted
+  standalone build path. `WorkDir=/app` is not the supported Quadlet key on the
+  VPS and can prevent the frontend unit from being generated.
 - PostgreSQL persistent state is handled as a compatibility boundary. A clean
   demo data root defaults to PostgreSQL 17; an existing
   `PG_VERSION` selects the matching supported `postgres:<major>-alpine` image.
@@ -301,6 +304,7 @@ Image=ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
 ContainerName=bridge-ph-padang-demo-frontend
 # proxy.network only — Caddy reaches this container; no direct DB access
 Network=bridge-ph-padang-demo-proxy.network
+WorkingDir=/app
 
 Environment=NODE_ENV=production
 Environment=APP_ENV=demo

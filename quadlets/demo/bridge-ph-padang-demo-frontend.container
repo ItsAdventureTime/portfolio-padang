@@ -8,6 +8,7 @@ RequiresMountsFor=/home/jk/bridge-ph/padang-demo/build/frontend
 Image=ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest
 ContainerName=bridge-ph-padang-demo-frontend
 Network=bridge-ph-padang-demo-proxy.network
+WorkingDir=/app
 Environment=NODE_ENV=production
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 Environment=NEXT_PUBLIC_APP_ENV=demo
