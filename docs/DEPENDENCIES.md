@@ -130,6 +130,11 @@ updater requires `realpath` with GNU `realpath -e` semantics to validate the
 trusted logical timer path against systemd's canonical `FragmentPath`; keep
 this command available in the Fedora CoreOS image. `systemd-analyze --user
 unit-paths` is the path-search diagnostic when a timer is not discovered.
+The standalone Next.js runtime also requires explicit `HOSTNAME=0.0.0.0` and
+`PORT=3000` in the frontend Quadlet because the raw `node:lts-alpine` runtime
+executes `server.js` directly. Its readiness command must use the loopback
+URL `http://127.0.0.1:3000/padang/demo` without a trailing slash; the compiled
+`/padang/demo` basePath is direct, while the slash variant redirects.
 
 References: [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
 and [Podman Quadlet basic usage and generator diagnostics](https://docs.podman.io/en/latest/markdown/podman-quadlet-basic-usage.7.html).

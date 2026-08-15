@@ -754,9 +754,53 @@ run_quadlet_fixture_tests() {
   local script_path="${BASH_SOURCE[0]}"
   local repo_root="$(cd "$(dirname "$script_path")/.." && pwd -P)"
   local template_path="$(cd "$(dirname "$script_path")/../quadlets/demo" && pwd -P)/bridge-ph-padang-demo-frontend.container"
+  local prod_template_path="$(cd "$(dirname "$script_path")/../quadlets/prod" && pwd -P)/bridge-ph-padang-frontend.container"
   local timer_template_path="$repo_root/systemd/user/padang-demo-reset.timer"
   local backup_timer_template_path="$repo_root/systemd/user/bridge-ph-padang-backup.timer"
   local unsupported_quadlet_option='--no''heading'
+  local generated_frontend_definition
+
+  assert_frontend_quadlet_definition() {
+    local definition="$1"
+    local label="$2"
+    local expected
+    for expected in \
+      'Environment=HOSTNAME=0.0.0.0' \
+      'Environment=PORT=3000' \
+      'Exec=node /app/server.js' \
+      'HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo || exit 1'; do
+      if ! grep -Fqx "$expected" <<<"$definition"; then
+        printf 'padang-demo-remote: %s is missing expected frontend definition: %s\n' "$label" "$expected" >&2
+        return 1
+      fi
+    done
+    if grep -Fqx 'HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo/ || exit 1' <<<"$definition"; then
+      printf 'padang-demo-remote: %s must not probe the redirecting trailing-slash basePath\n' "$label" >&2
+      return 1
+    fi
+  }
+
+  generated_frontend_definition=$(awk '
+    index($0, "cat > \"$quadlet_stage_dir/padang-demo-app.container\" <<EOF") { capture = 1; next }
+    capture && $0 == "EOF" { exit }
+    capture { print }
+  ' "$script_path")
+  [[ -n "$generated_frontend_definition" ]] || {
+    printf 'padang-demo-remote: dynamic renderer frontend definition could not be extracted\n' >&2
+    return 1
+  }
+  assert_frontend_quadlet_definition "$generated_frontend_definition" "generated frontend Quadlet" || return 1
+  assert_frontend_quadlet_definition "$(<"$template_path")" "checked-in frontend Quadlet" || return 1
+  for expected in \
+    'Environment=HOSTNAME=0.0.0.0' \
+    'Environment=PORT=3000' \
+    'HealthCmd=wget -q -O- http://127.0.0.1:3000/padang || exit 1'; do
+    if ! grep -Fqx "$expected" "$prod_template_path"; then
+      printf 'padang-demo-remote: production frontend template is missing expected runtime setting: %s\n' "$expected" >&2
+      return 1
+    fi
+  done
+
   grep -q 'quadlet_stage_dir/padang-demo-app\.container' "$script_path" || {
     printf 'padang-demo-remote: dynamic renderer must emit padang-demo-app.container\n' >&2
     return 1
@@ -884,7 +928,7 @@ run_quadlet_fixture_tests() {
     return 1
   fi
   run_reset_timer_path_fixture_tests
-  log "canonical renderer, frontend UID, working-directory, and generated-unit preflight fixtures passed"
+  log "canonical renderer, frontend runtime binding, health probe, UID, working-directory, and generated-unit preflight fixtures passed"
 }
 
 if [[ "${PADANG_CADDY_FIXTURE_TEST:-0}" == 1 ]]; then
@@ -1242,9 +1286,11 @@ Environment=NODE_ENV=production
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 Environment=NEXT_PUBLIC_APP_ENV=demo
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
+Environment=HOSTNAME=0.0.0.0
+Environment=PORT=3000
 Exec=node /app/server.js
 User=1000
-HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo/ || exit 1
+HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3
@@ -1563,6 +1609,10 @@ print_service_diagnostics() {
   journalctl --user -u "$service" -n 120 --no-pager >&2 || true
   podman inspect "$container" --format \
     'container status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' >&2 || true
+  podman inspect "$container" --format \
+    'container health status={{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' >&2 || true
+  podman inspect "$container" --format \
+    '{{if .State.Health}}{{range .State.Health.Log}}{{printf "health check start=%s end=%s exit=%d\n" .Start .End .ExitCode}}{{end}}{{else}}health check history=unavailable (no-healthcheck)\n{{end}}' >&2 || true
   podman logs --tail 200 "$container" >&2 || true
 }
 

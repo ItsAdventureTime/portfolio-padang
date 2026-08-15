@@ -285,6 +285,26 @@ Production backup activation follows the same placement with
 `/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer`. No VPS
 deployment, SSH operation, commit, or push is part of this remediation.
 
+## Standalone Frontend Bind and Health-Gate Remediation (2026-08-15)
+
+Reviewer reproduction confirmed that the generated `padang-demo-app.service`
+could run a ready Next.js standalone server while its health check failed. The
+raw `node:lts-alpine` Quadlet executes `node /app/server.js`; without an
+explicit hostname, Podman injected the container ID and Next.js bound/
+advertised that hostname instead of the loopback address probed by the health
+gate. Both the dynamic renderer and checked-in demo frontend Quadlet now set
+`Environment=HOSTNAME=0.0.0.0` and `Environment=PORT=3000`, retain the expected
+standalone `Exec=node /app/server.js`, and probe
+`http://127.0.0.1:3000/padang/demo` without a trailing slash. The compiled
+`/padang/demo` basePath is valid directly; `/padang/demo/` only redirects.
+Caddy routing was not changed.
+
+The Quadlet fixture now checks the generated and checked-in frontend
+definitions for these exact runtime and health-gate settings. Frontend service
+failure diagnostics also print the container health status and recent health
+start/end/exit history without health response bodies or secrets. No VPS
+deployment, SSH operation, commit, or push is part of this remediation.
+
 ## Reset Timer FragmentPath Alias Remediation (2026-08-15)
 
 The first post-placement validation produced a Fedora CoreOS false-negative:

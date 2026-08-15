@@ -80,6 +80,24 @@ of the logical path. Do not accept a `/tmp` link, another user's path, a
 relative/empty/missing value, or any alias merely because it resolves to the
 same inode. `realpath -e` failure is a validation failure.
 
+If the frontend container is running but its health gate refuses the
+loopback request, inspect the container health metadata before changing Caddy:
+
+```bash
+podman inspect bridge-ph-padang-demo-frontend --format \
+  'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}'
+podman inspect bridge-ph-padang-demo-frontend --format \
+  '{{if .State.Health}}{{range .State.Health.Log}}{{printf "start=%s end=%s exit=%d\n" .Start .End .ExitCode}}{{end}}{{else}}health history unavailable\n{{end}}'
+```
+
+The standalone Next.js Quadlet must set `HOSTNAME=0.0.0.0` and `PORT=3000`;
+otherwise Podman can inject the container ID as the hostname and Next.js can
+bind/advertise there even though the process is ready. The expected local
+probe is `http://127.0.0.1:3000/padang/demo` with no trailing slash. The
+compiled `/padang/demo` basePath is correct; `/padang/demo/` only adds a
+redirect. The updater's failure diagnostics print status, non-secret health
+timestamps/exit codes, and logs without health response bodies.
+
 ### Health Check
 
 ```bash

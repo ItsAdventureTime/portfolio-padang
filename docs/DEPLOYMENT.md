@@ -62,6 +62,12 @@ This runbook follows the current upstream model for the selected stack:
 - The generated Next.js service sets `WorkingDir=/app`, matching the mounted
   standalone build path. `WorkDir=/app` is not the supported Quadlet key on the
   VPS and can prevent the frontend unit from being generated.
+- The generated Next.js service runs the standalone `server.js` with explicit
+  `Environment=HOSTNAME=0.0.0.0` and `Environment=PORT=3000`. This prevents
+  Podman-injected container hostnames from becoming the bind/advertised host.
+  Its health gate probes `http://127.0.0.1:3000/padang/demo` without a trailing
+  slash: `/padang/demo` is the valid direct route, while `/padang/demo/`
+  introduces an unnecessary redirect and is not the deployment probe.
 - PostgreSQL persistent state is handled as a compatibility boundary. A clean
   demo data root defaults to PostgreSQL 17; an existing
   `PG_VERSION` selects the matching supported `postgres:<major>-alpine` image.
@@ -333,8 +339,10 @@ Environment=APP_ENV=demo
 Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
 # Internal API URL: frontend → API via shared proxy network
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
+Environment=HOSTNAME=0.0.0.0
+Environment=PORT=3000
 
-HealthCmd=wget -q -O- http://localhost:3000/padang/demo || exit 1
+HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3

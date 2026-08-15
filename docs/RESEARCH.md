@@ -224,6 +224,22 @@ the Caddy upstream. Activate the normal timers with
 `systemctl --user enable --now <timer>` after `daemon-reload`; do not enable
 application Quadlet units as part of a routine update.
 
+### Standalone Next.js Bind and Health Gate Incident (2026-08-15)
+
+Reviewer reproduction confirmed a separate runtime health failure after the
+frontend Quadlet was generated successfully. The standalone `server.js` was
+started without an explicit `HOSTNAME`; Podman injected the container ID, and
+Next.js bound/advertised that hostname. The process was ready, but a health
+check against `127.0.0.1:3000` refused the connection. The fix is explicit
+`HOSTNAME=0.0.0.0` and `PORT=3000` in both the dynamic and checked-in frontend
+Quadlets, while retaining `Exec=node /app/server.js`.
+
+The health gate now probes the direct compiled basePath route
+`http://127.0.0.1:3000/padang/demo`. The no-trailing-slash path is valid
+directly; `/padang/demo/` causes an unnecessary redirect and is not used as a
+readiness probe. This is an application bind/health-gate correction, not a
+Caddy routing change.
+
 Primary references:
 
 - [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
