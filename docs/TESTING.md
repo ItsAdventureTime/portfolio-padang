@@ -5,14 +5,16 @@
 ## Execution Boundary
 
 All project runtimes, package managers, compilers, tests, vulnerability
-scanners, and build tools run inside Podman. The macOS host is limited to
-control-plane work such as Git, `gh`, Podman, and ordinary text utilities.
-Use an ephemeral container with a read-only source mount; keep dependency
-trees and disposable build output inside the container. Export only
-intentional generated artifacts.
+scanners, and build tools run inside the deterministic Docker Sandbox through
+`jk-sbx-project exec` or `jk-sbx-project run`. The macOS host is limited to
+editing, Git/`gh`, sandbox lifecycle, and other control-plane work. Never run
+local project workloads through Podman. Podman remains the remote Fedora
+CoreOS deployment runtime.
 
-The local Podman VM currently has 2 GiB available. Use `-p 1` for Go checks
-and the Webpack build fallback for Next.js when Turbopack exceeds that limit.
+Keep dependency trees and disposable build output inside the sandbox where the
+command permits it; export only intentional generated artifacts. If a sandbox
+workload reaches its resource limit, inspect the sandbox status and adjust its
+Docker resources rather than stopping unrelated host containers.
 
 ### Luna audit focused checks (2026-08-14)
 
@@ -326,21 +328,18 @@ Steps:
 
 ```bash
 # Host control-plane checks
-/opt/homebrew/bin/podman machine list
+jk-sbx-project status
 git diff --check
 bash -n scripts/secrets-setup.sh
 bash scripts/test-deploy-padang-demo-caddy.sh
 bash scripts/check-padang-public-routes.sh --demo-only
 
-# Backend: run inside the containerized Go toolchain
-podman run --rm -v "$PWD/backend:/src:ro" -w /src \
-  docker.io/library/golang:alpine sh -c 'go test -p 1 ./...'
-podman run --rm -v "$PWD/backend:/src:ro" -w /src \
-  docker.io/library/golang:alpine sh -c 'go vet -p 1 ./... && go mod verify'
+# Backend: run inside the Docker Sandbox
+jk-sbx-project exec bash -lc 'cd backend && go test -p 1 ./...'
+jk-sbx-project exec bash -lc 'cd backend && go vet -p 1 ./... && go mod verify'
 
 # Go vulnerability scan (when govulncheck is installed in the image)
-podman run --rm -v "$PWD/backend:/src:ro" -w /src \
-  docker.io/library/golang:alpine sh -c 'govulncheck ./...'
+jk-sbx-project exec bash -lc 'cd backend && govulncheck ./...'
 
 # Inside the copied frontend directory in node:lts-alpine; see the C1 profile
 # above for the complete read-only mount and container-local copy pattern.
@@ -363,10 +362,10 @@ npx playwright test --project=a11y
 
 All implemented checks must pass before merging to `main`:
 
-- [ ] `go test -p 1 ./...` in Podman — all current Go tests pass
-- [ ] `go vet -p 1 ./...` in Podman — no vet errors
-- [ ] `CGO_ENABLED=0 go build ./cmd/api` in Podman — compiles without error
-- [ ] `go mod verify` in Podman — module checksums verify
+- [ ] `go test -p 1 ./...` in Docker Sandbox — all current Go tests pass
+- [ ] `go vet -p 1 ./...` in Docker Sandbox — no vet errors
+- [ ] `CGO_ENABLED=0 go build ./cmd/api` in Docker Sandbox — compiles without error
+- [ ] `go mod verify` in Docker Sandbox — module checksums verify
 - [ ] `npm run typecheck` — no TypeScript errors
 - [ ] `npm run lint` — no lint errors
 - [ ] Demo and production `npm run build -- --webpack` — both base paths compile

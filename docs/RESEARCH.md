@@ -43,6 +43,29 @@ Primary references:
 - [Expo New Architecture](https://docs.expo.dev/guides/new-architecture/)
 - [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
 
+### GitHub HTTPS and Signed-Commit Refresh (2026-08-16)
+
+The current repository workflow separates Git transport authentication from
+commit signing. GitHub CLI documents `gh auth setup-git` as the command that
+configures Git to use the authenticated CLI credential helper, while
+`gh auth status` verifies the active host/account. GitHub documents local
+commit signing separately and supports GPG, SSH, and S/MIME signatures. This
+project keeps the remote transport on HTTPS, requires `git commit -S`, and
+verifies the resulting remote commit through `gh api`; it does not use SSH
+Git remotes, passkeys, raw tokens, or force pushes.
+
+This refresh also aligns local execution with the current Docker Sandbox
+policy: project runtimes and build/test tools run through `jk-sbx-project`,
+while Git, `gh`, and sandbox lifecycle commands remain macOS control-plane
+operations. Remote deployment retains rootless Podman on the VPS.
+
+Primary references:
+
+- [GitHub CLI `gh auth setup-git`](https://cli.github.com/manual/gh_auth_setup-git)
+- [GitHub CLI `gh auth status`](https://cli.github.com/manual/gh_auth)
+- [GitHub CLI `gh api`](https://cli.github.com/manual/gh_api)
+- [GitHub signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+
 ### C1 Implementation Refresh: Current Maintainer Guidance
 
 The implementation uses Backblaze B2 as the storage provider. The S3 client

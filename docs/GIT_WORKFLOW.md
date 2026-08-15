@@ -1,8 +1,30 @@
 # Git and GitHub Workflow — Padang ERP Lite
 
-This guide is the repository workflow for local commits and GitHub updates.
-The source repository is authoritative. C1 work stays on `feat/*` branches;
-`main` is reserved for reviewed, stable code.
+This guide is the repository workflow for every source, configuration, script,
+UI/UX, and documentation revision. The source repository is authoritative.
+Every completed change must update affected guides, pass the applicable
+validation gates, receive a signed local commit, and synchronize through the
+authenticated HTTPS GitHub workflow below.
+
+## Normative post-change sequence
+
+After every update, revision, or modification:
+
+1. Update the affected documentation and guides. Update `docs/HANDOFF.md` when
+   behavior, release status, branch state, or deployment guidance changes.
+2. Run the applicable runtimes, package managers, builds, tests, and scanners
+   through the deterministic Docker Sandbox with `jk-sbx-project exec` or
+   `jk-sbx-project run`. Do not run local project workloads through Podman or
+   directly on macOS.
+3. Review `git diff --check`, the intended file list, and the current branch.
+4. Verify GitHub authentication and an HTTPS `origin` before committing.
+5. Create a signed local commit with `git commit -S`.
+6. Push the reviewed commit through the `gh` credential helper and verify the
+   remote commit with `gh api`.
+
+A documentation-only change still follows this sequence, with only the
+validation gates relevant to documentation. Stop if a required commit signer
+or GitHub authentication is unavailable; do not create or print credentials.
 
 ## Current remote policy
 
@@ -11,8 +33,10 @@ The source repository is authoritative. C1 work stays on `feat/*` branches;
 - Git transport: HTTPS only
 - GitHub authentication: the already-authenticated GitHub CLI (`gh`) as the
   Git credential helper
+- Commit signatures: required; use the repository's configured local signer
+  with `git commit -S` and verify the resulting signature before pushing
 - SSH URLs, SSH keys, and passkey-based Git operations are not part of this
-  workflow
+  Git transport workflow
 - VPS deployment SSH is separate from GitHub: the demo updater connects to
   `jk@216.75.75.136:22`; GitHub updates still use the HTTPS `origin` above.
 
@@ -33,14 +57,16 @@ gh auth status --hostname github.com
 Confirm that:
 
 - the worktree contains only intended changes;
-- the branch is not `main`;
+- the branch is appropriate for the task; direct `main` updates require the
+  explicit user-authorized maintenance workflow and a completed review;
 - `origin` uses `https://github.com/...`, not an SSH URL; and
 - `gh auth status` reports the intended authenticated account and HTTPS Git
   operations.
 
 Run the checks in `docs/TESTING.md`. Application runtimes, package managers,
-compilers, tests, and builds run inside Podman; Git and `gh` remain host-side
-control-plane tools.
+compilers, tests, and builds run inside the Docker Sandbox; Git, `gh`, and
+sandbox lifecycle commands remain host-side control-plane tools. Podman is
+reserved for the remote Fedora CoreOS deployment runtime.
 
 ## Commit locally
 
@@ -54,11 +80,17 @@ Examples:
 
 ```sh
 git add docs/ backend/ frontend/ scripts/
-git commit -m "fix(security): close C1 audit findings"
+git commit -S -m "fix(security): close C1 audit findings"
 ```
 
 Do not stage unrelated work. Avoid `git reset --hard`, broad cleanups, or
 history rewrites unless the user explicitly requests them.
+
+Verify the local signature without exposing private key material:
+
+```sh
+git log -1 --show-signature --format=fuller
+```
 
 ## Update GitHub over HTTPS
 
@@ -81,8 +113,15 @@ Verify the remote tip through GitHub CLI without exposing credentials:
 ```sh
 gh api repos/ItsAdventureTime/bridge-padang/branches/main \
   --jq '.name + " " + .commit.sha'
+gh api repos/ItsAdventureTime/bridge-padang/commits/HEAD \
+  --jq '.sha + " verified=" + (.commit.verification.verified|tostring)'
 git status --short --branch
 ```
+
+The GitHub API verification result must report `verified=true` for a signed
+commit. `gh auth setup-git` authenticates the HTTPS transport; it does not
+create a commit signature. Commit signing and transport authentication are
+separate checks.
 
 ## Current branch consolidation
 

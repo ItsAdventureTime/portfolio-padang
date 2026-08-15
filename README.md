@@ -26,33 +26,38 @@ QuickBooks Online (QBO) remains the official accounting system of record. This E
 
 ## Local Development
 
-> **macOS execution policy:** Do not run application services directly on macOS.
-> Use Podman containers for all runtime operations.
-> See `docs/DEPLOYMENT.md` for local development container setup.
+> **macOS execution policy:** Do not run application services, package
+> managers, builds, or tests directly on macOS. Use the deterministic Docker
+> Sandbox for project workloads. Local Podman is not the development runtime.
+> See `docs/TESTING.md` and `docs/GIT_WORKFLOW.md`.
 
 ### Prerequisites
 
-- Podman (installed and machine running)
+- Docker Desktop / Docker Sandbox support
+- `jk-sbx-project`
 - Git
+- authenticated GitHub CLI (`gh`) for repository synchronization
 
-### Quick Start (development containers)
+### Quick Start (Docker Sandbox)
 
 ```sh
-# Start an ephemeral demo API and Next.js frontend in Podman
-scripts/start-padang-local.sh
+# Initialize or resume the project sandbox
+jk-sbx-project ensure
+
+# Run a project command inside the sandbox
+jk-sbx-project exec bash -lc 'bash -n scripts/*.sh'
 ```
 
-Open `http://127.0.0.1:3000/padang/demo` and check
-`http://127.0.0.1:8080/api/v1/health`. If either port is already in use, pass
-`--web-port 3100 --api-port 8180`. The helper keeps the API and frontend
-runtime inside disposable Podman containers, uses no credentials or database,
-and removes its pod when you press Ctrl-C. It is a foundation preview: the
+Use the commands in `docs/TESTING.md` for backend, frontend, and deployment
+validation. The existing `scripts/start-padang-local.sh` is a Podman-based
+helper and is not the macOS default under the Docker Sandbox policy; do not
+invoke it directly on the host. The application remains a foundation preview:
 current module screens are read-only registers, not the completed ERP CRUD and
 approval workflows.
 
-If the helper reports an OOM-killed frontend, increase available Podman VM
-memory or pause unrelated containers before retrying; it never stops containers
-that it did not create.
+If a sandbox workload runs out of memory, inspect the sandbox status and adjust
+the Docker Sandbox resources before retrying; do not stop unrelated host
+containers.
 
 ## Update the Deployed Demo
 

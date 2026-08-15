@@ -23,6 +23,17 @@ DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
 DEMO PUBLIC URL: `https://delegateops.business/padang/demo`
 PRODUCTION PUBLIC URL: `https://delegateops.business/padang`
 
+## Normative Change Workflow (2026-08-16)
+
+Every source, configuration, script, UI/UX, or documentation revision must
+refresh the affected guides, run applicable project workloads through the
+Docker Sandbox (`jk-sbx-project exec`/`run`), review the diff, create a signed
+local commit, and synchronize the reviewed result through the authenticated
+HTTPS GitHub CLI workflow. `main` is the current consolidated baseline; direct
+maintenance updates are allowed only when explicitly user-authorized and
+reviewed. SSH is reserved for the separately documented VPS deployment
+transport; it is not a GitHub remote or Git credential path.
+
 ## C1 Review and Remediation Record
 
 The Luna reviewer identified authentication race conditions, stale production

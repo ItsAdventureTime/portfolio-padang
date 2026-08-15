@@ -2,6 +2,15 @@
 
 ## Daily Operations
 
+### Normative post-change workflow
+
+After every source, configuration, script, UI/UX, or documentation update,
+follow `docs/GIT_WORKFLOW.md`: update affected guides, run applicable checks
+through the Docker Sandbox, review the diff, create a signed local commit, and
+synchronize the reviewed branch through authenticated HTTPS GitHub CLI
+credentials. This applies to documentation-only changes as well. Do not use
+local Podman, SSH Git remotes, raw tokens, passkeys, or force pushes.
+
 ### Update the deployed demo
 
 The repository currently automates the demo route (`/padang/demo`) only. Do
@@ -17,8 +26,9 @@ From the repository root on macOS, run:
 scripts/update-padang-demo.sh
 ```
 
-This is the normal update path. It synchronizes the current source to the VPS,
-runs the Go and Next.js checks/builds inside disposable Podman containers,
+This is the normal remote update path. It synchronizes the current source to
+the VPS, runs the Go and Next.js checks/builds inside disposable Podman
+containers on the VPS,
 applies pending migrations, restarts the demo API/frontend Quadlet services,
 and verifies both the demo page and
 `https://delegateops.business/padang/demo/api/v1/health`.

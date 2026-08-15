@@ -30,9 +30,11 @@ The Git repository is the sole source of truth. Neither agent's chat history is 
 ## Branch Strategy
 
 - `main` — stable, reviewed code only
-- `docs/phase-0` — Phase 0: repository bootstrap (current)
+- `docs/phase-0` — historical Phase 0 repository bootstrap reference
 - `feat/*` — feature branches for implementation phases
-- No direct commits to `main` without explicit approval
+- Direct commits to `main` are normally disallowed. The explicit user-directed
+  maintenance workflow may update `main` after review, applicable validation,
+  and a signed local commit.
 
 ## Commit Convention
 
@@ -42,11 +44,30 @@ Conventional Commits style:
 - `fix(auth): prevent JWT reuse after logout`
 - `test(billing): add retention calculation tests`
 
-## macOS Execution Policy
+## macOS and Docker Sandbox Execution Policy
 
-No application services run directly on macOS.
-All runtime operations use `podman run --rm ...`.
-See Section 6 of the full constitution.
+macOS is the control/edit plane. Run application runtimes, package managers,
+builds, tests, linters, scanners, migrations, and code generation through the
+repository's Docker Sandbox:
+
+```sh
+jk-sbx-project ensure
+jk-sbx-project exec <command> [args...]
+```
+
+Do not run local project workloads directly on macOS or through local Podman.
+Podman remains valid for the remote Fedora CoreOS production/runtime plane.
+See `docs/TESTING.md` and `docs/GIT_WORKFLOW.md`.
+
+## GitHub HTTPS and Signed Commit Policy
+
+GitHub changes use the authenticated `gh` CLI with an HTTPS `origin` only.
+Before pushing, run `gh auth status --hostname github.com` and
+`gh auth setup-git --hostname github.com`, create a signed local commit with
+`git commit -S`, and verify the remote commit with `gh api`. SSH remotes, SSH
+transport keys, passkeys, raw tokens, and force pushes are outside this
+project workflow. VPS deployment SSH is a separate runtime transport and does
+not change the GitHub rule.
 
 ## VPS Platform
 
