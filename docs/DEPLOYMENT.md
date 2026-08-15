@@ -67,7 +67,8 @@ This runbook follows the current upstream model for the selected stack:
   Podman-injected container hostnames from becoming the bind/advertised host.
   Its health gate probes `http://127.0.0.1:3000/padang/demo` without a trailing
   slash: `/padang/demo` is the valid direct route, while `/padang/demo/`
-  introduces an unnecessary redirect and is not the deployment probe.
+  may receive Next.js's canonical-path redirect and is not the deployment
+  probe.
 - PostgreSQL persistent state is handled as a compatibility boundary. A clean
   demo data root defaults to PostgreSQL 17; an existing
   `PG_VERSION` selects the matching supported `postgres:<major>-alpine` image.
@@ -446,9 +447,13 @@ Follows the same pattern as PIMASCOR: separate handler files imported inside the
 **Key routing rules (matching PIMASCOR precedent):**
 - API routes: `handle /padang/{env}/api/*` + `uri strip_prefix /padang/{env}` → Go API container
   - After stripping, Go API receives `/api/v1/...` (matches its internal routing)
-- Frontend routes: `handle /padang/{env}/*` → Next.js container (reverse proxy, NOT static files)
-  - Full path preserved; Next.js `basePath` matches `/padang` or `/padang/demo`
-- Root redirect: `/padang/demo` → `/padang/demo/` (308)
+- Frontend routes: `handle /padang/demo` and `handle /padang/demo/*` → Next.js
+  container (reverse proxy, NOT static files)
+  - Full path preserved; Next.js `basePath=/padang/demo` matches the public
+    no-trailing-slash route and its descendants
+- Canonical demo URL: `/padang/demo`. Caddy does not add a root slash redirect;
+  this keeps the proxy contract aligned with Next.js's default
+  `trailingSlash=false` behavior.
 
 **IMPORTANT — Next.js CSP:** the selected Next.js release may require the
 documented launch-time hydration allowance.
@@ -488,10 +493,8 @@ Create: `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile`
 # Padang ERP Demo — handler directives only
 # Imported inside the delegateops.business block
 
-redir /padang/demo /padang/demo/ 308
-
 # Canonical public URL: https://delegateops.business/padang/demo
-# Caddy redirects the exact path to the slash form for the frontend.
+# Do not add a Caddy root redirect: Next.js owns the no-trailing-slash contract.
 # API: strip /padang/demo prefix; Go API receives /api/v1/...
 handle /padang/demo/api/* {
 	uri strip_prefix /padang/demo
@@ -506,7 +509,18 @@ handle /padang/demo/api/* {
 	reverse_proxy bridge-ph-padang-demo-api:8080
 }
 
-# Frontend: full path forwarded; Next.js basePath=/padang/demo handles routing
+# Frontend: full path forwarded; exact route and descendants are both proxied.
+handle /padang/demo {
+	import padang_nextjs_csp
+
+	header {
+		>Cache-Control "public, max-age=0, must-revalidate"
+		>X-Robots-Tag "noindex, nofollow, noarchive"
+	}
+
+	reverse_proxy bridge-ph-padang-demo-frontend:3000
+}
+
 handle /padang/demo/* {
 	import padang_nextjs_csp
 
@@ -573,11 +587,13 @@ The canonical Padang routes above use imported handler files. The remote demo
 deployment manages `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile` and
 inserts its matching import inside the `delegateops.business` site block before
 the generic `handle { ... }` fallback. Exactly one complete Padang route owner
-must exist: either the canonical/legacy inline route or the managed handler
+must exist: either the canonical inline route pair or the managed handler
 import. Duplicate imports, inline-plus-import layouts, incomplete routes, and
-imports outside the site block fail closed. The script uses direct path matchers
-for the generated root redirect, validates the assembled Caddyfile before
-installing Quadlets, and reloads Caddy when only the imported handler changes.
+imports outside the site block fail closed. The updater migrates the previous
+managed handler that redirected `/padang/demo` to `/padang/demo/`, removes that
+loop-causing redirect, and deduplicates repeated copies of its exact import.
+It validates the assembled Caddyfile before installing Quadlets and reloads
+Caddy when only the imported handler changes.
 When the Padang proxy network is new, its Quadlet is staged before the required
 Caddy restart so Caddy never starts with a reference to a missing network unit.
 
@@ -761,13 +777,15 @@ The remote script:
   application service fails. It then preserves the existing demo database by
   default and starts the 30-minute reset timer; `--seed-demo` is required for
   an intentional destructive reseed; and
-- makes only the required Caddy network and `/padang/demo/*` page/API route
-  changes, stages the Caddyfile, formats it with `caddy fmt --overwrite`,
+- makes only the required Caddy network and `/padang/demo` plus
+  `/padang/demo/*` page/API route changes, stages the Caddyfile, formats it
+  with `caddy fmt --overwrite`,
   validates it with `caddy validate`, then atomically replaces it after a
   timestamped backup. If the existing `delegateops.business` block contains
   the same managed Padang handler import more than once, it canonicalizes that
-  exact duplicate to one import; inline-plus-import, incomplete, or foreign
-  route owners still fail closed;
+  exact duplicate to one import. It also migrates the previous managed handler
+  that redirected the demo root to a trailing slash; inline-plus-import,
+  incomplete, or foreign route owners still fail closed;
   Caddyfile-only changes use a graceful `caddy reload` through disposable
   `podman run --rm`, with a systemd restart fallback. The updater explicitly
   waits for the database healthcheck and then verifies the

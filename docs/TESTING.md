@@ -203,10 +203,14 @@ inside the disposable fixture container. An inaccessible namespace probe must
 fail closed; the deployment must never respond by deleting, moving, repairing,
 chowning, or upgrading persistent state.
 
-The Caddy fixture also verifies that a repeated exact managed Padang import is
-normalized to one import, while inline-plus-import and duplicate named-matcher
-layouts remain rejected. It checks the supplied `/home/jk/caddy/conf` to
-`/etc/caddy` mount shape and proxy-network cardinality. The database identity
+The Caddy fixture also verifies that the demo has no Caddy root redirect,
+serves both the exact `/padang/demo` path and `/padang/demo/*` descendants
+without overmatching `/padang/demonstration`, migrates the previous managed
+slash-redirect handler, and normalizes a repeated exact managed Padang import
+to one import. A second normalization is byte-identical, while
+inline-plus-import and duplicate named-matcher layouts remain rejected. It
+checks the supplied `/home/jk/caddy/conf` to `/etc/caddy` mount shape and
+proxy-network cardinality. The database identity
 check must connect as the persisted configured `POSTGRES_USER`; it must not
 assume that an OS `postgres` user implies a PostgreSQL role named `postgres`.
 

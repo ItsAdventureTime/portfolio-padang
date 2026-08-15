@@ -48,24 +48,29 @@ The previous `docs/phase-0` and `feat/c1-foundation` branches remain as
 historical references. Both are ancestors of `main` and contain no divergent
 work requiring a separate merge or repair.
 
-## Caddy Deployment Remediation (2026-08-14)
+## Caddy Deployment Remediation (2026-08-15)
 
 The next demo update completed backend and frontend validation but stopped when
 the remote script could not find the literal `# DelegateOps static-site
 fallback` comment in the existing Caddyfile. The updater now manages the
 documented `padang-demo.handlers.Caddyfile` import inside the
 `delegateops.business` site block, supports the older marker and generic
-`handle { ... }` fallback, and recognizes canonical direct-path plus legacy
-named-matcher/upstream route forms. Exactly one complete Padang route owner is
+`handle { ... }` fallback, and recognizes the canonical exact-plus-wildcard
+route plus the legacy managed form for migration. Exactly one complete Padang
+route owner is
 allowed: inline or imported. Repeated copies of the exact managed import are
 normalized to one; inline-plus-import layouts, incomplete routes, and imports
 outside the site block fail closed.
 
-The generated handler uses direct path matchers for the root redirect and the
-documented `bridge-ph-padang-demo-api` / `bridge-ph-padang-demo-frontend`
-container names. Caddy validates the staged main file and handler before the
-Caddyfile, handler, or Caddy Quadlet is replaced. A handler-only change triggers a
-graceful Caddy reload; a proxy-network change triggers a restart. Fixtures cover
+The demo's canonical public path is `/padang/demo` without a trailing slash.
+The generated handler uses separate exact and wildcard frontend path handlers,
+does not redirect the exact path to `/padang/demo/`, and keeps the documented
+`bridge-ph-padang-demo-api` / `bridge-ph-padang-demo-frontend` container names.
+The updater migrates the previous managed slash-redirect handler and
+deduplicates repeated exact imports. Caddy validates the staged main file and
+handler before the Caddyfile, handler, or Caddy Quadlet is replaced. A
+handler-only change triggers a graceful Caddy reload; a proxy-network change
+triggers a restart. Fixtures cover
 canonical, legacy, duplicate, inline/import, idempotent, handler-only, and
 unsafe layouts. The public route checker now accepts `--demo-only` for the
 demo-only release gate; its default remains the four-route demo plus production
@@ -296,8 +301,9 @@ gate. Both the dynamic renderer and checked-in demo frontend Quadlet now set
 `Environment=HOSTNAME=0.0.0.0` and `Environment=PORT=3000`, retain the expected
 standalone `Exec=node /app/server.js`, and probe
 `http://127.0.0.1:3000/padang/demo` without a trailing slash. The compiled
-`/padang/demo` basePath is valid directly; `/padang/demo/` only redirects.
-Caddy routing was not changed.
+`/padang/demo` basePath is valid directly; Next.js may redirect the
+trailing-slash variant back to its no-slash canonical path. Caddy routing was
+not changed by that health-gate remediation.
 
 The Quadlet fixture now checks the generated and checked-in frontend
 definitions for these exact runtime and health-gate settings. Frontend service

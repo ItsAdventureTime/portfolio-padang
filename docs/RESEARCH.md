@@ -112,27 +112,34 @@ Primary deployment references:
 - [Caddy command line](https://caddyserver.com/docs/command-line)
 - [Backblaze S3-compatible application keys](https://www.backblaze.com/docs/cloud-storage-s3-compatible-app-keys)
 
-### Caddy Route-Collision Refresh: Current Maintainer Guidance (2026-08-14)
+### Caddy Route and Canonical-Path Refresh: Current Maintainer Guidance (2026-08-15)
 
 The failed demo update exposed a Caddyfile ownership problem: a named matcher
 such as `@padang_demo_root` was expanded more than once in the same site block.
 The deployment baseline now treats the route as an owned unit and requires
 exactly one complete owner, either an inline route or an imported handler. The
-generated handler uses direct path matchers for the root redirect, keeps API and
-frontend routing in mutually exclusive `handle` blocks, validates the staged
-configuration before installation, and reloads Caddy when only the handler
-changes. Repeated copies of the exact managed handler import are reduced to one
-inside the site block; inline-plus-import, incomplete, or out-of-site owners are
-still rejected.
+demo keeps `/padang/demo` as its canonical public path because Next.js defaults
+to no trailing slashes; a Caddy redirect from that path to `/padang/demo/`
+would conflict with the framework's canonicalization. The generated handler
+therefore uses separate exact and wildcard frontend `handle` blocks, keeps API
+and frontend routing in mutually exclusive `handle` blocks, validates the
+staged configuration before installation, and reloads Caddy when only the
+handler changes. Repeated copies of the exact managed handler import are
+reduced to one inside the site block, and the previous managed slash-redirect
+handler is migrated to the new contract; inline-plus-import, incomplete, or
+out-of-site owners are still rejected.
 
 Primary Caddy references:
 
 - [Caddy request matchers](https://caddyserver.com/docs/caddyfile/matchers)
 - [Caddy `handle` directive](https://caddyserver.com/docs/caddyfile/directives/handle)
+- [Caddy `redir` directive](https://caddyserver.com/docs/caddyfile/directives/redir)
 - [Caddy `handle_path` directive](https://caddyserver.com/docs/caddyfile/directives/handle_path)
 - [Caddy `import` directive](https://caddyserver.com/docs/caddyfile/directives/import)
 - [Caddy directive ordering](https://caddyserver.com/docs/caddyfile/directives)
 - [Caddy configuration concepts](https://caddyserver.com/docs/caddyfile/concepts)
+- [Next.js `trailingSlash`](https://nextjs.org/docs/app/api-reference/config/next-config-js/trailingSlash)
+- [Next.js `basePath`](https://nextjs.org/docs/pages/api-reference/config/next-config-js/basePath)
 
 ### Demo PostgreSQL Persistence Refresh: Current Maintainer Guidance (2026-08-15)
 

@@ -94,9 +94,11 @@ The standalone Next.js Quadlet must set `HOSTNAME=0.0.0.0` and `PORT=3000`;
 otherwise Podman can inject the container ID as the hostname and Next.js can
 bind/advertise there even though the process is ready. The expected local
 probe is `http://127.0.0.1:3000/padang/demo` with no trailing slash. The
-compiled `/padang/demo` basePath is correct; `/padang/demo/` only adds a
-redirect. The updater's failure diagnostics print status, non-secret health
-timestamps/exit codes, and logs without health response bodies.
+compiled `/padang/demo` basePath is correct; the public route is served
+directly without a Caddy root redirect. `/padang/demo/` is not the demo
+deployment contract and may receive Next.js's normal canonical-path redirect.
+The updater's failure diagnostics print status, non-secret health timestamps/
+exit codes, and logs without health response bodies.
 
 ### Health Check
 
@@ -451,6 +453,25 @@ link remains a validation failure.
 2. Verify B2 credentials: run backup script manually in test mode
 3. Check B2 bucket accessibility from VPS
 
+### Too many redirects at the demo URL
+
+The canonical demo URL is `https://delegateops.business/padang/demo` without a
+trailing slash. The managed Caddy handler serves both the exact route and its
+descendants; it must not redirect the exact route to `/padang/demo/`. If a
+redirect trace alternates between those two paths, the VPS still has the
+legacy managed handler. Inspect and then rerun the normal demo updater so it
+deduplicates the exact handler import and migrates that handler:
+
+```bash
+grep -nE 'redir|handle /padang/demo|padang-demo.handlers' \
+  /home/jk/caddy/conf/Caddyfile \
+  /home/jk/caddy/conf/padang-demo.handlers.Caddyfile
+scripts/update-padang-demo.sh
+```
+
+The API health contract remains
+`https://delegateops.business/padang/demo/api/v1/health`.
+
 ### 502 from Caddy
 
 1. Check frontend container is running
@@ -465,9 +486,10 @@ This means the deployment script could not identify a safe insertion point
 inside `delegateops.business`. The current supported layout uses the managed
 `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile` import before the generic
 `handle { ... }` fallback; an older exact `# DelegateOps static-site fallback`
-marker is also supported. The updater recognizes both the canonical direct-path
-route and the older named-matcher/upstream form. Do not add the route outside
-that site block or place it after the fallback. Re-sync and verify the corrected
+marker is also supported. The updater recognizes the canonical exact-plus-
+wildcard route and the older managed handler form for migration. Do not add the
+route outside that site block or place it after the fallback. Re-sync and verify
+the corrected
 script without applying runtime changes, then rerun the deployment:
 
 ```bash
@@ -475,13 +497,14 @@ scripts/update-padang-demo.sh --dry-run
 scripts/update-padang-demo.sh
 ```
 
-If an existing inline managed Padang route is present, the script preserves it.
-Exactly one complete route owner is required: inline or imported. Duplicate
-managed Padang imports inside `delegateops.business` are canonicalized to one
-import; inline-plus-import configurations, incomplete canonical/legacy routes,
-and imports outside `delegateops.business` are rejected before Caddy/handler
-files or the Caddy edge Quadlet are installed. The assembled Caddyfile and
-handler are validated in a
+If an existing canonical inline managed Padang route is present, the script
+preserves it. Exactly one complete route owner is required: inline or
+imported. Duplicate managed Padang imports inside `delegateops.business` are
+canonicalized to one import; the previous managed imported handler is migrated
+to the no-slash contract; inline-plus-import configurations, incomplete
+routes, and imports outside `delegateops.business` are rejected before
+Caddy/handler files or the Caddy edge Quadlet are installed. The assembled
+Caddyfile and handler are validated in a
 disposable Caddy container before runtime files are changed.
 
 ### Caddy reports `matcher is defined more than once`
@@ -498,7 +521,8 @@ grep -nE 'padang_demo|padang/demo|padang-demo.handlers' \
   /home/jk/caddy/conf/padang-demo.handlers.Caddyfile
 ```
 
-The generated handler uses inline path matchers for the root redirect and the
-canonical upstreams `bridge-ph-padang-demo-api` and
+The generated handler uses separate inline exact and wildcard path handlers
+for the frontend (avoiding named-matcher collisions) and the canonical
+upstreams `bridge-ph-padang-demo-api` and
 `bridge-ph-padang-demo-frontend`. A handler-only change still requires a Caddy
 reload; the updater performs that reload after staged validation.

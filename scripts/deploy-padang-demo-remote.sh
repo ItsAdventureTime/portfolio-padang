@@ -387,8 +387,6 @@ padang_demo_handler_block() {
 # BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
 # Path matchers are inline so this imported route does not define a named
 # matcher that can collide with another route in the delegateops.business site.
-redir /padang/demo /padang/demo/ 308
-
 handle /padang/demo/api/* {
   uri strip_prefix /padang/demo
   header {
@@ -398,6 +396,14 @@ handle /padang/demo/api/* {
     >X-Robots-Tag "noindex, nofollow, noarchive"
   }
   reverse_proxy $CADDY_DEMO_API_UPSTREAM
+}
+
+handle /padang/demo {
+  header {
+    >Cache-Control "public, max-age=0, must-revalidate"
+    >X-Robots-Tag "noindex, nofollow, noarchive"
+  }
+  reverse_proxy $CADDY_DEMO_FRONTEND_UPSTREAM
 }
 
 handle /padang/demo/* {
@@ -413,16 +419,59 @@ EOF
 
 handler_route_state() {
   local input_file="$1"
-  local api_blocks app_blocks api_proxies app_proxies root_redirects evidence
+  local api_blocks app_blocks app_exact_blocks app_wildcard_blocks
+  local app_named_legacy_blocks api_proxies app_proxies root_redirects
+  local evidence managed_markers
   api_blocks=$(grep -Ec '^[[:space:]]*handle([[:space:]]+(/padang/demo/api/\*|@padang_demo_api))[[:space:]]*\{' "$input_file" || true)
-  app_blocks=$(grep -Ec '^[[:space:]]*handle([[:space:]]+(/padang/demo/\*|@padang_demo))[[:space:]]*\{' "$input_file" || true)
+  app_exact_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+/padang/demo[[:space:]]*\{' "$input_file" || true)
+  app_wildcard_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+/padang/demo/\*[[:space:]]*\{' "$input_file" || true)
+  app_named_legacy_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+@padang_demo[[:space:]]*\{' "$input_file" || true)
+  app_blocks=$((app_exact_blocks + app_wildcard_blocks + app_named_legacy_blocks))
   api_proxies=$(grep -Ec '^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-api|padang-demo-api):8080([[:space:]]|$)' "$input_file" || true)
   app_proxies=$(grep -Ec '^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-frontend|padang-demo-app):3000([[:space:]]|$)' "$input_file" || true)
   root_redirects=$(grep -Ec '^[[:space:]]*redir[[:space:]]+(@padang_demo_root[[:space:]]+/padang/demo/[[:space:]]+308|/padang/demo[[:space:]]+/padang/demo/[[:space:]]+308)[[:space:]]*$' "$input_file" || true)
   evidence=$(grep -Ec 'PADANG DEMO ROUTE|PADANG DEMO API ROUTE|@padang_demo(_root|_api)?|/padang/demo(/api)?/\*|bridge-ph-padang-demo-(api|frontend):|padang-demo-(api|app):' "$input_file" || true)
-  printf '%s %s %s %s %s %s\n' \
-    "$api_blocks" "$app_blocks" "$api_proxies" "$app_proxies" \
-    "$root_redirects" "$evidence"
+  managed_markers=$(grep -Fc '# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)' "$input_file" || true)
+  printf '%s %s %s %s %s %s %s %s %s %s\n' \
+    "$api_blocks" "$app_blocks" "$app_exact_blocks" "$app_wildcard_blocks" \
+    "$app_named_legacy_blocks" "$api_proxies" "$app_proxies" \
+    "$root_redirects" "$evidence" "$managed_markers"
+}
+
+handler_route_kind() {
+  local input_file="$1"
+  local api_blocks app_blocks app_exact_blocks app_wildcard_blocks
+  local app_named_legacy_blocks api_proxies app_proxies root_redirects
+  local evidence managed_markers
+
+  [[ -f "$input_file" ]] || {
+    printf 'missing\n'
+    return 0
+  }
+  [[ -s "$input_file" ]] || {
+    printf 'empty\n'
+    return 0
+  }
+
+  read -r api_blocks app_blocks app_exact_blocks app_wildcard_blocks \
+    app_named_legacy_blocks api_proxies app_proxies root_redirects \
+    evidence managed_markers \
+    < <(handler_route_state "$input_file")
+  if [[ "$managed_markers" == 1 && "$api_blocks" == 1 &&
+    "$app_exact_blocks" == 1 && "$app_wildcard_blocks" == 1 &&
+    "$app_named_legacy_blocks" == 0 && "$app_blocks" == 2 &&
+    "$api_proxies" == 1 && \
+    "$app_proxies" == 2 && "$root_redirects" == 0 ]]; then
+    printf 'canonical\n'
+  elif [[ "$managed_markers" == 1 && "$api_blocks" == 1 &&
+    "$app_exact_blocks" == 0 &&
+    "$((app_wildcard_blocks + app_named_legacy_blocks))" == 1 &&
+    "$app_blocks" == 1 && "$api_proxies" == 1 &&
+    "$app_proxies" == 1 && "$root_redirects" == 1 ]]; then
+    printf 'legacy\n'
+  else
+    printf 'unsafe\n'
+  fi
 }
 
 caddy_site_route_state() {
@@ -454,6 +503,9 @@ caddy_site_route_state() {
       all_imports = 0
       api_blocks = 0
       app_blocks = 0
+      app_exact_blocks = 0
+      app_wildcard_blocks = 0
+      app_named_legacy_blocks = 0
       api_proxies = 0
       app_proxies = 0
       root_redirects = 0
@@ -480,12 +532,19 @@ caddy_site_route_state() {
           api_blocks++
           evidence++
         }
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo[[:space:]]*\{[[:space:]]*$/) {
+          app_blocks++
+          app_exact_blocks++
+          evidence++
+        }
         if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo\/\*[[:space:]]*\{[[:space:]]*$/) {
           app_blocks++
+          app_wildcard_blocks++
           evidence++
         }
         if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+@padang_demo[[:space:]]*\{[[:space:]]*$/) {
           app_blocks++
+          app_named_legacy_blocks++
           evidence++
         }
         if (line ~ /^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-api|padang-demo-api):8080([[:space:]]|$)/) {
@@ -508,11 +567,17 @@ caddy_site_route_state() {
       }
     }
     END {
-      complete = (api_blocks == 1 && app_blocks == 1 &&
-        api_proxies == 1 && app_proxies == 1 && root_redirects == 1)
-      printf "%d %d %d %d %d %d %d %d %d %d\n", site_count, site_imports,
-        all_imports, complete, evidence, api_blocks, app_blocks, api_proxies,
-        app_proxies, root_redirects
+      canonical = (api_blocks == 1 && app_exact_blocks == 1 &&
+        app_wildcard_blocks == 1 && app_named_legacy_blocks == 0 &&
+        app_blocks == 2 && api_proxies == 1 && app_proxies == 2 &&
+        root_redirects == 0)
+      legacy = (api_blocks == 1 && app_exact_blocks == 0 &&
+        (app_wildcard_blocks + app_named_legacy_blocks) == 1 &&
+        app_blocks == 1 && api_proxies == 1 && app_proxies == 1 &&
+        root_redirects == 1)
+      printf "%d %d %d %d %d %d %d %d %d %d %d\n", site_count, site_imports,
+        all_imports, canonical, legacy, evidence, api_blocks, app_blocks,
+        api_proxies, app_proxies, root_redirects
     }
   ' "$input_file"
 }
@@ -536,18 +601,18 @@ rewrite_managed_import() {
 
 is_unambiguous_caddy_route() {
   local input_file="$1"
-  local site_count site_imports all_imports inline_complete inline_evidence
+  local site_count site_imports all_imports inline_canonical inline_legacy inline_evidence
   local api_blocks app_blocks api_proxies app_proxies root_redirects
-  read -r site_count site_imports all_imports inline_complete inline_evidence \
+  read -r site_count site_imports all_imports inline_canonical inline_legacy inline_evidence \
     api_blocks app_blocks api_proxies app_proxies root_redirects \
     < <(caddy_site_route_state "$input_file")
   ((site_count == 1)) || return 1
   ((all_imports == site_imports)) || return 1
   ((site_imports <= 1)) || return 1
-  if ((inline_complete && site_imports)); then
+  if ((inline_canonical && site_imports)); then
     return 1
   fi
-  if ((inline_evidence && !inline_complete)); then
+  if ((inline_evidence && !inline_canonical)); then
     return 1
   fi
   return 0
@@ -621,21 +686,26 @@ run_caddy_fixture_tests() {
     '    respond "fallback"' \
     '  }' \
     '}' > "$legacy"
-  [[ "$(caddy_site_route_state "$legacy" | awk '{print $5}')" -gt 0 ]]
-  [[ "$(caddy_site_route_state "$legacy" | awk '{print $4}')" == 1 ]]
+  [[ "$(caddy_site_route_state "$legacy" | awk '{print $5}')" == 1 ]]
+  [[ "$(caddy_site_route_state "$legacy" | awk '{print $4}')" == 0 ]]
 
   padang_demo_handler_block > "$handler"
   ! grep -q '^@padang_demo_root' "$handler"
+  ! grep -q '^redir ' "$handler"
+  grep -q '^handle /padang/demo {' "$handler"
+  grep -q '^handle /padang/demo/\* {' "$handler"
   grep -q '^  reverse_proxy bridge-ph-padang-demo-api:8080$' "$handler"
   grep -q '^  reverse_proxy bridge-ph-padang-demo-frontend:3000$' "$handler"
   cp "$legacy" "$fixture_dir/Caddyfile"
   caddy_fixture_validate "$fixture_dir"
   printf '%s\n' \
     'delegateops.business {' \
-    '  redir /padang/demo /padang/demo/ 308' \
     '  handle /padang/demo/api/* {' \
     '    uri strip_prefix /padang/demo' \
     '    reverse_proxy bridge-ph-padang-demo-api:8080' \
+    '  }' \
+    '  handle /padang/demo {' \
+    '    reverse_proxy bridge-ph-padang-demo-frontend:3000' \
     '  }' \
     '  handle /padang/demo/* {' \
     '    reverse_proxy bridge-ph-padang-demo-frontend:3000' \
@@ -645,6 +715,8 @@ run_caddy_fixture_tests() {
     '  }' \
     '}' > "$canonical"
   [[ "$(caddy_site_route_state "$canonical" | awk '{print $4}')" == 1 ]]
+  [[ "$(caddy_site_route_state "$canonical" | awk '{print $5}')" == 0 ]]
+  ! grep -q '^  handle /padang/demo\*' "$canonical"
   cp "$canonical" "$fixture_dir/Caddyfile"
   caddy_fixture_validate "$fixture_dir"
 
@@ -714,6 +786,28 @@ run_caddy_fixture_tests() {
   cp "$output" "$fixture_dir/handler-only-main-after"
   cp "$handler" "$fixture_dir/handler-before"
   cat > "$fixture_dir/legacy-handler" <<'EOF'
+# BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
+# Path matchers are inline so this imported route does not define a named
+# matcher that can collide with another route in the delegateops.business site.
+redir /padang/demo /padang/demo/ 308
+
+handle /padang/demo/api/* {
+  uri strip_prefix /padang/demo
+  reverse_proxy padang-demo-api:8080
+}
+handle /padang/demo/* {
+  reverse_proxy padang-demo-app:3000
+}
+# END PADANG DEMO ROUTE
+EOF
+  cp "$fixture_dir/legacy-handler" "$handler"
+  [[ "$(handler_route_kind "$handler")" == legacy ]]
+  padang_demo_handler_block > "$handler"
+  [[ "$(handler_route_kind "$handler")" == canonical ]]
+  ! grep -q '^redir ' "$handler"
+  grep -q '^handle /padang/demo {' "$handler"
+  grep -q '^handle /padang/demo/\* {' "$handler"
+  cat > "$fixture_dir/legacy-handler-shape" <<'EOF'
 @padang_demo_root path /padang/demo
 redir @padang_demo_root /padang/demo/ 308
 @padang_demo_api path /padang/demo/api/*
@@ -726,8 +820,7 @@ handle @padang_demo {
   reverse_proxy padang-demo-app:3000
 }
 EOF
-  cp "$fixture_dir/legacy-handler" "$handler"
-  if ! handler_route_state "$handler" | awk '$1 == 1 && $2 == 1 && $3 == 1 && $4 == 1 && $5 == 1 { found = 1 } END { exit !found }'; then
+  if ! handler_route_state "$fixture_dir/legacy-handler-shape" | awk '$1 == 1 && $2 == 1 && $3 == 0 && (($4 == 1 && $5 == 0) || ($4 == 0 && $5 == 1)) && $6 == 1 && $7 == 1 && $8 == 1 && $9 > 0 { found = 1 } END { exit !found }'; then
     printf 'padang-demo-remote: complete legacy handler fixture was rejected\n' >&2
     return 1
   fi
@@ -737,10 +830,18 @@ EOF
     printf 'padang-demo-remote: handler-only reload fixture failed\n' >&2
     return 1
   fi
-  cp "$legacy" "$fixture_dir/duplicate-named.Caddyfile"
-  sed -i.bak \
-    's|  handle {|  import /etc/caddy/padang-demo.handlers.Caddyfile\n  handle {|' \
-    "$fixture_dir/duplicate-named.Caddyfile"
+  cat > "$fixture_dir/duplicate-named.Caddyfile" <<'EOF'
+delegateops.business {
+  @padang_demo_api path /padang/demo/api/*
+  @padang_demo_api path /padang/demo/api/*
+  handle @padang_demo_api {
+    reverse_proxy padang-demo-api:8080
+  }
+  handle {
+    respond "fallback"
+  }
+}
+EOF
   cp "$fixture_dir/duplicate-named.Caddyfile" "$fixture_dir/Caddyfile"
   if caddy_fixture_validate "$fixture_dir" >/dev/null 2>&1; then
     printf 'padang-demo-remote: duplicate named-matcher fixture unexpectedly validated\n' >&2
@@ -1435,9 +1536,9 @@ install_caddy_route() {
   }
 
   app_block=$(padang_demo_handler_block)
-  local site_count site_imports all_imports inline_complete inline_evidence
+  local site_count site_imports all_imports inline_complete inline_legacy inline_evidence
   local api_blocks app_blocks api_proxies app_proxies root_redirects
-  read -r site_count site_imports all_imports inline_complete inline_evidence \
+  read -r site_count site_imports all_imports inline_complete inline_legacy inline_evidence \
     api_blocks app_blocks api_proxies app_proxies root_redirects \
     < <(caddy_site_route_state "$caddy_tmp")
   ((site_count == 1)) || {
@@ -1465,19 +1566,26 @@ install_caddy_route() {
     if [[ -f "$CADDY_HANDLER_FILE" ]]; then
       handler_existed=1
       cp -p "$CADDY_HANDLER_FILE" "$handler_tmp"
-      local handler_api_blocks handler_app_blocks handler_api_proxies handler_app_proxies
-      local handler_root_redirects handler_evidence
-      read -r handler_api_blocks handler_app_blocks handler_api_proxies \
-        handler_app_proxies handler_root_redirects handler_evidence \
-        < <(handler_route_state "$handler_tmp")
-      if [[ "$handler_api_blocks" == 1 && "$handler_app_blocks" == 1 &&
-        "$handler_api_proxies" == 1 && "$handler_app_proxies" == 1 &&
-        "$handler_root_redirects" == 1 ]]; then
-        handler_route=1
-      elif [[ "$handler_evidence" != 0 || -s "$handler_tmp" ]]; then
-        rm -f "$caddy_tmp" "$quadlet_tmp" "$handler_tmp"
-        die "existing Padang handler file is not a complete managed route"
-      fi
+      local handler_kind
+      handler_kind=$(handler_route_kind "$handler_tmp")
+      case "$handler_kind" in
+        canonical)
+          handler_route=1
+          ;;
+        legacy)
+          log "migrating legacy Padang demo handler to the no-slash route contract"
+          ;;
+        unsafe)
+          rm -f "$caddy_tmp" "$quadlet_tmp" "$handler_tmp"
+          die "existing Padang handler file is not a complete managed route"
+          ;;
+        missing|empty)
+          ;;
+        *)
+          rm -f "$caddy_tmp" "$quadlet_tmp" "$handler_tmp"
+          die "could not classify existing Padang handler file"
+          ;;
+      esac
     fi
     if ((handler_route == 0)); then
       printf '%s\n' "$app_block" > "$handler_tmp"
