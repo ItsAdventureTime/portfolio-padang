@@ -32,12 +32,15 @@ changing Quadlets, secrets, Caddy, or runtime data. Normal updates preserve the
 demo database. `--seed-demo` is an explicit destructive reset and should only
 be used when refreshing synthetic demo data is intended.
 
-The workflow follows the current Podman model: Quadlet files are systemd
-generated units, so the script reloads the user systemd manager and restarts
-the changed services after the artifact build. Application Quadlets do not
-declare an auto-update policy; the update command is the controlled release
-boundary and refuses to apply while `podman-auto-update.timer` is active or
-enabled.
+The workflow follows the current Podman model: `.container` and `.network`
+files are Quadlet sources that become generated systemd units, so the script
+reloads the user systemd manager and restarts the changed services after the
+artifact build. Standard `.timer` units are kept separately under
+`/home/jk/.config/systemd/user/`; the demo reset timer is
+`padang-demo-reset.timer` and the production backup timer is
+`bridge-ph-padang-backup.timer`. Application Quadlets do not declare an
+auto-update policy; the update command is the controlled release boundary and
+refuses to apply while `podman-auto-update.timer` is active or enabled.
 
 If the updater reports `Unit padang-demo-app.service not found`, it is a
 Quadlet generation failure, not a frontend health failure. The incident was
@@ -57,12 +60,18 @@ systemd-analyze --user --generators=true verify padang-demo-app.service
 podman quadlet list
 systemctl --user list-unit-files 'padang-demo-*' --no-legend
 find /home/jk/.config/containers/systemd/bridge-ph/padang-demo \
-  -maxdepth 1 -type f -print
+  -maxdepth 1 -type f \( -name '*.container' -o -name '*.network' \) -print
+systemctl --user show padang-demo-reset.timer \
+  -p LoadState -p FragmentPath -p Unit --no-pager
+systemctl --user cat padang-demo-reset.timer
 ```
 
 The expected mapping is `padang-demo-app.container` to
 `padang-demo-app.service`; `ContainerName=bridge-ph-padang-demo-frontend` is
-only the Podman container name.
+only the Podman container name. The reset container remains in the Quadlet
+directory, but `padang-demo-reset.timer` must resolve from
+`/home/jk/.config/systemd/user/padang-demo-reset.timer`; a `.timer` file under
+the Quadlet directory is not a supported Quadlet source.
 
 ### Health Check
 
@@ -96,6 +105,8 @@ systemctl --user status bridge-ph-padang-backup.service
 
 # Check backup timer
 systemctl --user list-timers bridge-ph-padang-backup.timer
+systemctl --user is-enabled bridge-ph-padang-backup.timer
+systemctl --user is-active bridge-ph-padang-backup.timer
 ```
 
 The backup service uses the dedicated backup utility image. A successful run
@@ -108,6 +119,8 @@ successful restore test in the operations log.
 ```bash
 # Check reset timer
 systemctl --user list-timers padang-demo-reset.timer
+systemctl --user show padang-demo-reset.timer \
+  -p LoadState -p FragmentPath -p Unit --no-pager
 
 # Manual demo reset
 systemctl --user start padang-demo-reset.service
@@ -396,8 +409,9 @@ condition.
 ### Demo not resetting
 
 1. Check timer: `systemctl --user list-timers padang-demo-reset.timer`
-2. Check last run: `journalctl --user -u padang-demo-reset.service -n 20`
-3. Manual trigger: `systemctl --user start padang-demo-reset.service`
+2. Verify placement/target: `systemctl --user show padang-demo-reset.timer -p FragmentPath -p Unit`
+3. Check last run: `journalctl --user -u padang-demo-reset.service -n 20`
+4. Manual trigger: `systemctl --user start padang-demo-reset.service`
 
 ### Backup failure
 

@@ -107,7 +107,7 @@ Type=oneshot
 RemainAfterExit=no
 ```
 
-**`bridge-ph-padang-backup.timer`**
+**`systemd/user/bridge-ph-padang-backup.timer` (normal systemd user unit, not Quadlet)**
 
 ```ini
 [Unit]
@@ -117,10 +117,27 @@ Description=Padang ERP Production - Daily Backup Timer
 OnCalendar=*-*-* 18:00:00 UTC
 AccuracySec=5min
 Persistent=true
+Unit=bridge-ph-padang-backup.service
 
 [Install]
 WantedBy=timers.target
 ```
+
+Install the backup container source under
+`/home/jk/.config/containers/systemd/bridge-ph/padang/`, but install this
+timer separately under `/home/jk/.config/systemd/user/`:
+
+```bash
+install -m 0640 systemd/user/bridge-ph-padang-backup.timer \
+  /home/jk/.config/systemd/user/bridge-ph-padang-backup.timer
+systemctl --user daemon-reload
+systemctl --user enable --now bridge-ph-padang-backup.timer
+systemctl --user list-timers bridge-ph-padang-backup.timer
+```
+
+The `.timer` suffix is standard systemd user-unit syntax, not a supported
+Quadlet source suffix. Do not copy the timer into the production Quadlet
+directory.
 
 ---
 

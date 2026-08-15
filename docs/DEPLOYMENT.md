@@ -29,11 +29,18 @@ This runbook follows the current upstream model for the selected stack:
 - Quadlet `[Install]` relationships describe boot-time activation, but the
   updater explicitly starts generated units after `daemon-reload`; routine
   updates do not run `systemctl enable` on generated container services.
-- The updater verifies every expected generated network, container, and timer
-  unit immediately after `daemon-reload`, before starting PostgreSQL or the
-  application stack. A missing generated unit fails closed and prints the
-  Quadlet files, the direct Podman generator dry-run for the nested directory,
-  visible units, and `systemd-analyze` generator diagnostics.
+- Standard systemd `.timer` units are not Quadlet sources. The demo reset timer
+  is installed at `/home/jk/.config/systemd/user/padang-demo-reset.timer`, and
+  the production backup timer is installed at
+  `/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer`; only
+  `.container` and `.network` files belong under
+  `/home/jk/.config/containers/systemd/bridge-ph/`.
+- The updater verifies every expected generated network and container unit plus
+  the normal systemd reset timer immediately after `daemon-reload`, before
+  starting PostgreSQL or the application stack. A missing generated unit or
+  mislocated timer fails closed and prints the Quadlet files, the direct Podman
+  generator dry-run for the nested directory, visible units, and
+  `systemd-analyze` generator diagnostics.
 - The dynamic demo renderer writes `padang-demo-app.container`, which Quadlet
   maps to `padang-demo-app.service`. `ContainerName=bridge-ph-padang-demo-
   frontend` remains the Podman container name used by Caddy and does not name
@@ -87,6 +94,7 @@ Slug format: `{client}-{app}-{env}-{component}`
 | Backup container | N/A | `bridge-ph-padang-backup` |
 | DB name | `padang_demo` | `padang_prod` |
 | DB user | `padang_demo_user` | `padang_prod_user` |
+| Systemd user timer | `/home/jk/.config/systemd/user/padang-demo-reset.timer` | `/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer` |
 | Project release identity | `padang-bridge-ph:demo` | `padang-bridge-ph:prod` |
 | OCI image (API) | `ghcr.io/itsadventuretime/padang-erp-api:demo-latest` | `ghcr.io/itsadventuretime/padang-erp-api:latest` |
 | OCI image (Frontend) | `ghcr.io/itsadventuretime/padang-erp-frontend:demo-latest` (`/padang/demo`) | `ghcr.io/itsadventuretime/padang-erp-frontend:latest` (`/padang`) |
@@ -176,8 +184,10 @@ The examples in this section describe the checked-in static templates under
 `quadlets/demo/` and `quadlets/prod/`. The current demo deployment script
 renders `padang-demo-*` service files under the VPS Quadlet directory, with
 `bridge-ph-padang-demo-*` container names matching the checked-in templates and
-Caddy upstreams. For the live demo, follow the updater procedure below instead
-of copying these demo templates directly.
+Caddy upstreams. The checked-in user timers are under `systemd/user/`; `.timer`
+files are normal systemd units and must not be copied into a Quadlet directory.
+For the live demo, follow the updater procedure below instead of copying these
+demo templates directly.
 
 ### Networks
 
@@ -365,19 +375,28 @@ The reset command must refuse to run unless `APP_ENV=demo`, `RUN_MODE=seed`,
 database identity all prove that the target is demo. Production images do not
 include the reset command, and reset is never exposed as an HTTP endpoint.
 
-**`bridge-ph-padang-demo-reset.timer`**
+**`systemd/user/padang-demo-reset.timer` (normal systemd user unit, not Quadlet)**
 ```ini
 [Unit]
 Description=Padang ERP Demo Reset Timer
 
 [Timer]
-OnBootSec=5min
+OnBootSec=30min
 OnUnitActiveSec=30min
 AccuracySec=1min
+Unit=padang-demo-reset.service
 
 [Install]
 WantedBy=timers.target
 ```
+
+The live reset container remains a Quadlet source at
+`/home/jk/.config/containers/systemd/bridge-ph/padang-demo/padang-demo-reset.container`;
+the timer is installed separately at
+`/home/jk/.config/systemd/user/padang-demo-reset.timer` because `.timer` is a
+standard systemd suffix, not a supported Quadlet suffix. The timer starts the
+generated `padang-demo-reset.service` after 30 minutes and repeats 30 minutes
+after each activation.
 
 ---
 
@@ -555,24 +574,26 @@ Caddy restart so Caddy never starts with a reference to a missing network unit.
 │   │   └── postgres-data/    ← PostgreSQL data directory
 │   └── padang-demo/          ← Demo data
 │       └── postgres-data/    ← PostgreSQL data directory (wiped on reset)
-└── .config/containers/systemd/
-    └── bridge-ph/
-        ├── padang/           ← Production Quadlets
-        │   ├── bridge-ph-padang.network
-        │   ├── bridge-ph-padang-db.container
-        │   ├── bridge-ph-padang-api.container
-        │   ├── bridge-ph-padang-frontend.container
-        │   ├── bridge-ph-padang-backup.container
-        │   └── bridge-ph-padang-backup.timer
-        └── padang-demo/      ← Demo Quadlets rendered by the updater
-            ├── bridge-ph-padang-demo.network
-            ├── bridge-ph-padang-demo-proxy.network
-            ├── padang-demo-db.container
-            ├── padang-demo-migrate.container
-            ├── padang-demo-api.container
-            ├── padang-demo-app.container
-            ├── padang-demo-reset.container
-            └── padang-demo-reset.timer
+├── .config/
+│   ├── containers/systemd/
+│   │   └── bridge-ph/
+│   │       ├── padang/       ← Production Quadlets
+│   │       │   ├── bridge-ph-padang.network
+│   │       │   ├── bridge-ph-padang-db.container
+│   │       │   ├── bridge-ph-padang-api.container
+│   │       │   ├── bridge-ph-padang-frontend.container
+│   │       │   └── bridge-ph-padang-backup.container
+│   │       └── padang-demo/ (rendered demo Quadlet sources)
+│   │           ├── bridge-ph-padang-demo.network
+│   │           ├── bridge-ph-padang-demo-proxy.network
+│   │           ├── padang-demo-db.container
+│   │           ├── padang-demo-migrate.container
+│   │           ├── padang-demo-api.container
+│   │           ├── padang-demo-app.container
+│   │           └── padang-demo-reset.container
+│   └── systemd/user/          ← Standard systemd user timers
+│       ├── bridge-ph-padang-backup.timer
+│       └── padang-demo-reset.timer
 ```
 
 ---
@@ -602,7 +623,10 @@ performed manually, the production-only service start sequence is:
 systemctl --user start bridge-ph-padang-db.service
 systemctl --user start bridge-ph-padang-api.service
 systemctl --user start bridge-ph-padang-frontend.service
-systemctl --user start bridge-ph-padang-backup.timer
+install -m 0640 systemd/user/bridge-ph-padang-backup.timer \
+  /home/jk/.config/systemd/user/bridge-ph-padang-backup.timer
+systemctl --user daemon-reload
+systemctl --user enable --now bridge-ph-padang-backup.timer
 
 # Update Caddy configuration
 # (Inspect existing config first per Section 10 of Project Constitution)
@@ -706,10 +730,13 @@ The remote script:
   `/home/jk/.config/containers/systemd/bridge-ph/padang-demo/` and persistent
   state in `/home/jk/bridge-ph/padang-demo/`. The Quadlets, networks, secrets,
   and container names use the `padang-demo` deployment identity and remain
-  separate from production. After reload, it verifies the generated
-  `padang-demo-*` services before starting any application service; a missing
-  unit prints the direct Podman generator dry-run and
-  `systemd-analyze --user --generators=true verify` diagnostics;
+  separate from production. The reset container is staged under the Quadlet
+  directory, while its standard systemd user timer is installed at
+  `/home/jk/.config/systemd/user/padang-demo-reset.timer`. After reload, the
+  updater verifies the generated `padang-demo-*` services and the timer target
+  before starting any application service; a missing unit prints the direct
+  Podman generator dry-run and `systemd-analyze --user --generators=true verify`
+  diagnostics;
 - starts the database and waits for its health and identity checks, runs
   migrations, and passes API/frontend health gates before activating or
   reloading the Caddy route. This preserves the previous public route when an
@@ -881,10 +908,11 @@ in a command line, `.env` file, Quadlet `Environment=`, or Git.
 Routine updates do not reseed data. The VPS-side script restarts the migration,
 API, and frontend units so bind-mounted build artifacts are actually loaded;
 `systemctl start` alone would leave an already-running API/frontend on its old
-process. It also reloads and starts the generated reset timer explicitly; it
-does not enable generated units during a routine update. It performs public
-page and API health checks after apply. Use `--skip-health-check` only when
-DNS/TLS is intentionally unavailable during maintenance.
+process. It installs, reloads, and enables the standard systemd reset timer with
+`systemctl --user enable --now padang-demo-reset.timer`; it does not enable
+generated container units during a routine update. It performs public page and
+API health checks after apply. Use `--skip-health-check` only when DNS/TLS is
+intentionally unavailable during maintenance.
 
 After an update, inspect the demo from the VPS if the public health check fails:
 
@@ -918,11 +946,13 @@ mkdir -p /home/jk/bridge-ph/padang/postgres-data
 mkdir -p /home/jk/.config/containers/systemd/bridge-ph/padang
 
 cp quadlets/prod/* /home/jk/.config/containers/systemd/bridge-ph/padang/
+install -m 0640 systemd/user/bridge-ph-padang-backup.timer \
+  /home/jk/.config/systemd/user/bridge-ph-padang-backup.timer
 systemctl --user daemon-reload
 systemctl --user start bridge-ph-padang-db.service
 systemctl --user start bridge-ph-padang-api.service
 systemctl --user start bridge-ph-padang-frontend.service
-systemctl --user start bridge-ph-padang-backup.timer
+systemctl --user enable --now bridge-ph-padang-backup.timer
 
 curl --fail-with-body https://delegateops.business/padang
 curl --fail-with-body https://delegateops.business/padang/api/v1/health

@@ -2,9 +2,10 @@
 Description=Padang ERP Demo reset timer
 
 [Timer]
-OnBootSec=5min
+OnBootSec=30min
 OnUnitActiveSec=30min
-Unit=bridge-ph-padang-demo-reset.service
+AccuracySec=1min
+Unit=padang-demo-reset.service
 
 [Install]
 WantedBy=timers.target

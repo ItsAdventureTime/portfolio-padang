@@ -267,6 +267,24 @@ reference template. Focused validation passed: `bash -n scripts/*.sh`,
 available for containerized execution checks. No VPS deployment or SSH
 operation was performed.
 
+## Quadlet Timer Placement Remediation (2026-08-15)
+
+The reset deployment follow-up confirmed that plain `.timer` files are normal
+systemd user units, not supported Quadlet sources. The demo renderer now keeps
+`padang-demo-reset.container` under
+`/home/jk/.config/containers/systemd/bridge-ph/padang-demo/`, installs
+`padang-demo-reset.timer` under `/home/jk/.config/systemd/user/`, and validates
+that the timer targets `padang-demo-reset.service`. It preserves
+`OnBootSec=30min`, `OnUnitActiveSec=30min`, and `RemainAfterExit=no`; repeated
+updates use `systemctl --user enable --now padang-demo-reset.timer` without
+enabling application Quadlet units.
+
+The checked-in demo and production timer references now live under
+`systemd/user/`, and the Quadlet directories contain no `.timer` sources.
+Production backup activation follows the same placement with
+`/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer`. No VPS
+deployment, SSH operation, commit, or push is part of this remediation.
+
 ---
 
 ## Specification Overview & Architectural Decisions
@@ -479,7 +497,7 @@ an undocumented placeholder table.
 ### TASK-008: Synthetic Demo Seed Data & 30-Minute Automatic Reset
 - **GOAL:** Create realistic synthetic demo seed SQL script (`seed/demo_seed.sql`) and implement one-shot reset container/binary with systemd 30-minute timer definition.
 - **CONTEXT:** Detailed in `docs/DEPLOYMENT.md`, `docs/TESTING.md`, `docs/UI_UX.md`.
-- **FILES/AREAS:** `seed/demo_seed.sql`, `backend/cmd/seed/`, `quadlets/demo/bridge-ph-padang-demo-reset.container`, `quadlets/demo/bridge-ph-padang-demo-reset.timer`
+- **FILES/AREAS:** `seed/demo_seed.sql`, `backend/cmd/seed/`, `quadlets/demo/bridge-ph-padang-demo-reset.container`, `systemd/user/padang-demo-reset.timer`
 - **DEPENDENCIES:** TASK-007
 - **CONSTRAINTS:**
   - Seed data MUST be realistic and rich: 3–5 projects in varied statuses, 3–5 fab jobs, suppliers, inventory, progress billings with partial collections, pending GM and DCS approvals.
@@ -491,7 +509,7 @@ an undocumented placeholder table.
   - Running seed script populates demo DB with complete operational state across all roles.
   - Running reset container wipes modified demo data and restores clean seed state.
 - **REQUIRED TESTS:** Integration test verifying demo reset restores exact initial record counts.
-- **DEFINITION OF DONE:** Demo seed script and automatic 30-minute reset Quadlet container complete and verified.
+- **DEFINITION OF DONE:** Demo seed script, automatic 30-minute reset systemd timer, and reset Quadlet container complete and verified.
 
 ---
 
@@ -576,6 +594,10 @@ an undocumented placeholder table.
   the canonical `padang-demo-app.container` → `padang-demo-app.service`
   mapping, numeric `User=1000` for the Node frontend, and verifies the
   generated `padang-demo-*` units immediately after the user-manager reload.
+  The reset container is a Quadlet source, while
+  `/home/jk/.config/systemd/user/padang-demo-reset.timer` is a normal systemd
+  user timer activated with `systemctl --user enable --now`; `.timer` files are
+  not staged in the Quadlet directory.
 - The VPS generates and persists the database username in
   `config/db-user`, generates the database password directly into a Podman
   secret, and prompts interactively only for the two Backblaze B2 values.

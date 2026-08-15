@@ -3,6 +3,8 @@ set -Eeuo pipefail
 
 APP_ROOT="/home/jk/bridge-ph/padang-demo"
 QUADLET_DIR="/home/jk/.config/containers/systemd/bridge-ph/padang-demo"
+SYSTEMD_USER_DIR="/home/jk/.config/systemd/user"
+RESET_TIMER_PATH="$SYSTEMD_USER_DIR/padang-demo-reset.timer"
 SOURCE_ROOT="$APP_ROOT/source"
 BUILD_ROOT="$APP_ROOT/build"
 FRONTEND_BUILD="$BUILD_ROOT/frontend"
@@ -80,8 +82,12 @@ print_quadlet_generator_diagnostics() {
   printf 'padang-demo-remote: renderer mapping: %s/padang-demo-app.container -> padang-demo-app.service; ContainerName=bridge-ph-padang-demo-frontend is the Podman container name\n' "$QUADLET_DIR" >&2
   printf 'padang-demo-remote: Quadlet files found under %s:\n' "$QUADLET_DIR" >&2
   find "$QUADLET_DIR" -maxdepth 1 -type f \
-    \( -name '*.container' -o -name '*.network' -o -name '*.timer' \) \
+    \( -name '*.container' -o -name '*.network' \) \
     -print >&2 || true
+  printf 'padang-demo-remote: standard systemd user timer path: %s\n' "$RESET_TIMER_PATH" >&2
+  if [[ -f "$RESET_TIMER_PATH" ]]; then
+    sed -n '1,120p' "$RESET_TIMER_PATH" >&2 || true
+  fi
   if [[ -x "$generator" ]]; then
     printf 'padang-demo-remote: direct Podman generator dry-run for the nested Quadlet directory:\n' >&2
     QUADLET_UNIT_DIRS="$QUADLET_DIR" "$generator" --user --dryrun >&2 || true
@@ -109,7 +115,6 @@ assert_quadlet_units_present() {
     padang-demo-api.service
     padang-demo-app.service
     padang-demo-reset.service
-    padang-demo-reset.timer
   )
   local -a missing_units=()
 
@@ -123,6 +128,25 @@ assert_quadlet_units_present() {
     printf '  %s\n' "${missing_units[@]}" >&2
     print_quadlet_generator_diagnostics "${missing_units[0]%% (*}"
     die "Quadlet generation failed; no application services were started"
+  fi
+}
+
+assert_reset_timer_present() {
+  local state target fragment
+  local -a missing_details=()
+  state=$(systemctl --user show padang-demo-reset.timer -p LoadState --value 2>/dev/null || true)
+  [[ "$state" == loaded ]] || missing_details+=("padang-demo-reset.timer (LoadState=${state:-unknown})")
+  target=$(systemctl --user show padang-demo-reset.timer -p Unit --value 2>/dev/null || true)
+  [[ "$target" == padang-demo-reset.service ]] || missing_details+=("padang-demo-reset.timer target (Unit=${target:-unknown})")
+  fragment=$(systemctl --user show padang-demo-reset.timer -p FragmentPath --value 2>/dev/null || true)
+  [[ "$fragment" == "$RESET_TIMER_PATH" ]] || missing_details+=("padang-demo-reset.timer path (FragmentPath=${fragment:-unknown})")
+
+  if ((${#missing_details[@]})); then
+    printf 'padang-demo-remote: expected standard systemd user timer is missing or misconfigured:\n' >&2
+    printf '  %s\n' "${missing_details[@]}" >&2
+    printf 'padang-demo-remote: expected timer file: %s\n' "$RESET_TIMER_PATH" >&2
+    systemctl --user cat padang-demo-reset.timer >&2 || true
+    die "reset timer validation failed; no application services were started"
   fi
 }
 
@@ -591,7 +615,10 @@ EOF
 
 run_quadlet_fixture_tests() {
   local script_path="${BASH_SOURCE[0]}"
+  local repo_root="$(cd "$(dirname "$script_path")/.." && pwd -P)"
   local template_path="$(cd "$(dirname "$script_path")/../quadlets/demo" && pwd -P)/bridge-ph-padang-demo-frontend.container"
+  local timer_template_path="$repo_root/systemd/user/padang-demo-reset.timer"
+  local backup_timer_template_path="$repo_root/systemd/user/bridge-ph-padang-backup.timer"
   local unsupported_quadlet_option='--no''heading'
   grep -q 'quadlet_stage_dir/padang-demo-app\.container' "$script_path" || {
     printf 'padang-demo-remote: dynamic renderer must emit padang-demo-app.container\n' >&2
@@ -635,6 +662,70 @@ run_quadlet_fixture_tests() {
     return 1
   }
   grep -q 'systemd-analyze --user --generators=true verify' "$script_path" || return 1
+  grep -q 'SYSTEMD_USER_DIR="/home/jk/.config/systemd/user"' "$script_path" || {
+    printf 'padang-demo-remote: standard systemd user directory is missing\n' >&2
+    return 1
+  }
+  grep -q 'systemd_stage_dir/padang-demo-reset\.timer' "$script_path" || {
+    printf 'padang-demo-remote: reset timer must be staged separately from Quadlet sources\n' >&2
+    return 1
+  }
+  if grep -q 'quadlet_stage_dir/padang-demo-reset\.timer' "$script_path"; then
+    printf 'padang-demo-remote: reset timer must not be staged under QUADLET_DIR\n' >&2
+    return 1
+  fi
+  grep -q '^Unit=padang-demo-reset.service$' "$script_path" || {
+    printf 'padang-demo-remote: reset timer target must be padang-demo-reset.service\n' >&2
+    return 1
+  }
+  grep -q '^OnBootSec=30min$' "$script_path" || {
+    printf 'padang-demo-remote: reset timer must start after 30 minutes\n' >&2
+    return 1
+  }
+  grep -q '^OnUnitActiveSec=30min$' "$script_path" || {
+    printf 'padang-demo-remote: reset timer must repeat every 30 minutes\n' >&2
+    return 1
+  }
+  grep -q '^RemainAfterExit=no$' "$script_path" || {
+    printf 'padang-demo-remote: reset container must remain a repeatable one-shot service\n' >&2
+    return 1
+  }
+  grep -q 'assert_reset_timer_present' "$script_path" || {
+    printf 'padang-demo-remote: standard reset timer validation is missing\n' >&2
+    return 1
+  }
+  grep -q 'systemctl --user enable --now padang-demo-reset.timer' "$script_path" || {
+    printf 'padang-demo-remote: reset timer must be persistently activated with enable --now\n' >&2
+    return 1
+  }
+  [[ -f "$timer_template_path" ]] || {
+    printf 'padang-demo-remote: checked-in demo timer reference is missing\n' >&2
+    return 1
+  }
+  [[ -f "$backup_timer_template_path" ]] || {
+    printf 'padang-demo-remote: checked-in production timer reference is missing\n' >&2
+    return 1
+  }
+  if find "$repo_root/quadlets/demo" "$repo_root/quadlets/prod" -maxdepth 1 -type f -name '*.timer' -print -quit | grep -q .; then
+    printf 'padang-demo-remote: timer references must not be stored as Quadlet sources\n' >&2
+    return 1
+  fi
+  grep -q '^OnBootSec=30min$' "$timer_template_path" || {
+    printf 'padang-demo-remote: demo timer reference must use OnBootSec=30min\n' >&2
+    return 1
+  }
+  grep -q '^OnUnitActiveSec=30min$' "$timer_template_path" || {
+    printf 'padang-demo-remote: demo timer reference must repeat every 30 minutes\n' >&2
+    return 1
+  }
+  grep -q '^Unit=padang-demo-reset.service$' "$timer_template_path" || {
+    printf 'padang-demo-remote: demo timer reference target is incorrect\n' >&2
+    return 1
+  }
+  grep -q '^Unit=bridge-ph-padang-backup.service$' "$backup_timer_template_path" || {
+    printf 'padang-demo-remote: production timer reference target is incorrect\n' >&2
+    return 1
+  }
   grep -q '^User=1000$' "$template_path" || {
     printf 'padang-demo-remote: checked-in frontend template must use numeric User=1000\n' >&2
     return 1
@@ -668,6 +759,7 @@ fi
 [[ "$(id -un)" == jk ]] || die "this script must run as user jk"
 [[ "$APP_ROOT" == /home/jk/bridge-ph/padang-demo ]] || die "demo root guard failed"
 [[ "$QUADLET_DIR" == /home/jk/.config/containers/systemd/bridge-ph/padang-demo ]] || die "Quadlet directory guard failed"
+[[ "$SYSTEMD_USER_DIR" == /home/jk/.config/systemd/user ]] || die "systemd user directory guard failed"
 
 for command_name in podman systemctl awk sed grep find install cmp journalctl stat; do
   command -v "$command_name" >/dev/null 2>&1 || die "$command_name is required"
@@ -871,15 +963,17 @@ build_frontend() {
 
 write_quadlets() {
   mkdir -p "$APP_ROOT" "$APP_ROOT/postgres-data" "$APP_ROOT/config" \
-    "$APP_ROOT/data" "$QUADLET_DIR"
+    "$APP_ROOT/data" "$QUADLET_DIR" "$SYSTEMD_USER_DIR"
   chmod 0750 "$APP_ROOT" "$BUILD_ROOT" "$APP_ROOT/config" "$APP_ROOT/data"
   local quadlet_dir="$QUADLET_DIR"
   local postgres_image
   local quadlet_stage_dir
+  local systemd_stage_dir
   local staged_file
   postgres_image=$(postgres_image_for_state) || die "could not resolve a supported PostgreSQL image"
   quadlet_stage_dir=$(mktemp -d "$APP_ROOT/.quadlet-stage.XXXXXX")
-  trap 'rm -rf "$quadlet_stage_dir"' RETURN
+  systemd_stage_dir=$(mktemp -d "$APP_ROOT/.systemd-stage.XXXXXX")
+  trap 'rm -rf "$quadlet_stage_dir" "$systemd_stage_dir"' RETURN
   log "staging Padang demo Quadlets under $quadlet_dir"
   cat > "$quadlet_stage_dir/$INTERNAL_NETWORK.network" <<EOF
 [Unit]
@@ -1049,7 +1143,7 @@ RemainAfterExit=no
 TimeoutStartSec=900
 EOF
 
-  cat > "$quadlet_stage_dir/padang-demo-reset.timer" <<EOF
+  cat > "$systemd_stage_dir/padang-demo-reset.timer" <<EOF
 [Unit]
 Description=Bridge PH Padang demo reset timer
 
@@ -1062,12 +1156,16 @@ Unit=padang-demo-reset.service
 [Install]
 WantedBy=timers.target
 EOF
+
+  rm -f "$QUADLET_DIR/padang-demo-reset.timer"
   for staged_file in "$quadlet_stage_dir"/*; do
     install -m 0640 "$staged_file" "$quadlet_dir/$(basename "$staged_file")"
   done
+  install -m 0640 "$systemd_stage_dir/padang-demo-reset.timer" "$RESET_TIMER_PATH"
   rm -rf "$quadlet_stage_dir"
+  rm -rf "$systemd_stage_dir"
   trap - RETURN
-  log "installed staged Padang demo Quadlets under $quadlet_dir"
+  log "installed Padang demo Quadlet sources under $quadlet_dir and standard user timer under $SYSTEMD_USER_DIR"
 }
 
 CADDY_ROLLBACK_ACTIVE=0
@@ -1359,6 +1457,7 @@ start_stack() {
     die "user systemd daemon-reload failed; no application services were started"
   fi
   assert_quadlet_units_present
+  assert_reset_timer_present
   systemctl --user start "${INTERNAL_NETWORK}-network.service" \
     "${PROXY_NETWORK}-network.service"
   if ! systemctl --user start padang-demo-db.service; then
@@ -1401,7 +1500,10 @@ start_stack() {
     print_service_diagnostics padang-demo-app.service bridge-ph-padang-demo-frontend
     die "frontend did not become healthy"
   fi
-  systemctl --user start padang-demo-reset.timer
+  if ! systemctl --user enable --now padang-demo-reset.timer; then
+    systemctl --user status padang-demo-reset.timer --no-pager >&2 || true
+    die "reset timer activation failed after application health checks"
+  fi
 }
 
 record_image_digests() {

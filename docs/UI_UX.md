@@ -149,14 +149,16 @@ buttons.
 
 ### Flow 4: Demo Reset (Internal / Operational)
 
-1. Systemd timer fires every 30 minutes → starts `bridge-ph-padang-demo-reset` container
+1. The standard systemd user timer at
+   `/home/jk/.config/systemd/user/padang-demo-reset.timer` fires every 30
+   minutes → starts the `padang-demo-reset` container
 2. Reset container connects to demo database
 3. Drops and recreates demo schema
 4. Runs seed data script (deterministic, idempotent)
 5. Container exits (one-shot)
 6. Demo environment is fresh
 
-Manual reset: `systemctl --user start bridge-ph-padang-demo-reset.service`
+Manual reset: `systemctl --user start padang-demo-reset.service`
 (Requires SSH access to VPS; not a public endpoint)
 
 ---

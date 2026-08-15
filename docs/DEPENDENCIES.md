@@ -120,7 +120,12 @@ The rootless VPS runtime uses the deployed Podman Quadlet parser as its
 compatibility baseline. The frontend unit must use `WorkingDir=/app`; the
 similar-looking `WorkDir=/app` key is rejected by that generator. For failure
 diagnostics, use the bare `podman quadlet list`: the VPS Podman version rejects
-the optional `--noheading` flag.
+the optional `--noheading` flag. Plain `.timer` files are standard systemd user
+units, not Quadlet sources; install them under
+`/home/jk/.config/systemd/user/`, separate from the recursive Quadlet directory.
+The demo reset timer is `padang-demo-reset.timer` and the production backup
+timer is `bridge-ph-padang-backup.timer`; activate either with
+`systemctl --user enable --now <timer>` after `daemon-reload`.
 
 References: [Podman Quadlet systemd units](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
 and [Podman Quadlet basic usage and generator diagnostics](https://docs.podman.io/en/latest/markdown/podman-quadlet-basic-usage.7.html).

@@ -87,6 +87,9 @@ Primary C1 references:
 - Rootless Quadlet files belong under the user's `.config/containers/systemd`
   search path; `.network` references are translated by the generator into
   dependencies on generated `*-network.service` units.
+- Standard systemd `.timer` units are not Quadlet sources. Keep them under the
+  user's `/home/jk/.config/systemd/user/` directory, separate from the
+  `/home/jk/.config/containers/systemd/` Quadlet search path.
 - The production filesystem targets are `/home/jk/.config/containers/systemd/bridge-ph/padang/`
   for Quadlets and `/home/jk/bridge-ph/padang/` for persistent state. The
   project-level production release identity is `padang-bridge-ph:prod`.
@@ -188,9 +191,9 @@ for the container working directory. The runtime renderer and checked-in
 frontend template now use the supported key.
 
 The updater now reloads the user systemd manager and verifies the complete set
-of expected generated network, container, and timer units before starting the
-database. On a missing unit it prints the installed Quadlet files, visible
-units, `podman quadlet list`, a scoped
+of expected generated network and container units plus the separately installed
+standard systemd reset timer before starting the database. On a missing unit it
+prints the installed Quadlet files, visible units, `podman quadlet list`, a scoped
 `QUADLET_UNIT_DIRS=... /usr/lib/systemd/system-generators/podman-system-generator
 --user --dryrun` output, and the upstream-recommended
 `systemd-analyze --user --generators=true verify` diagnostic. This makes
@@ -205,10 +208,21 @@ release exposes identical listing flags.
 
 The current Podman search path supports recursive Quadlet discovery under the
 user search directory, so the existing `/home/jk/.config/containers/systemd/
-bridge-ph/padang-demo/` layout remains valid. The generated service name still
-comes from the rendered filename: `padang-demo-app.container` produces
-`padang-demo-app.service`, while the Podman container is intentionally named
-`bridge-ph-padang-demo-frontend` for the Caddy upstream.
+bridge-ph/padang-demo/` layout remains valid for `.container` and `.network`
+sources. A plain `.timer` is not a supported Quadlet suffix: the renderer keeps
+`padang-demo-reset.container` in that directory and installs
+`/home/jk/.config/systemd/user/padang-demo-reset.timer` separately. The timer
+targets `padang-demo-reset.service`, starts after `OnBootSec=30min`, and repeats
+with `OnUnitActiveSec=30min`. Production follows the same split for
+`bridge-ph-padang-backup.container` and
+`/home/jk/.config/systemd/user/bridge-ph-padang-backup.timer`.
+
+The generated service name still comes from the rendered filename:
+`padang-demo-app.container` produces `padang-demo-app.service`, while the
+Podman container is intentionally named `bridge-ph-padang-demo-frontend` for
+the Caddy upstream. Activate the normal timers with
+`systemctl --user enable --now <timer>` after `daemon-reload`; do not enable
+application Quadlet units as part of a routine update.
 
 Primary references:
 
