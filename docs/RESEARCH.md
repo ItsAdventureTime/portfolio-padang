@@ -38,7 +38,7 @@ Primary references:
 - [Next.js CSP guidance](https://nextjs.org/docs/pages/guides/content-security-policy)
 - [Caddy `reverse_proxy`](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
 - [Caddy `route`](https://caddyserver.com/docs/caddyfile/directives/route)
-- [Podman auto-update](https://docs.podman.io/en/v4.9.0/markdown/podman-auto-update.1.html)
+- [Podman auto-update](https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html)
 - [React Native TypeScript](https://reactnative.dev/docs/typescript)
 - [Expo New Architecture](https://docs.expo.dev/guides/new-architecture/)
 - [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
@@ -137,7 +137,7 @@ Primary C1 references:
 - [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting)
 - [Next.js standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
 - [Tailwind CSS installation](https://tailwindcss.com/docs/installation/tailwind-cli)
-- [Podman auto-update](https://docs.podman.io/en/v5.5.0/markdown/podman-auto-update.1.html)
+- [Podman auto-update](https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html)
 - [Resend Go SDK](https://resend.com/docs/send-with-go)
 
 ### Padang Demo Deployment Refresh: Current Maintainer Guidance (2026-08-13)
