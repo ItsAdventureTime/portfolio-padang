@@ -79,7 +79,7 @@ build_frontend() {
     --env NPM_CONFIG_CACHE=/tmp/npm-cache \
     --env NPM_CONFIG_USERCONFIG=/tmp/npm-config/npmrc \
     --env NEXT_TELEMETRY_DISABLED=1 \
-    --env NEXT_PUBLIC_BASE_PATH=/padang/demo \
+    --env NEXT_PUBLIC_BASE_PATH=/demo/padang \
     --env NEXT_PUBLIC_APP_ENV=demo \
     --mount "type=bind,src=$REPO_ROOT/frontend,dst=/src,readonly" \
     --mount "type=bind,src=$BUILD_ROOT/frontend,dst=/out" \

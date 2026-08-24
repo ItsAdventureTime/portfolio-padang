@@ -10,14 +10,14 @@ ContainerName=bridge-ph-padang-demo-frontend
 Network=bridge-ph-padang-demo-proxy.network
 WorkingDir=/app
 Environment=NODE_ENV=production
-Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
+Environment=NEXT_PUBLIC_BASE_PATH=/demo/padang
 Environment=NEXT_PUBLIC_APP_ENV=demo
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
 Environment=HOSTNAME=0.0.0.0
 Environment=PORT=3000
 User=1000
 Exec=node /app/server.js
-HealthCmd=wget -q -O- http://127.0.0.1:3000/padang/demo || exit 1
+HealthCmd=wget -q -O- http://127.0.0.1:3000/demo/padang || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3

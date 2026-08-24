@@ -1,5 +1,48 @@
 # DEPLOYMENT.md — Padang ERP Lite
 
+## Canonical public routes (2026-08-25)
+
+| Environment | Application | Health endpoint |
+|---|---|---|
+| Demo | `https://delegateops.business/demo/padang` | `https://delegateops.business/demo/padang/api/v1/health` |
+| Production | `https://delegateops.business/prod/padang` | `https://delegateops.business/prod/padang/api/v1/health` |
+
+The frontend artifact must be built with the matching `NEXT_PUBLIC_BASE_PATH`.
+`basePath` is compiled into Next.js client bundles; changing a runtime Quadlet
+environment variable alone does not move an already-built application.
+
+### Demo release
+
+From the repository control plane, run:
+
+```bash
+scripts/update-padang-demo.sh --apply
+scripts/check-padang-public-routes.sh --demo-only
+```
+
+The update wrapper invokes the supported local release builder before it
+synchronizes the demo release. It owns only demo artifacts, services, reset
+state, and `/etc/caddy/padang-demo.handlers.Caddyfile` on the VPS.
+
+### Production route activation
+
+This repository does not treat a route activation as a production application
+release. Before activating the route, ensure the production API and frontend
+Quadlets are present, both use `bridge-ph-padang-proxy.network`, and the
+frontend artifact was built with `NEXT_PUBLIC_BASE_PATH=/prod/padang`.
+
+On the VPS, from the checked-out release source, review then apply the route:
+
+```bash
+bash scripts/install-padang-production-route.sh --dry-run
+bash scripts/install-padang-production-route.sh --apply
+scripts/check-padang-public-routes.sh --production-only
+```
+
+The installer manages the remote generated production handler and inserts its
+import before the DelegateOps fallback. It validates and reloads Caddy with
+rollback protection; do not hand-edit or commit generated handler files.
+
 ## Platform
 
 - **OS:** Fedora CoreOS (latest stable), rootless Podman, SELinux enforcing
@@ -455,11 +498,11 @@ The existing Caddyfile is at `/home/jk/caddy/conf/Caddyfile`.
 Follows the same pattern as PIMASCOR: separate handler files imported inside the `delegateops.business` block.
 
 **Key routing rules (matching PIMASCOR precedent):**
-- API routes: `handle /padang/{env}/api/*` + `uri strip_prefix /padang/{env}` → Go API container
+- API routes: `handle /{env}/padang/api/*` + `uri strip_prefix /{env}/padang` → Go API container
   - After stripping, Go API receives `/api/v1/...` (matches its internal routing)
 - Frontend routes: `handle /padang/demo` and `handle /padang/demo/*` → Next.js
   container (reverse proxy, NOT static files)
-  - Full path preserved; Next.js `basePath=/padang/demo` matches the public
+- Full path preserved; Next.js `basePath=/demo/padang` matches the public
     no-trailing-slash route and its descendants
 - Canonical demo URL: `/padang/demo`. Caddy does not add a root slash redirect;
   this keeps the proxy contract aligned with Next.js's default
@@ -503,10 +546,10 @@ Create: `/home/jk/caddy/conf/padang-demo.handlers.Caddyfile`
 # Padang ERP Demo — handler directives only
 # Imported inside the delegateops.business block
 
-# Canonical public URL: https://delegateops.business/padang/demo
+# Canonical public URL: https://delegateops.business/demo/padang
 # Do not add a Caddy root redirect: Next.js owns the no-trailing-slash contract.
-# API: strip /padang/demo prefix; Go API receives /api/v1/...
-handle /padang/demo/api/* {
+# API: strip /demo/padang prefix; Go API receives /api/v1/...
+handle /demo/padang/api/* {
 	uri strip_prefix /padang/demo
 
 	header {
@@ -520,7 +563,7 @@ handle /padang/demo/api/* {
 }
 
 # Frontend: full path forwarded; exact route and descendants are both proxied.
-handle /padang/demo {
+handle /demo/padang {
 	import padang_nextjs_csp
 
 	header {
@@ -531,7 +574,7 @@ handle /padang/demo {
 	reverse_proxy bridge-ph-padang-demo-frontend:3000
 }
 
-handle /padang/demo/* {
+handle /demo/padang/* {
 	import padang_nextjs_csp
 
 	header {
@@ -554,10 +597,10 @@ Create: `/home/jk/caddy/conf/padang-production.handlers.Caddyfile`
 @padang_root path /padang
 redir @padang_root /padang/ 308
 
-# Canonical public URL: https://delegateops.business/padang
+# Canonical public URL: https://delegateops.business/prod/padang
 # Caddy redirects the exact path to the slash form for the frontend.
-# API: strip /padang prefix; Go API receives /api/v1/...
-handle /padang/api/* {
+# API: strip /prod/padang prefix; Go API receives /api/v1/...
+handle /prod/padang/api/* {
 	uri strip_prefix /padang
 
 	header {
@@ -569,8 +612,14 @@ handle /padang/api/* {
 	reverse_proxy bridge-ph-padang-api:8080
 }
 
-# Frontend: full path forwarded; Next.js basePath=/padang handles routing
-handle /padang/* {
+# Frontend: full path forwarded; Next.js basePath=/prod/padang handles routing
+handle /prod/padang {
+	header {
+		>Cache-Control "public, max-age=0, must-revalidate"
+	}
+	reverse_proxy bridge-ph-padang-frontend:3000
+}
+handle /prod/padang/* {
 	import padang_nextjs_csp
 
 	header {

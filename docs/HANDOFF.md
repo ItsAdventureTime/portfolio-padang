@@ -1,5 +1,18 @@
 # HANDOFF.md — Padang ERP Lite
 
+## URL migration status — 2026-08-25
+
+- Demo canonical route is `/demo/padang`; the demo deployer generates and
+  safely installs its remote Caddy handler.
+- Production canonical route is `/prod/padang`; the new production route
+  installer manages a separate generated handler/import and Caddy proxy-network
+  attachment without touching demo lifecycle state.
+- Source fixtures, shell checks, and build-time base-path assertions pass. No
+  VPS route activation or production artifact deployment has been performed.
+- Next live action: deploy the demo with `scripts/update-padang-demo.sh --apply`;
+  only activate production after its matching `/prod/padang` frontend artifact
+  and services are ready.
+
 ---
 
 CURRENT AGENT: ChatGPT Codex (Implementation Engineer)

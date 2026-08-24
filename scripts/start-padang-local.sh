@@ -92,7 +92,7 @@ podman run --detach --name "$FRONTEND_NAME" --pod "$POD_NAME" \
   --env NODE_OPTIONS=--max-old-space-size=512 \
   --env NEXT_TELEMETRY_DISABLED=1 \
   --env NEXT_PUBLIC_APP_ENV=demo \
-  --env NEXT_PUBLIC_BASE_PATH=/padang/demo \
+  --env NEXT_PUBLIC_BASE_PATH=/demo/padang \
   --env NEXT_PUBLIC_API_ORIGIN="http://127.0.0.1:$API_PORT" \
   --volume "$REPO_ROOT/frontend:/src:ro,Z" --workdir /src \
   docker.io/library/node:lts-alpine sh -ec '

@@ -8,8 +8,8 @@ readonly REMOTE_SCRIPT="${REMOTE_SOURCE}/scripts/deploy-padang-demo-remote.sh"
 readonly DEFAULT_VPS_HOST="216.75.75.136"
 readonly DEFAULT_VPS_USER="jk"
 readonly DEFAULT_VPS_PORT="22"
-readonly DEFAULT_PUBLIC_DEMO_URL="https://delegateops.business/padang/demo"
-readonly DEFAULT_PUBLIC_HEALTH_URL="https://delegateops.business/padang/demo/api/v1/health"
+readonly DEFAULT_PUBLIC_DEMO_URL="https://delegateops.business/demo/padang"
+readonly DEFAULT_PUBLIC_HEALTH_URL="https://delegateops.business/demo/padang/api/v1/health"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "${SCRIPT_DIR}/.." && pwd -P)

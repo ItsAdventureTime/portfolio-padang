@@ -7,12 +7,12 @@ Image=ghcr.io/itsadventuretime/padang-erp-frontend:latest
 ContainerName=bridge-ph-padang-frontend
 Network=bridge-ph-padang-proxy.network
 Environment=NODE_ENV=production
-Environment=NEXT_PUBLIC_BASE_PATH=/padang
+Environment=NEXT_PUBLIC_BASE_PATH=/prod/padang
 Environment=NEXT_PUBLIC_APP_ENV=production
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-api:8080
 Environment=HOSTNAME=0.0.0.0
 Environment=PORT=3000
-HealthCmd=wget -q -O- http://127.0.0.1:3000/padang || exit 1
+HealthCmd=wget -q -O- http://127.0.0.1:3000/prod/padang || exit 1
 HealthInterval=20s
 HealthTimeout=10s
 HealthRetries=3

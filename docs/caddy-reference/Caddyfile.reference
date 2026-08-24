@@ -135,8 +135,8 @@ linguapath.academy {
 #
 # Routes:
 #   /accustandard/demo/*
-#   /padang/demo/*        ← PADANG ERP (demo)   [PENDING DEPLOYMENT]
-#   /padang/*             ← PADANG ERP (prod)   [PENDING DEPLOYMENT]
+#   /demo/padang/*        ← PADANG ERP (demo)   [PENDING DEPLOYMENT]
+#   /prod/padang/*        ← PADANG ERP (prod)   [PENDING DEPLOYMENT]
 #   /pimascor/*
 #   /pimascor/demo/*
 #   everything else -> DelegateOps static site

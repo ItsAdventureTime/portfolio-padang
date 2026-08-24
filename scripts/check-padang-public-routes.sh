@@ -71,14 +71,14 @@ ORIGIN="${ORIGIN%/}"
 declare -a ROUTES=()
 if [[ "$ROUTE_SCOPE" == all || "$ROUTE_SCOPE" == demo ]]; then
   ROUTES+=(
-    "demo page|$ORIGIN/padang/demo"
-    "demo API health|$ORIGIN/padang/demo/api/v1/health"
+"demo page|$ORIGIN/demo/padang"
+"demo API health|$ORIGIN/demo/padang/api/v1/health"
   )
 fi
 if [[ "$ROUTE_SCOPE" == all || "$ROUTE_SCOPE" == production ]]; then
   ROUTES+=(
-    "production page|$ORIGIN/padang"
-    "production API health|$ORIGIN/padang/api/v1/health"
+"production page|$ORIGIN/prod/padang"
+"production API health|$ORIGIN/prod/padang/api/v1/health"
   )
 fi
 

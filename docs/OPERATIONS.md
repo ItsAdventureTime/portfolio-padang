@@ -1,5 +1,25 @@
 # OPERATIONS.md — Padang ERP Lite
 
+## Padang URL operations (2026-08-25)
+
+After each demo release, verify only the demo routes:
+
+```bash
+scripts/check-padang-public-routes.sh --demo-only
+```
+
+The canonical demo URL is `https://delegateops.business/demo/padang` and its
+health endpoint is `/demo/padang/api/v1/health`. A 404 at either path normally
+means the demo handler import, its Caddy proxy network, or the demo service is
+unavailable.
+
+Production is separate: `https://delegateops.business/prod/padang` and
+`/prod/padang/api/v1/health`. Run `--production-only` only after the production
+frontend/API are deployed and `install-padang-production-route.sh --apply` has
+completed on the VPS. To back out a failed route activation, restore the
+installer's automatically preserved Caddy/Quadlet files and reload Caddy; do
+not alter the demo route or reset services.
+
 ## Daily Operations
 
 ### Normative post-change workflow

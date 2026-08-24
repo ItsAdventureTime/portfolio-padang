@@ -1,5 +1,17 @@
 # Padang ERP Lite
 
+## Demo deployment
+
+The demo is served at `https://delegateops.business/demo/padang`.
+
+```bash
+scripts/update-padang-demo.sh --apply
+scripts/check-padang-public-routes.sh --demo-only
+```
+
+See [the deployment guide](docs/DEPLOYMENT.md) for build requirements,
+production route activation, and rollback guidance.
+
 **Padang Construction and Supplies Corporation**  
 Design | Construct | Supply · AAA Accredited Contractor · Pampanga, Philippines
 

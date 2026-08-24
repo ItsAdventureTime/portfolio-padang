@@ -1,5 +1,25 @@
 # TESTING.md — Padang ERP Lite
 
+## URL-routing deployment checks (2026-08-25)
+
+Run the production route fixture before a production route activation:
+
+```bash
+jk-sbx-project exec -- env PADANG_ROUTE_SKIP_CADDY_VALIDATE=1 PADANG_ROUTE_SKIP_SYSTEMD=1 \
+  bash scripts/test-install-padang-production-route.sh
+```
+
+The fixture verifies the generated production API, exact-root, and wildcard
+handlers; idempotent import insertion before the DelegateOps fallback; and the
+required Caddy/production proxy-network relationship. Demo deployment checks
+remain `scripts/test-deploy-padang-demo-caddy.sh` and
+`scripts/test-padang-demo-quadlets.sh`.
+
+Route checks may be scoped to `--demo-only` or `--production-only`. Build the
+demo and production frontend artifacts separately with `/demo/padang` and
+`/prod/padang` respectively: Next.js `basePath` is a build-time artifact
+property, not a runtime-only setting.
+
 ## Test Strategy
 
 ## Execution Boundary
@@ -21,7 +41,7 @@ Docker resources rather than stopping unrelated host containers.
 For the current bounded frontend implementation, verify all of the following
 in both build artifacts where applicable:
 
-- production `proxy.ts` protects `/padang` and each known `/padang/{module}`
+- production `proxy.ts` protects `/prod/padang` and each known `/prod/padang/{module}`
   route, while `/padang/demo` remains public and visibly labeled;
 - a production shell does not render until `/api/v1/auth/me` succeeds, and an
   API/auth failure shows an error/retry state rather than synthetic rows;

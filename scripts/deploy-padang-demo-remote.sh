@@ -393,8 +393,8 @@ padang_demo_handler_block() {
 # BEGIN PADANG DEMO ROUTE (managed by deploy-padang-demo-remote.sh)
 # Path matchers are inline so this imported route does not define a named
 # matcher that can collide with another route in the delegateops.business site.
-handle /padang/demo/api/* {
-  uri strip_prefix /padang/demo
+handle /demo/padang/api/* {
+  uri strip_prefix /demo/padang
   header {
     >Cache-Control "private, no-store"
     >CDN-Cache-Control "no-store"
@@ -404,7 +404,7 @@ handle /padang/demo/api/* {
   reverse_proxy $CADDY_DEMO_API_UPSTREAM
 }
 
-handle /padang/demo {
+handle /demo/padang {
   header {
     >Cache-Control "public, max-age=0, must-revalidate"
     >X-Robots-Tag "noindex, nofollow, noarchive"
@@ -412,7 +412,7 @@ handle /padang/demo {
   reverse_proxy $CADDY_DEMO_FRONTEND_UPSTREAM
 }
 
-handle /padang/demo/* {
+handle /demo/padang/* {
   header {
     >Cache-Control "public, max-age=0, must-revalidate"
     >X-Robots-Tag "noindex, nofollow, noarchive"
@@ -428,9 +428,9 @@ handler_route_state() {
   local api_blocks app_blocks app_exact_blocks app_wildcard_blocks
   local app_named_legacy_blocks api_proxies app_proxies root_redirects
   local evidence managed_markers
-  api_blocks=$(grep -Ec '^[[:space:]]*handle([[:space:]]+(/padang/demo/api/\*|@padang_demo_api))[[:space:]]*\{' "$input_file" || true)
-  app_exact_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+/padang/demo[[:space:]]*\{' "$input_file" || true)
-  app_wildcard_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+/padang/demo/\*[[:space:]]*\{' "$input_file" || true)
+  api_blocks=$(grep -Ec '^[[:space:]]*handle([[:space:]]+(/demo/padang/api/\*|@padang_demo_api))[[:space:]]*\{' "$input_file" || true)
+  app_exact_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+/demo/padang[[:space:]]*\{' "$input_file" || true)
+  app_wildcard_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+/demo/padang/\*[[:space:]]*\{' "$input_file" || true)
   app_named_legacy_blocks=$(grep -Ec '^[[:space:]]*handle[[:space:]]+@padang_demo[[:space:]]*\{' "$input_file" || true)
   app_blocks=$((app_exact_blocks + app_wildcard_blocks + app_named_legacy_blocks))
   api_proxies=$(grep -Ec '^[[:space:]]*reverse_proxy[[:space:]]+(bridge-ph-padang-demo-api|padang-demo-api):8080([[:space:]]|$)' "$input_file" || true)
@@ -530,7 +530,7 @@ caddy_site_route_state() {
         if (padang_import(line)) {
           if (depth == 1 && managed_import(line)) site_imports++
         }
-        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo\/api\/\*[[:space:]]*\{[[:space:]]*$/) {
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/demo\/padang\/api\/\*[[:space:]]*\{[[:space:]]*$/) {
           api_blocks++
           evidence++
         }
@@ -538,12 +538,12 @@ caddy_site_route_state() {
           api_blocks++
           evidence++
         }
-        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo[[:space:]]*\{[[:space:]]*$/) {
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/demo\/padang[[:space:]]*\{[[:space:]]*$/) {
           app_blocks++
           app_exact_blocks++
           evidence++
         }
-        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/padang\/demo\/\*[[:space:]]*\{[[:space:]]*$/) {
+        if (depth == 1 && line ~ /^[[:space:]]*handle[[:space:]]+\/demo\/padang\/\*[[:space:]]*\{[[:space:]]*$/) {
           app_blocks++
           app_wildcard_blocks++
           evidence++
@@ -562,7 +562,7 @@ caddy_site_route_state() {
           evidence++
         }
         if (line ~ /^[[:space:]]*redir[[:space:]]+@padang_demo_root[[:space:]]+\/padang\/demo\/[[:space:]]+308[[:space:]]*$/ ||
-            line ~ /^[[:space:]]*redir[[:space:]]+\/padang\/demo[[:space:]]+\/padang\/demo\/[[:space:]]+308[[:space:]]*$/) {
+            line ~ /^[[:space:]]*redir[[:space:]]+\/demo\/padang[[:space:]]+\/demo\/padang\/[[:space:]]+308[[:space:]]*$/) {
           root_redirects++
           evidence++
         }
@@ -685,7 +685,7 @@ run_caddy_fixture_tests() {
     '  @padang_demo_api path /padang/demo/api/*' \
     '  @padang_demo path /padang/demo/*' \
     '  handle @padang_demo_api {' \
-    '    uri strip_prefix /padang/demo' \
+    '    uri strip_prefix /demo/padang' \
     '    reverse_proxy padang-demo-api:8080' \
     '  }' \
     '  handle @padang_demo {' \
@@ -701,22 +701,22 @@ run_caddy_fixture_tests() {
   padang_demo_handler_block > "$handler"
   ! grep -q '^@padang_demo_root' "$handler"
   ! grep -q '^redir ' "$handler"
-  grep -q '^handle /padang/demo {' "$handler"
-  grep -q '^handle /padang/demo/\* {' "$handler"
+  grep -q '^handle /demo/padang {' "$handler"
+  grep -q '^handle /demo/padang/\* {' "$handler"
   grep -q '^  reverse_proxy bridge-ph-padang-demo-api:8080$' "$handler"
   grep -q '^  reverse_proxy bridge-ph-padang-demo-frontend:3000$' "$handler"
   cp "$legacy" "$fixture_dir/Caddyfile"
   caddy_fixture_validate "$fixture_dir"
   printf '%s\n' \
     'delegateops.business {' \
-    '  handle /padang/demo/api/* {' \
-    '    uri strip_prefix /padang/demo' \
+    '  handle /demo/padang/api/* {' \
+    '    uri strip_prefix /demo/padang' \
     '    reverse_proxy bridge-ph-padang-demo-api:8080' \
     '  }' \
-    '  handle /padang/demo {' \
+    '  handle /demo/padang {' \
     '    reverse_proxy bridge-ph-padang-demo-frontend:3000' \
     '  }' \
-    '  handle /padang/demo/* {' \
+    '  handle /demo/padang/* {' \
     '    reverse_proxy bridge-ph-padang-demo-frontend:3000' \
     '  }' \
     '  handle {' \
@@ -800,11 +800,11 @@ run_caddy_fixture_tests() {
 # matcher that can collide with another route in the delegateops.business site.
 redir /padang/demo /padang/demo/ 308
 
-handle /padang/demo/api/* {
-  uri strip_prefix /padang/demo
+handle /demo/padang/api/* {
+  uri strip_prefix /demo/padang
   reverse_proxy padang-demo-api:8080
 }
-handle /padang/demo/* {
+handle /demo/padang/* {
   reverse_proxy padang-demo-app:3000
 }
 # END PADANG DEMO ROUTE
@@ -814,15 +814,15 @@ EOF
   padang_demo_handler_block > "$handler"
   [[ "$(handler_route_kind "$handler")" == canonical ]]
   ! grep -q '^redir ' "$handler"
-  grep -q '^handle /padang/demo {' "$handler"
-  grep -q '^handle /padang/demo/\* {' "$handler"
+  grep -q '^handle /demo/padang {' "$handler"
+  grep -q '^handle /demo/padang/\* {' "$handler"
   cat > "$fixture_dir/legacy-handler-shape" <<'EOF'
 @padang_demo_root path /padang/demo
 redir @padang_demo_root /padang/demo/ 308
 @padang_demo_api path /padang/demo/api/*
 @padang_demo path /padang/demo/*
 handle @padang_demo_api {
-  uri strip_prefix /padang/demo
+  uri strip_prefix /demo/padang
   reverse_proxy padang-demo-api:8080
 }
 handle @padang_demo {
@@ -904,7 +904,7 @@ run_quadlet_fixture_tests() {
   for expected in \
     'Environment=HOSTNAME=0.0.0.0' \
     'Environment=PORT=3000' \
-    'HealthCmd=wget -q -O- http://127.0.0.1:3000/padang || exit 1'; do
+    'HealthCmd=wget -q -O- http://127.0.0.1:3000/demo/padang || exit 1'; do
     if ! grep -Fqx "$expected" "$prod_template_path"; then
       printf 'padang-demo-remote: production frontend template is missing expected runtime setting: %s\n' "$expected" >&2
       return 1
@@ -1388,7 +1388,7 @@ Network=$PROXY_NETWORK.network
 WorkingDir=/app
 Volume=$FRONTEND_BUILD:/app:ro,Z
 Environment=NODE_ENV=production
-Environment=NEXT_PUBLIC_BASE_PATH=/padang/demo
+Environment=NEXT_PUBLIC_BASE_PATH=/demo/padang
 Environment=NEXT_PUBLIC_APP_ENV=demo
 Environment=API_INTERNAL_URL=http://bridge-ph-padang-demo-api:8080
 Environment=HOSTNAME=0.0.0.0
