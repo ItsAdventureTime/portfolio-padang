@@ -34,7 +34,7 @@ The Git repository is the sole source of truth. Neither agent's chat history is 
 - `feat/*` — feature branches for implementation phases
 - Direct commits to `main` are normally disallowed. The explicit user-directed
   maintenance workflow may update `main` after review, applicable validation,
-  and a signed local commit.
+  and a GitHub-verified commit.
 
 ## Commit Convention
 
@@ -59,12 +59,14 @@ Do not run local project workloads directly on macOS or through local Podman.
 Podman remains valid for the remote Fedora CoreOS production/runtime plane.
 See `docs/TESTING.md` and `docs/GIT_WORKFLOW.md`.
 
-## GitHub HTTPS and Signed Commit Policy
+## GitHub HTTPS and GitHub-Signed Commit Policy
 
 GitHub changes use the authenticated `gh` CLI with an HTTPS `origin` only.
-Before pushing, run `gh auth status --hostname github.com` and
-`gh auth setup-git --hostname github.com`, create a signed local commit with
-`git commit -S`, and verify the remote commit with `gh api`. SSH remotes, SSH
+Before publishing, run `gh auth status --hostname github.com`, verify the
+HTTPS `origin`, and create the reviewed commit through GitHub's
+`createCommitOnBranch` GraphQL mutation with an exact `expectedHeadOid`.
+Verify the resulting GitHub signature and tree with `gh api`, then synchronize
+local refs through the authenticated HTTPS credential helper. SSH remotes, SSH
 transport keys, passkeys, raw tokens, and force pushes are outside this
 project workflow. VPS deployment SSH is a separate runtime transport and does
 not change the GitHub rule.

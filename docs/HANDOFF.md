@@ -1,5 +1,14 @@
 # HANDOFF.md — Padang ERP Lite
 
+> **Demo deployment override — 2026-09-07:** The active demo target is
+> `https://padang.delegateops.business/`, deployed manually through OrbStack
+> Docker Compose at `~/docker/portfolio/padang/compose.yaml`. Build/export only
+> through `jk-sbx-project`; import, migration, seed, startup, and rollback are
+> manual steps in `docs/MACOS-DOCKER-COMPOSE.md`. This supersedes prior demo VPS
+> Quadlet/Caddy instructions. Static Compose and shell-snippet checks passed;
+> no live deployment or public URL verification has been performed. Production
+> guidance remains unchanged.
+
 ## URL migration status — 2026-08-25
 
 - Demo canonical route is `/demo/padang`; the demo deployer generates and
@@ -27,7 +36,7 @@ BRANCH: main
 BASE COMMIT: bbdd803
 LATEST IMPLEMENTATION COMMIT: current `main` tip; verify with
 `git rev-parse HEAD`
-REMOTE: https://github.com/ItsAdventureTime/bridge-padang.git
+REMOTE: https://github.com/ItsAdventureTime/portfolio-padang.git
 REMOTE PUSH STATUS: `main` is the GitHub default branch and contains the
 consolidated implementation; updates were pushed through the authenticated
 HTTPS GitHub CLI path
@@ -40,12 +49,13 @@ PRODUCTION PUBLIC URL: `https://delegateops.business/padang`
 
 Every source, configuration, script, UI/UX, or documentation revision must
 refresh the affected guides, run applicable project workloads through the
-Docker Sandbox (`jk-sbx-project exec`/`run`), review the diff, create a signed
-local commit, and synchronize the reviewed result through the authenticated
-HTTPS GitHub CLI workflow. `main` is the current consolidated baseline; direct
-maintenance updates are allowed only when explicitly user-authorized and
-reviewed. SSH is reserved for the separately documented VPS deployment
-transport; it is not a GitHub remote or Git credential path.
+Docker Sandbox (`jk-sbx-project exec`/`run`), review the diff, create a
+GitHub-verified commit through the authenticated HTTPS GitHub CLI workflow,
+and synchronize local refs while preserving existing staged and unstaged user
+changes. `main` is the current consolidated baseline; direct maintenance
+updates are allowed only when explicitly user-authorized and reviewed. SSH is
+reserved for the separately documented VPS deployment transport; it is not a
+GitHub remote or Git credential path.
 
 ## Local Artifact Deployment Revision (2026-08-16)
 

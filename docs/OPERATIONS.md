@@ -1,5 +1,12 @@
 # OPERATIONS.md — Padang ERP Lite
 
+> **Demo operations override — 2026-09-07:** Operate the demo manually with
+> OrbStack Docker Compose in `~/docker/portfolio/padang`; its public URL is
+> `https://padang.delegateops.business/`. Use
+> `docs/MACOS-DOCKER-COMPOSE.md` for every build/export, import, migration,
+> startup, verification, upgrade, and rollback. The older demo VPS commands
+> below no longer apply. Production operations remain unchanged.
+
 ## Padang URL operations (2026-08-25)
 
 After each demo release, verify only the demo routes:

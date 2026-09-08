@@ -2,15 +2,9 @@
 
 ## Demo deployment
 
-The demo is served at `https://delegateops.business/demo/padang`.
-
-```bash
-scripts/update-padang-demo.sh --apply
-scripts/check-padang-public-routes.sh --demo-only
-```
-
-See [the deployment guide](docs/DEPLOYMENT.md) for build requirements,
-production route activation, and rollback guidance.
+The demo is served at `https://padang.delegateops.business/`. Build its images
+manually in Docker Sandbox, then import and run them manually with OrbStack
+Docker Compose. The complete procedure is the [Compose guide](docs/MACOS-DOCKER-COMPOSE.md).
 
 **Padang Construction and Supplies Corporation**  
 Design | Construct | Supply · AAA Accredited Contractor · Pampanga, Philippines
@@ -130,7 +124,7 @@ GitHub push or a successful local build as a public deployment.
 
 | Environment | URL | Purpose |
 |---|---|---|
-| Demo | `https://delegateops.business/padang/demo` | Stakeholder preview; auto-resets every 30 min; no authentication |
+| Demo | `https://padang.delegateops.business/` | Stakeholder preview; manual synthetic-data reset; no authentication |
 | Production | `https://delegateops.business/padang` | Live system; Email OTP auth; full backups |
 
 The demo has no authentication and contains synthetic data only. Production

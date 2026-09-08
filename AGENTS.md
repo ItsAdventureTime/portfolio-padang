@@ -1,5 +1,11 @@
 # AGENTS.md — Padang ERP Lite
 
+> **Demo deployment override — 2026-09-07:** The demo is a manual OrbStack
+> Docker Compose deployment at `~/docker/portfolio/padang/compose.yaml`, public
+> at `https://padang.delegateops.business/`. Compile and export images only via
+> `jk-sbx-project`; see `docs/MACOS-DOCKER-COMPOSE.md`. This overrides earlier
+> demo VPS Quadlet/Caddy instructions. Production architecture is unchanged.
+
 ## Two-Agent Workflow
 
 This project uses a two-agent software engineering workflow governed by `docs/PROJECT_CONSTITUTION.md`.

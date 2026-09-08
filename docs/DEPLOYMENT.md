@@ -1,5 +1,12 @@
 # DEPLOYMENT.md — Padang ERP Lite
 
+> **Demo deployment override — 2026-09-07:** Demo now uses the root hostname
+> `https://padang.delegateops.business/` and manual OrbStack Docker Compose at
+> `~/docker/portfolio/padang/compose.yaml`. Build/export images only through
+> `jk-sbx-project`; follow `docs/MACOS-DOCKER-COMPOSE.md` for import, migration,
+> seed, startup, verification, upgrade, and rollback. This supersedes the demo
+> VPS Quadlet/Caddy procedure below. Production remains unchanged.
+
 ## Canonical public routes (2026-08-25)
 
 | Environment | Application | Health endpoint |
