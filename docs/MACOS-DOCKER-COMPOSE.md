@@ -13,6 +13,16 @@ The demo uses fictional data, no authentication, and no B2/R2 credentials.
 Attachment upload is unavailable until an R2-backed attachment demonstration is
 explicitly needed.
 
+## Repository and build-context safety
+
+`.gitignore` keeps new local files out of Git, but it does not protect secrets
+that are already tracked. Docker uses each service's `.dockerignore` to filter
+its build context; Git ignore rules do not filter Docker contexts. Keep the
+Compose password and other file-backed secrets in
+`~/docker/portfolio/padang/secrets/`, outside this checkout, and never copy them
+into the repository. See [GitHub's ignoring-files guidance](https://docs.github.com/en/get-started/git-basics/ignoring-files)
+and [Docker's build-context rules](https://docs.docker.com/build/concepts/context/#dockerignore-files).
+
 ## 1. First release: prepare the runtime folder and secret
 
 From the repository root:

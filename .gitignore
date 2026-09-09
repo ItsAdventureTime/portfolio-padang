@@ -44,6 +44,27 @@ build/
 *.p12
 *.pfx
 secrets/
+.secrets/
+*.credentials
+*.token
+credentials/
+.credentials/
+
+# Local database dumps and image archives — NEVER commit
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.dump.gz
+*.sql.gz
+*.bak
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.img
+*.qcow2
+padang-demo-before-upgrade.sql
 
 # Temporary
 tmp/
