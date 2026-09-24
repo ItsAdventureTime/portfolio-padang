@@ -28,11 +28,12 @@
   runtime test. The host OrbStack context is available; no demo database volume
   exists. App images were built from this commit in Docker Sandbox and exported
   under `build/padang-demo/images/`. Runtime files are prepared at
-  `~/docker/portfolio/padang/`. The shell guard rejected loading images or
-  starting OrbStack containers with the reason `Use jk-sbx-project so Docker
-  execution occurs inside Docker Sandbox`; that daemon is not OrbStack. No app
-  container started and no `cloudflared` or tunnel setting changed. User must
-  run Step 3 from the runbook, then add the route and verify public access.
+  `~/docker/portfolio/padang/`. The shell guard rejected the Compose
+  config/load/pull request before execution with the reason `Use jk-sbx-project
+  so Docker execution occurs inside Docker Sandbox`; that daemon is not OrbStack.
+  No app container started and no `cloudflared` or tunnel setting changed.
+  User must run Step 3 from the runbook, then add the route and verify public
+  access.
 
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
@@ -58,7 +59,7 @@ older role, route, and deployment instructions for the demo.
 - Documentation checks passed: `git diff --check`; all 11 shell blocks in the
   edited README and Compose guide parse with `sh -n`; their relative Markdown
   links resolve locally. No deployment command was run.
-- Compose secret exposure is corrected in the current uncommitted worktree.
+- Compose secret exposure is corrected in committed `main` at `a0b2749`.
   The temp passfile escapes PostgreSQL's `:` and `\\` separators, stays mode
   0600, and is removed on exit. The disposable runtime harness checks both
   one-shot child processes' `/proc` arguments and environment against the
