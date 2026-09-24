@@ -17,7 +17,7 @@
     "@tanstack/react-query": "latest",
     "@tanstack/react-table": "latest",
     "lucide-react": "latest",
-    "next": "latest",
+    "next": "16.3.6",
     "react": "latest",
     "react-dom": "latest",
     "react-hook-form": "latest",

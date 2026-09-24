@@ -6,6 +6,14 @@ Every completed change must update affected guides, pass the applicable
 validation gates, receive a GitHub-verified commit, and synchronize through the
 authenticated HTTPS GitHub workflow below.
 
+## Branch policy
+
+Use `main` for all current local and remote work. Do not create feature, task,
+or documentation branches. Create each reviewed, validated commit directly on
+GitHub `main` using the signed `createCommitOnBranch` workflow. Preserve any
+preexisting dirty worktree and staged index while synchronizing the local
+`main` ref; never discard, reset, or commit unrelated changes.
+
 ## Normative post-change sequence
 
 After every update, revision, or modification:
@@ -16,11 +24,12 @@ After every update, revision, or modification:
    through the deterministic Docker Sandbox with `jk-sbx-project exec` or
    `jk-sbx-project run`. Do not run local project workloads through Podman or
    directly on macOS.
-3. Review `git diff --check`, the intended file list, and the current branch.
+3. Review `git diff --check`, the intended file list, and confirm `main` is the
+   target branch. A dirty preserved worktree may remain attached elsewhere.
 4. Verify GitHub authentication and an HTTPS `origin` before committing.
-5. Create the reviewed commit through GitHub's `createCommitOnBranch` GraphQL
-   mutation with the exact expected remote head; GitHub signs the commit when
-   the account supports server-side signing.
+5. Create the reviewed commit directly on GitHub `main` through
+   `createCommitOnBranch`, using the exact remote `main` head; GitHub signs the
+   commit when the account supports server-side signing.
 6. Verify the remote commit and tree with `gh api`, then fetch and synchronize
    local refs through the authenticated HTTPS credential helper.
 
@@ -75,9 +84,8 @@ gh auth status --hostname github.com
 
 Confirm that:
 
-- the worktree contains only intended changes;
-- the branch is appropriate for the task; direct `main` updates require the
-  explicit user-authorized maintenance workflow and a completed review;
+- the reviewed commit contains only intended paths and content;
+- unrelated staged and unstaged changes remain outside that commit;
 - `origin` uses `https://github.com/...`, not an SSH URL; and
 - `gh auth status` reports the intended authenticated account and HTTPS Git
   operations.
@@ -163,22 +171,14 @@ GitHub's canonical/default branch is now `main`. The histories from
 current release tip. Those source branches remain available for traceability;
 they are not divergent from `main` and were not deleted.
 
-For future work, commit on a `feat/*` or `docs/*` branch, review it, and merge
-it into `main` before release. Confirm the result with:
+For future work, commit directly on `main` after review and validation. Do not
+create side branches. Confirm the local and remote refs with:
 
 ```sh
 gh repo view ItsAdventureTime/portfolio-padang \
   --json defaultBranchRef --jq '.defaultBranchRef.name'
 gh api repos/ItsAdventureTime/portfolio-padang/branches/main \
   --jq '.name + " " + .commit.sha'
-```
-
-Create a pull request only when the review workflow calls for one:
-
-```sh
-gh pr create --base main --head feat/c1-foundation \
-  --title "fix(security): close C1 audit findings" \
-  --body-file /path/to/review-notes.md
 ```
 
 Deployment is separate from a branch push and remains governed by

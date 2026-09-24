@@ -29,12 +29,15 @@ The Git repository is the sole source of truth. Neither agent's chat history is 
 
 ## Branch Strategy
 
-- `main` — stable, reviewed code only
+- `main` — the only local and remote branch for current work; commits land here
+  after review and applicable validation.
 - `docs/phase-0` — historical Phase 0 repository bootstrap reference
-- `feat/*` — feature branches for implementation phases
-- Direct commits to `main` are normally disallowed. The explicit user-directed
-  maintenance workflow may update `main` after review, applicable validation,
-  and a GitHub-verified commit.
+- Do not create feature, task, or documentation branches. Preserve a preexisting
+  dirty worktree when reconciling it to `main`; do not discard or commit its
+  unrelated staged or unstaged changes.
+- Create commits on GitHub `main` with the authenticated HTTPS `gh` workflow,
+  an exact expected head OID, review, applicable validation, and signature
+  verification. Never force-push or rewrite shared history.
 
 ## Commit Convention
 

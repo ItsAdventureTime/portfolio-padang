@@ -2,11 +2,15 @@
 
 ## Active demo handoff — 2026-09-24
 
-- **Current role:** GPT-6 Sol (High), planning complete; independent review and
-  validation resume after implementation.
-- **Next owner:** GPT-6 Luna (High), implementation. The user will start that
-  pass manually. The implementation brief and acceptance gates are in
-  [DEMO_PLATFORM_PLAN.md](DEMO_PLATFORM_PLAN.md).
+- **Git policy:** Use local and remote `main` only. Do not create feature,
+  task, or documentation branches. Preserve any existing dirty worktree while
+  syncing local `main`; never include unrelated changes in a commit.
+
+- **Current role:** GPT-6 Sol (High), bounded implementation review passed;
+  live route and rendered acceptance remain pending deployment.
+- **Next owner:** User, perform the manual OrbStack and Cloudflare steps in
+  [DEMO_PLATFORM_PLAN.md](DEMO_PLATFORM_PLAN.md), then return to Sol for public
+  route and rendered acceptance.
 - **Deployment owner:** User. The public OrbStack deployment and Cloudflare
   Tunnel dashboard route are manual; no live deployment is authorized by this
   planning handoff.
@@ -18,12 +22,72 @@
   do not switch this application to Workers/D1/KV/Hyperdrive/Containers for the
   demo. Close actual Compose/runtime blockers and report remaining product
   gaps. Do not claim full ERP functionality from a healthy read-only shell.
-- **Review return:** Luna updates this handoff with exact checks, changed
-  files, deployment readiness, and unresolved issues; Sol then reviews,
-  validates, and returns a focused remediation handoff if needed.
+- **Review return:** Sol's review of this implementation passed after two
+  safety fixes. Live volume, secret, tunnel, public-route, and rendered checks
+  still require the user-owned deployment.
 
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
+
+### Luna implementation progress — 2026-09-24
+
+- The initial Compose file used floating `postgres:alpine`; both database
+  services are now pinned to `postgres:17-alpine`.
+- The Docker Sandbox has no `orbstack` context, so the existing runtime volume's
+  `PG_VERSION` cannot be inspected from this pass. Deployment stays held until
+  the documented operator preflight confirms the existing volume is version 17.
+- The first sandbox stack run found the Compose migration mount referenced a
+  nonexistent root `migrations/` directory; source migrations live in
+  `backend/migrations/`. The mount and runbook copy path now match; migration
+  and seed pass in the isolated stack test.
+- The unrelated staged and unstaged changes in the primary worktree remain
+  untouched.
+
+### Luna implementation results — 2026-09-24
+
+- Changed: `compose.yaml`, `frontend/package.json`,
+  `frontend/package-lock.json`, `scripts/test-padang-demo-compose.py`,
+  `scripts/test-padang-demo-compose-runtime.py`, and this handoff. Updated
+  [MACOS-DOCKER-COMPOSE.md](MACOS-DOCKER-COMPOSE.md) with the PostgreSQL volume
+  preflight and sandbox test steps.
+- Compose pins both PostgreSQL services to `postgres:17-alpine`, preserves the
+  `postgres-data` volume, and mounts migrations from `backend/migrations/`.
+- The runbook checks an existing `padang-demo_postgres-data` volume read-only
+  and stops before the database service starts if the version cannot be
+  inspected, `PG_VERSION` is absent, or its major is not 17.
+  It also checks that PostgreSQL and API non-root users can read the external
+  secret without printing it.
+- The dependency audit found vulnerable `next@16.3.0` and `sharp@0.35.3`.
+  Updated the lock to `next@16.3.6` and `sharp@0.35.4`; the full and production
+  `npm audit` checks now report zero vulnerabilities. Registry signatures
+  verified for 431 packages and attestations for 111.
+- Sandbox checks passed: `python3 scripts/test-padang-demo-compose.py &&
+  python3 scripts/test-padang-demo-compose-runtime.py`; backend Containerfile
+  build and Go tests; frontend typecheck, lint, and root-host production build.
+  The runtime test applied migration `1/u`, ran the demo seed, verified both
+  non-root secret reads, gateway API health, root HTML, dashboard API data, and
+  the read-only register marker, then removed its temporary resources.
+- `python3 -m py_compile scripts/test-padang-demo-compose.py
+  scripts/test-padang-demo-compose-runtime.py` and `sh -n` for the new volume
+  preflight block also pass in Docker Sandbox.
+- Sol's first review found two issues before publication: ambiguous volume
+  inspection was treated as absence, and the runtime test used a reusable PID
+  name while ignoring cleanup errors. Both are corrected; the volume guard now
+  fails closed and the runtime test uses a UUID project, checks for collisions,
+  and raises on teardown failures. Sol's focused re-review passed with no
+  further findings.
+- Deployment remains held: the Docker Sandbox has only its private `default`
+  context, not OrbStack. Existing live-volume version, OrbStack secret
+  permissions, Cloudflared network, public route, and rendered browser behavior
+  are unverified. No images were exported or imported and no live service was
+  changed. Run the documented `PG_VERSION` preflight before applying the new
+  database image.
+- The demo still has read-only workflows and no upload UI, so R2 remains
+  unconfigured. Full product workflow acceptance remains open.
+- **Review result:** Sol independently reviewed the Compose changes and the
+  framework lock update. The bounded implementation passes; Sol did not run
+  new local tests in the focused re-review. Do not close the overall demo
+  completion gate on this platform slice.
 
 > **Demo deployment override — 2026-09-07:** The active demo target is
 > `https://padang.delegateops.business/`, deployed manually through OrbStack
@@ -70,17 +134,16 @@ DEMO UPDATE COMMAND: `scripts/update-padang-demo.sh`
 DEMO PUBLIC URL: `https://delegateops.business/padang/demo`
 PRODUCTION PUBLIC URL: `https://delegateops.business/padang`
 
-## Normative Change Workflow (2026-08-16)
+## Historical Change Workflow (2026-08-16)
 
 Every source, configuration, script, UI/UX, or documentation revision must
 refresh the affected guides, run applicable project workloads through the
 Docker Sandbox (`jk-sbx-project exec`/`run`), review the diff, create a
 GitHub-verified commit through the authenticated HTTPS GitHub CLI workflow,
-and synchronize local refs while preserving existing staged and unstaged user
-changes. `main` is the current consolidated baseline; direct maintenance
-updates are allowed only when explicitly user-authorized and reviewed. SSH is
-reserved for the separately documented VPS deployment transport; it is not a
-GitHub remote or Git credential path.
+and synchronize local `main` without discarding pre-existing staged or
+unstaged work. `main` is the only current local/remote work branch; feature
+branches are not used. SSH is reserved for the separately documented VPS
+deployment transport; it is not a GitHub remote or Git credential path.
 
 ## Local Artifact Deployment Revision (2026-08-16)
 
@@ -672,7 +735,8 @@ an undocumented placeholder table.
 4. Execute project runtimes, builds, and tests through `jk-sbx-project exec` in
    the Docker Sandbox per the macOS execution policy. Use Podman only for the
    remote VPS runtime.
-5. Create feature branches (`feat/task-001-db-migrations`, etc.) for implementation commits.
+5. Create reviewed, validated implementation commits directly on `main` using
+   the authenticated HTTPS GitHub CLI workflow and exact expected head OID.
 6. Record exact verification results for each task.
 
 ---
@@ -680,11 +744,10 @@ an undocumented placeholder table.
 ## Authorization & Handoff State
 
 - **Phase A1 Status:** COMPLETE, with planning clarification addendum applied.
-- **Current instruction:** **GO: CODEX C1** is active. Implement sequentially,
-  validate runtime/build/test work through the Docker Sandbox, and do not deploy
-  to the VPS without explicit authorization. Update this handoff with exact
-  results before committing and pushing the working branch; the reviewed C1
-  history is now consolidated on `main`.
+- **Current instruction:** **GO: CODEX C1** is historical. Validate project
+  workloads through Docker Sandbox and do not deploy without explicit
+  authorization. The active demo handoff at the top controls current work. Use
+  `main` for local and remote commits and record exact verification results.
 
 ## C1 Implementation and Validation Log
 

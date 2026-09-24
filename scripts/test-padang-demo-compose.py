@@ -26,6 +26,12 @@ def main() -> None:
 
     assert compose["networks"]["padang-network"]["internal"] is True
     assert compose["networks"]["cloudflared-network"]["external"] is True
+    assert services["db"]["image"] == "docker.io/library/postgres:17-alpine"
+    assert services["demo-seed"]["image"] == "docker.io/library/postgres:17-alpine"
+    assert any(
+        volume["source"].endswith("/backend/migrations") and volume["target"] == "/migrations"
+        for volume in services["migrate"]["volumes"]
+    )
     assert set(services["gateway"]["networks"]) == {"padang-network", "cloudflared-network"}
     for name, service in services.items():
         assert "ports" not in service, name

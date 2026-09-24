@@ -30,12 +30,47 @@ and [Docker's build-context rules](https://docs.docker.com/build/concepts/contex
 
 ## 1. First release: prepare the runtime folder and secret
 
+Before replacing an existing demo image, inspect its named volume. This mounts
+the volume read-only and does not start PostgreSQL or change its data:
+
+```sh
+if docker --context orbstack volume inspect padang-demo_postgres-data >/dev/null 2>&1; then
+  docker --context orbstack run --rm \
+    --mount type=volume,source=padang-demo_postgres-data,target=/data,readonly \
+    --entrypoint sh docker.io/library/postgres:17-alpine -ec '
+      test -s /data/PG_VERSION || {
+        echo "Existing volume has no readable PG_VERSION. Stop." >&2
+        exit 1
+      }
+      version=$(cat /data/PG_VERSION)
+      test "$version" = 17 || {
+        echo "Expected PostgreSQL 17 data; found $version. Stop." >&2
+        exit 1
+      }
+    '
+else
+  volumes=$(docker --context orbstack volume ls --quiet --filter name=padang-demo_postgres-data) || {
+    echo "Could not determine whether the demo database volume exists. Stop." >&2
+    exit 1
+  }
+  if [ -n "$volumes" ]; then
+    echo "The demo database volume exists but could not be inspected. Stop." >&2
+    exit 1
+  fi
+  echo "No existing demo database volume; PostgreSQL 17 will initialize it."
+fi
+```
+
+If inspection fails, `PG_VERSION` is absent, or the version is not 17, stop.
+Keep the existing volume and perform a planned dump/restore migration to a new
+volume; never start PostgreSQL against an unverified data directory.
+
 From the repository root:
 
 ```sh
-mkdir -p ~/docker/portfolio/padang/{migrations,seed,gateway,secrets}
+mkdir -p ~/docker/portfolio/padang/{backend/migrations,seed,gateway,secrets}
 cp compose.yaml ~/docker/portfolio/padang/compose.yaml
-cp backend/migrations/* ~/docker/portfolio/padang/migrations/
+cp backend/migrations/* ~/docker/portfolio/padang/backend/migrations/
 cp seed/demo_seed.sql ~/docker/portfolio/padang/seed/
 cp gateway/default.conf ~/docker/portfolio/padang/gateway/
 chmod 700 ~/docker/portfolio/padang/secrets
@@ -74,11 +109,13 @@ jk-sbx-project implement '
 The Containerfiles use their own service directories as build contexts, so the
 repository `.dockerignore` is not needed for this release path.
 
-Before an import, validate the image-only network boundary without starting a
-service:
+Before an import, validate the Compose boundary and run the disposable stack
+smoke test inside the Docker Sandbox. The runtime test creates its own
+temporary password, database volume, and Cloudflared network when needed, then
+removes those test resources. It does not access the OrbStack context.
 
 ```sh
-jk-sbx-project implement 'python3 scripts/test-padang-demo-compose.py'
+jk-sbx-project implement 'python3 scripts/test-padang-demo-compose.py && python3 scripts/test-padang-demo-compose-runtime.py'
 ```
 
 ## 3. Import, migrate, seed, and start in OrbStack
@@ -98,13 +135,23 @@ docker --context orbstack compose ps
 docker --context orbstack compose --profile migrate run --rm migrate
 docker --context orbstack compose --profile demo-seed run --rm demo-seed
 docker --context orbstack compose up -d api frontend gateway
+docker --context orbstack compose exec -T -u postgres db sh -ec 'test -r /run/secrets/db-password'
+docker --context orbstack compose exec -T -u nobody api sh -ec 'test -r /run/secrets/db-password'
 ```
+
+The last two checks verify that the PostgreSQL and API non-root users can read
+the mounted secret without printing its value. Keep the secret directory at
+`0700` and the file at `0644`: the private parent limits host traversal, while
+the file mode permits both container UIDs to read the bind-mounted file on
+OrbStack. Do not continue if either check fails.
 
 `migrate` and `demo-seed` are deliberate one-shot profiles. Do not seed during
 ordinary restarts: it truncates and reloads the demo database.
 
-`node:lts-alpine` is the available LTS Alpine tag. PostgreSQL and nginx use
-their supported floating `alpine` tags; `migrate:latest` uses its upstream
+`node:lts-alpine` is the available LTS Alpine tag. PostgreSQL is pinned to
+major version 17, matching the schema's supported major; its minor updates
+continue to float within 17. Nginx uses its supported floating `alpine` tag;
+`migrate:latest` uses its upstream
 [Alpine runtime](https://raw.githubusercontent.com/golang-migrate/migrate/master/Dockerfile).
 
 ## 4. Connect the existing Cloudflared container
@@ -175,7 +222,7 @@ For application rollback, load the two `*-before.tar` archives and run the
 same forced recreation command. Database rollback requires the matching
 `pg_dump` backup; migrations do not automatically reverse.
 
-`postgres:alpine` floats to the current supported major. A PostgreSQL major
+The Compose file keeps PostgreSQL on major version 17. A PostgreSQL major
 upgrade needs a logical backup, a new volume, restore, verification, and the
 old volume retained until acceptance; it cannot reuse the old data directory.
 

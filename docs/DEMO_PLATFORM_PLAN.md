@@ -69,8 +69,8 @@ checked in the user's own Cloudflare account before adopting a paid service.
 
 Use `docs/HANDOFF.md` for ownership and this file for acceptance. Use
 `jk-sbx-project implement` for project builds/tests and normal edit tools for
-source changes. Keep implementation on a reviewable branch or otherwise
-isolate the intended files from the existing dirty worktree. Do not discard or
+source changes. Commit reviewed changes directly to `main`; do not create a
+feature branch. Preserve the existing dirty worktree and do not discard or
 commit unrelated edits.
 
 1. Reconcile actual Compose inputs with the checkout. Keep the current
