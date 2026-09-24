@@ -1,5 +1,30 @@
 # HANDOFF.md — Padang ERP Lite
 
+## Active demo handoff — 2026-09-24
+
+- **Current role:** GPT-6 Sol (High), planning complete; independent review and
+  validation resume after implementation.
+- **Next owner:** GPT-6 Luna (High), implementation. The user will start that
+  pass manually. The implementation brief and acceptance gates are in
+  [DEMO_PLATFORM_PLAN.md](DEMO_PLATFORM_PLAN.md).
+- **Deployment owner:** User. The public OrbStack deployment and Cloudflare
+  Tunnel dashboard route are manual; no live deployment is authorized by this
+  planning handoff.
+- **Chosen demo architecture:** Existing `compose.yaml` on OrbStack, with the
+  existing `cloudflared` tunnel and `https://padang.delegateops.business/`.
+  Safe environment variables stay in Compose; secrets stay in external files.
+  Production architecture is unchanged.
+- **Implementation boundary:** Preserve unrelated staged and unstaged work;
+  do not switch this application to Workers/D1/KV/Hyperdrive/Containers for the
+  demo. Close actual Compose/runtime blockers and report remaining product
+  gaps. Do not claim full ERP functionality from a healthy read-only shell.
+- **Review return:** Luna updates this handoff with exact checks, changed
+  files, deployment readiness, and unresolved issues; Sol then reviews,
+  validates, and returns a focused remediation handoff if needed.
+
+The dated C1 history below remains for context. This section supersedes its
+older role, route, and deployment instructions for the demo.
+
 > **Demo deployment override — 2026-09-07:** The active demo target is
 > `https://padang.delegateops.business/`, deployed manually through OrbStack
 > Docker Compose at `~/docker/portfolio/padang/compose.yaml`. Build/export only
@@ -24,9 +49,9 @@
 
 ---
 
-CURRENT AGENT: ChatGPT Codex (Implementation Engineer)
-CURRENT PHASE: C1 — implementation and containerized validation
-STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
+HISTORICAL C1 AGENT: ChatGPT Codex (Implementation Engineer)
+HISTORICAL C1 PHASE: implementation and containerized validation
+HISTORICAL C1 STATUS: `GO: CODEX C1` received. Foundation implementation, Luna review
 remediation, documentation updates, deployment-update workflow, containerized
 validation, frontend npm cache remediation, Caddy route insertion remediation,
 offline font build remediation, and bounded route/UX remediation are complete.

@@ -1,5 +1,10 @@
 # Padang demo on OrbStack Docker Compose
 
+Read the [2026-09-24 platform plan and Luna handoff](DEMO_PLATFORM_PLAN.md)
+before using this runbook. Its acceptance gates and stop conditions govern
+the next demo release. This runbook describes operator actions after Luna's
+implementation has passed Sol's independent review.
+
 This is the manual, demo-only release procedure for
 `https://padang.delegateops.business`. Docker Sandbox is the workshop that
 builds the images; OrbStack is the showroom that runs imported images. Compose
@@ -53,7 +58,7 @@ export after a failed build. The fixed `:manual` image tags and `pull_policy:
 never` prevent OrbStack from falling back to a registry image.
 
 ```sh
-jk-sbx-project exec bash -lc '
+jk-sbx-project implement '
   set -eu
   docker build --pull -f backend/Containerfile --tag padang-demo-api:manual backend
   docker build --pull -f frontend/Containerfile \
@@ -73,7 +78,7 @@ Before an import, validate the image-only network boundary without starting a
 service:
 
 ```sh
-jk-sbx-project exec python3 scripts/test-padang-demo-compose.py
+jk-sbx-project implement 'python3 scripts/test-padang-demo-compose.py'
 ```
 
 ## 3. Import, migrate, seed, and start in OrbStack
