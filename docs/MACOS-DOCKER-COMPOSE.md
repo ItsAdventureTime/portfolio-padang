@@ -5,18 +5,17 @@ This guide covers the manual release of the portfolio demo at
 Docker Sandbox, then import them into OrbStack. Docker Compose runs the app.
 Cloudflare Tunnel serves the public hostname.
 
-**Release hold:** The migration and seed jobs still expose the database password
-in a process argument or environment variable. Wait for the correction and
-independent review recorded in [HANDOFF.md](HANDOFF.md) before running the
-OrbStack steps below. [The platform plan](DEMO_PLATFORM_PLAN.md) records the
-remaining acceptance checks.
+**Release gate:** The migration and seed jobs now use a temporary mode-0600
+PostgreSQL passfile. The disposable runtime test checks their live process
+arguments and environment for the password. This check passed, and Sol's final
+review found no issues. The app can now start in OrbStack; leave the existing
+Cloudflare Tunnel container and configuration unchanged. [The platform plan](DEMO_PLATFORM_PLAN.md)
+records the remaining acceptance checks.
 
-Isolated Compose configuration and runtime tests passed on committed `026d983`;
-the local backend image and frontend production build also passed. No images
-were exported or imported into OrbStack, and no live application services or
-tunnel changes were made. Public URL checks could not resolve the hostname on
-2026-09-24. The secret-handling correction in `docs/HANDOFF.md` remains a
-release gate before these operator steps.
+The earlier isolated Compose run passed on committed `026d983`. The focused
+secret-handling correction remains under review. No images were imported into
+OrbStack and no app services were started for that earlier run. Public URL
+checks could not resolve the hostname on 2026-09-24.
 
 The demo uses fictional data and has no login. It needs one generated database
 password, stored in an ignored `secrets/db-password` file. The database name,
@@ -167,7 +166,9 @@ The Containerfiles use their own service directories as build contexts, so the
 repository `.dockerignore` is not needed for this release path.
 
 Before an import, validate the Compose boundary and run the disposable stack
-smoke test inside the Docker Sandbox. The runtime test creates its own
+smoke test inside the Docker Sandbox. It verifies the migration and seed jobs
+complete and that their live child process arguments and environment do not
+contain the password. The runtime test creates its own
 temporary password, database volume, and Cloudflared network when needed, then
 removes those test resources. It does not access the OrbStack context.
 

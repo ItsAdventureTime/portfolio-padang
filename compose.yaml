@@ -30,9 +30,13 @@ services:
     entrypoint: [/bin/sh, -ec]
     command:
       - |
-        exec migrate -path /migrations \
-          -database "postgres://padang_demo_user:$$(cat /run/secrets/db-password)@db:5432/padang_demo?sslmode=disable" \
-          up
+        umask 077
+        passfile=$$(mktemp)
+        trap 'rm -f "$$passfile"' EXIT
+        { printf 'db:5432:padang_demo:padang_demo_user:'; sed 's/[\\:]/\\&/g' /run/secrets/db-password; } > "$$passfile"
+        chmod 600 "$$passfile"
+        export PGPASSFILE="$$passfile"
+        migrate -path /migrations -database "postgres://padang_demo_user@db:5432/padang_demo?sslmode=disable" up
     restart: "no"
 
   api:
@@ -97,9 +101,14 @@ services:
     entrypoint: [/bin/sh, -ec]
     command:
       - |
-        export PGPASSWORD="$$(cat /run/secrets/db-password)"
+        umask 077
+        passfile=$$(mktemp)
+        trap 'rm -f "$$passfile"' EXIT
+        { printf 'db:5432:padang_demo:padang_demo_user:'; sed 's/[\\:]/\\&/g' /run/secrets/db-password; } > "$$passfile"
+        chmod 600 "$$passfile"
+        export PGPASSFILE="$$passfile"
         test "$$(psql -h db -U padang_demo_user -d padang_demo -Atqc 'select current_database()')" = padang_demo
-        exec psql --single-transaction -v ON_ERROR_STOP=1 -h db -U padang_demo_user -d padang_demo -f /seed/demo_seed.sql
+        psql --single-transaction -v ON_ERROR_STOP=1 -h db -U padang_demo_user -d padang_demo -f /seed/demo_seed.sql
     restart: "no"
 
 volumes:

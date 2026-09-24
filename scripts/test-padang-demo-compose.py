@@ -44,10 +44,14 @@ def main() -> None:
         assert services[name]["pull_policy"] == "never"
     assert services["migrate"]["profiles"] == ["migrate"]
     assert services["demo-seed"]["profiles"] == ["demo-seed"]
-    for name, command in (("migrate", "exec migrate"), ("demo-seed", "exec psql")):
+    for name, command in (("migrate", "migrate -path"), ("demo-seed", "psql --single-transaction")):
+        script = services[name]["command"][0]
         assert len(services[name]["command"]) == 1
-        assert command in services[name]["command"][0]
-        subprocess.run(["sh", "-n"], input=services[name]["command"][0].replace("$$", "$"), text=True, check=True)
+        assert command in script
+        assert "PGPASSFILE" in script and "chmod 600" in script
+        assert "PGPASSWORD" not in script and "$(cat /run/secrets/db-password)" not in script
+        assert "/proc/" not in script
+        subprocess.run(["sh", "-n"], input=script.replace("$$", "$"), text=True, check=True)
 
 
 if __name__ == "__main__":

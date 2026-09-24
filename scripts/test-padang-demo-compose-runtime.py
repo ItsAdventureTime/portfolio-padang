@@ -5,12 +5,36 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
 PROJECT = f"padang-demo-check-{uuid.uuid4().hex}"
+
+PROCESS_CHECK = r"""
+found=false
+for proc in /proc/[0-9]*; do
+  if read -r comm < "$proc/comm" 2>/dev/null && [ "$comm" = "$1" ]; then
+    cmdline=$(tr '\000' '\n' < "$proc/cmdline" 2>/dev/null) || continue
+    environ=$(tr '\000' '\n' < "$proc/environ" 2>/dev/null) || continue
+    if [ -n "$cmdline" ] && printf '%s\n' "$environ" | grep -q '^PGPASSFILE='; then
+      for metadata in "$cmdline" "$environ"; do
+        if printf '%s\n' "$metadata" | grep -Fqf /run/secrets/db-password; then
+          echo "Database password found in process metadata" >&2
+          exit 1
+        fi
+      done
+      found=true
+    fi
+  fi
+done
+if [ "$found" != true ]; then
+  echo "Job process is not visible yet" >&2
+  exit 2
+fi
+"""
 
 
 def run(command: list[str]) -> str:
@@ -22,10 +46,36 @@ def run(command: list[str]) -> str:
     return result.stdout
 
 
+def run_job(compose: list[str], service: str, jobs: list[str]) -> None:
+    profile = "migrate" if service == "migrate" else "demo-seed"
+    process = "migrate" if service == "migrate" else "psql"
+    container = run([*compose, "--profile", profile, "run", "--detach", "--no-deps", service]).strip()
+    jobs.append(container)
+    for _ in range(100):
+        state = run(["docker", "inspect", "--format", "{{.State.Status}}", container]).strip()
+        if state != "running":
+            raise RuntimeError(f"{service} exited before its process metadata could be checked")
+        check = subprocess.run(
+            ["docker", "exec", container, "sh", "-ec", PROCESS_CHECK, "check-process", process],
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode == 0:
+            break
+        if check.returncode != 2:
+            raise RuntimeError(f"{service} process metadata check failed")
+        time.sleep(0.05)
+    else:
+        raise RuntimeError(f"{service} process metadata check timed out")
+    status = run(["docker", "wait", container]).strip()
+    if status != "0":
+        raise RuntimeError(f"{service} exited with status {status}")
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="padang-demo-check-") as temp:
         secret = Path(temp, "db-password")
-        secret.write_text("sandbox-test-only\n")
+        secret.write_text("sandbox:test\\only\n")
         secret.chmod(0o644)
         override = Path(temp, "compose.override.yaml")
         override.write_text(
@@ -51,6 +101,7 @@ def main() -> None:
 
         network_created = False
         cleanup_errors: list[str] = []
+        jobs: list[str] = []
 
         try:
             if subprocess.run(
@@ -62,8 +113,8 @@ def main() -> None:
                 network_created = True
             run([*compose, "config", "--quiet"])
             run([*compose, "up", "-d", "--wait", "--wait-timeout", "120", "db"])
-            run([*compose, "--profile", "migrate", "run", "--rm", "migrate"])
-            run([*compose, "--profile", "demo-seed", "run", "--rm", "demo-seed"])
+            run_job(compose, "migrate", jobs)
+            run_job(compose, "demo-seed", jobs)
             run([*compose, "up", "-d", "--wait", "--wait-timeout", "120", "api", "frontend", "gateway"])
             run([*compose, "exec", "-T", "-u", "postgres", "db", "sh", "-ec", "test -r /run/secrets/db-password"])
             run([*compose, "exec", "-T", "-u", "nobody", "api", "sh", "-ec", "test -r /run/secrets/db-password"])
@@ -80,6 +131,10 @@ def main() -> None:
             down = subprocess.run([*compose, "down"], cwd=ROOT, capture_output=True, text=True)
             if down.returncode:
                 cleanup_errors.append(f"compose down failed: {down.stderr.strip()}")
+            for container in jobs:
+                removed = subprocess.run(["docker", "rm", "-f", container], capture_output=True, text=True)
+                if removed.returncode:
+                    cleanup_errors.append(f"job container removal failed: {removed.stderr.strip()}")
             volumes = subprocess.run(
                 ["docker", "volume", "ls", "--quiet", "--filter", f"name={volume}"],
                 capture_output=True,

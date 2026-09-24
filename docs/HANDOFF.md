@@ -5,20 +5,13 @@
 - **Git policy:** Use local and remote `main` only. Do not create feature,
   task, or documentation branches. Preserve any existing dirty worktree while
   syncing local `main`; never include unrelated changes in a commit.
-
-- **Current role:** GPT-6 Sol (Medium), independent review and validation.
-  The bounded Compose implementation needs one security correction before
-  release acceptance; live route and rendered acceptance also remain open.
-- **Next implementation owner:** Luna, remove database-password exposure from
-  the `migrate` process arguments and `demo-seed` process environment as
-  described below, then return the focused change to Sol for review.
-- **Next deployment owner:** User, after Sol accepts that correction, perform
-  the manual OrbStack and Cloudflare steps in
-  [DEMO_PLATFORM_PLAN.md](DEMO_PLATFORM_PLAN.md), then return to Sol for public
-  route and rendered acceptance.
-- **Deployment owner:** User. The public OrbStack deployment and Cloudflare
-  Tunnel dashboard route are manual; no live deployment is authorized by this
-  planning handoff.
+- **Current role:** GPT-6 Luna (High), implementation.
+- **Next owner:** Luna, synchronize the reviewed change to `main`, then build
+  the committed app images in Docker Sandbox and start them in OrbStack. Report
+  the gateway container name so the user can add its Cloudflare route.
+- **Deployment owner:** User owns Cloudflare dashboard changes. The user
+  authorized starting the app stack after independent acceptance; do not alter
+  the existing `cloudflared` container or tunnel configuration.
 - **Chosen demo architecture:** Existing `compose.yaml` on OrbStack, with the
   existing `cloudflared` tunnel and `https://padang.delegateops.business/`.
   Safe environment variables stay in Compose; secrets stay in external files.
@@ -27,10 +20,11 @@
   do not switch this application to Workers/D1/KV/Hyperdrive/Containers for the
   demo. Close actual Compose/runtime blockers and report remaining product
   gaps. Do not claim full ERP functionality from a healthy read-only shell.
-- **Review return:** The earlier focused review passed after two safety fixes.
-  This later independent pass found the secret exposure below, so the bounded
-  implementation is not yet accepted for deployment. Live volume, secret,
-  tunnel, public-route, and rendered checks require the user-owned deployment.
+- **Review return:** Sol's final focused review passed with no findings.
+  Migration, seed, and live process metadata checks passed in the disposable
+  runtime test. The host OrbStack context is available; no demo database volume
+  exists. Start app services, leave `cloudflared` unchanged, then hand off the
+  gateway name and public-route verification to the user.
 
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
@@ -56,9 +50,21 @@ older role, route, and deployment instructions for the demo.
 - Documentation checks passed: `git diff --check`; all 11 shell blocks in the
   edited README and Compose guide parse with `sh -n`; their relative Markdown
   links resolve locally. No deployment command was run.
-- The Compose secret exposure found on 2026-09-24 is still unresolved in code.
-  Luna must fix and test it before the user runs the OrbStack steps. Public
-  route, browser, and existing-volume checks remain open.
+- Compose secret exposure is corrected in the current uncommitted worktree.
+  The temp passfile escapes PostgreSQL's `:` and `\\` separators, stays mode
+  0600, and is removed on exit. The disposable runtime harness checks both
+  one-shot child processes' `/proc` arguments and environment against the
+  secret file while they run, without printing the value. `jk-sbx-project implement 'python3
+  scripts/test-padang-demo-compose.py && python3
+  scripts/test-padang-demo-compose-runtime.py'` passed: configuration, shell
+  syntax, migration, seed, process metadata, secret reads, gateway health,
+  dashboard data, and read-only UI. Official PostgreSQL 17 passfile
+  documentation and `lib/pq` connection docs confirm `PGPASSFILE` support and
+  mode-0600 requirements.
+  Sol's focused review passed with no findings. OrbStack's `cloudflared`
+  container is running on the existing network; no `padang-demo_postgres-data`
+  volume exists. Start app services next without changing `cloudflared`.
+  Public route and browser checks remain open for the user.
 
 ### Sol independent review — 2026-09-24
 
