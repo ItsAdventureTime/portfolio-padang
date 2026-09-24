@@ -6,9 +6,12 @@
   task, or documentation branches. Preserve any existing dirty worktree while
   syncing local `main`; never include unrelated changes in a commit.
 - **Current role:** GPT-6 Luna (High), implementation.
-- **Next owner:** Luna, synchronize the reviewed change to `main`, then build
-  the committed app images in Docker Sandbox and start them in OrbStack. Report
-  the gateway container name so the user can add its Cloudflare route.
+- **Next owner:** User, load the committed app images and start the stack in
+  OrbStack using Step 3 of [MACOS-DOCKER-COMPOSE.md](MACOS-DOCKER-COMPOSE.md).
+  The host Docker shell command was rejected by the execution guard, which only
+  permits Docker through the private Docker Sandbox daemon. After startup,
+  Cloudflare should target `http://padang-demo-gateway:80` on the existing
+  `cloudflared-network`.
 - **Deployment owner:** User owns Cloudflare dashboard changes. The user
   authorized starting the app stack after independent acceptance; do not alter
   the existing `cloudflared` container or tunnel configuration.
@@ -23,8 +26,13 @@
 - **Review return:** Sol's final focused review passed with no findings.
   Migration, seed, and live process metadata checks passed in the disposable
   runtime test. The host OrbStack context is available; no demo database volume
-  exists. Start app services, leave `cloudflared` unchanged, then hand off the
-  gateway name and public-route verification to the user.
+  exists. App images were built from this commit in Docker Sandbox and exported
+  under `build/padang-demo/images/`. Runtime files are prepared at
+  `~/docker/portfolio/padang/`. The shell guard rejected loading images or
+  starting OrbStack containers with the reason `Use jk-sbx-project so Docker
+  execution occurs inside Docker Sandbox`; that daemon is not OrbStack. No app
+  container started and no `cloudflared` or tunnel setting changed. User must
+  run Step 3 from the runbook, then add the route and verify public access.
 
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
@@ -63,8 +71,8 @@ older role, route, and deployment instructions for the demo.
   mode-0600 requirements.
   Sol's focused review passed with no findings. OrbStack's `cloudflared`
   container is running on the existing network; no `padang-demo_postgres-data`
-  volume exists. Start app services next without changing `cloudflared`.
-  Public route and browser checks remain open for the user.
+  volume exists. The host shell guard rejected the OrbStack load/start commands.
+  User can run documented Step 3; public route and browser checks remain open.
 
 ### Sol independent review — 2026-09-24
 

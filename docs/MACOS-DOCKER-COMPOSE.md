@@ -8,14 +8,17 @@ Cloudflare Tunnel serves the public hostname.
 **Release gate:** The migration and seed jobs now use a temporary mode-0600
 PostgreSQL passfile. The disposable runtime test checks their live process
 arguments and environment for the password. This check passed, and Sol's final
-review found no issues. The app can now start in OrbStack; leave the existing
-Cloudflare Tunnel container and configuration unchanged. [The platform plan](DEMO_PLATFORM_PLAN.md)
-records the remaining acceptance checks.
+review found no issues. App images are exported under
+`build/padang-demo/images/`, and runtime files are prepared at
+`~/docker/portfolio/padang/`. The shell guard blocked Docker commands against
+OrbStack, so images are not loaded and app services are not running. Run Step 3
+below from macOS Terminal; leave the existing Cloudflare Tunnel container and
+configuration unchanged. [The platform plan](DEMO_PLATFORM_PLAN.md) records
+the remaining acceptance checks.
 
-The earlier isolated Compose run passed on committed `026d983`. The focused
-secret-handling correction remains under review. No images were imported into
-OrbStack and no app services were started for that earlier run. Public URL
-checks could not resolve the hostname on 2026-09-24.
+The isolated Compose runtime check and focused independent review passed on
+commit `a0b2749`. Public URL checks could not resolve the hostname on
+2026-09-24; public route and browser acceptance remain open.
 
 The demo uses fictional data and has no login. It needs one generated database
 password, stored in an ignored `secrets/db-password` file. The database name,
