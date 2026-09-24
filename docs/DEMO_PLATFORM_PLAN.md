@@ -3,7 +3,7 @@
 Date: 2026-09-24. Target: `https://padang.delegateops.business/`.
 This is the current plan for the portfolio **demo only**. Production remains on
 its existing architecture. The user will start the GPT-6 Luna (High)
-implementation pass manually; GPT-6 Sol (High) will independently review and
+implementation pass manually; GPT-6 Sol (Medium) will independently review and
 validate each result. The user performs the final OrbStack and Cloudflare
 dashboard deployment steps.
 

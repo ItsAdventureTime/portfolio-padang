@@ -6,9 +6,14 @@
   task, or documentation branches. Preserve any existing dirty worktree while
   syncing local `main`; never include unrelated changes in a commit.
 
-- **Current role:** GPT-6 Sol (High), bounded implementation review passed;
-  live route and rendered acceptance remain pending deployment.
-- **Next owner:** User, perform the manual OrbStack and Cloudflare steps in
+- **Current role:** GPT-6 Sol (Medium), independent review and validation.
+  The bounded Compose implementation needs one security correction before
+  release acceptance; live route and rendered acceptance also remain open.
+- **Next implementation owner:** Luna, remove database-password exposure from
+  the `migrate` process arguments and `demo-seed` process environment as
+  described below, then return the focused change to Sol for review.
+- **Next deployment owner:** User, after Sol accepts that correction, perform
+  the manual OrbStack and Cloudflare steps in
   [DEMO_PLATFORM_PLAN.md](DEMO_PLATFORM_PLAN.md), then return to Sol for public
   route and rendered acceptance.
 - **Deployment owner:** User. The public OrbStack deployment and Cloudflare
@@ -22,12 +27,46 @@
   do not switch this application to Workers/D1/KV/Hyperdrive/Containers for the
   demo. Close actual Compose/runtime blockers and report remaining product
   gaps. Do not claim full ERP functionality from a healthy read-only shell.
-- **Review return:** Sol's review of this implementation passed after two
-  safety fixes. Live volume, secret, tunnel, public-route, and rendered checks
-  still require the user-owned deployment.
+- **Review return:** The earlier focused review passed after two safety fixes.
+  This later independent pass found the secret exposure below, so the bounded
+  implementation is not yet accepted for deployment. Live volume, secret,
+  tunnel, public-route, and rendered checks require the user-owned deployment.
 
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
+
+### Sol independent review — 2026-09-24
+
+- **Required before deployment:** `compose.yaml` builds the `migrate` database
+  URL with `$(cat /run/secrets/db-password)`, putting the password in the
+  `migrate` process arguments. `demo-seed` exports the password as
+  `PGPASSWORD`. Both depart from the platform plan's file-secret rule; the
+  migration command also violates its ban on secret values in commands. Keep
+  the external Compose secret file, use a verified
+  file-based PostgreSQL authentication path for both one-shot jobs, and add a
+  bounded runtime check that the password is absent from their arguments and
+  environment while migration and seed still succeed. Do not print the secret
+  in test failure output. [PostgreSQL 17 documents password files with mode
+  0600](https://www.postgresql.org/docs/17/libpq-pgpass.html), and
+  [`lib/pq` documents a passfile connection
+  parameter](https://pkg.go.dev/github.com/lib/pq). Verify the actual
+  migration image supports the chosen path before changing the command.
+- Fresh isolated `jk-sbx-project validate` run passed
+  `python3 scripts/test-padang-demo-compose.py && python3
+  scripts/test-padang-demo-compose-runtime.py` against committed `026d983`:
+  migration, seed, non-root secret reads, gateway health, dashboard data, and
+  read-only UI marker. `cd backend && go test ./... && go vet ./...` also passed.
+- A separate isolated `cd frontend && npm ci --ignore-scripts && npm run
+  typecheck && npm run lint && NEXT_PUBLIC_BASE_PATH= NEXT_PUBLIC_APP_ENV=demo
+  npm run build && npm audit --omit=dev --audit-level=high` passed on committed
+  `026d983`. The build used Next.js 16.3.6 and npm audit found zero
+  vulnerabilities. `npm ci` warned that the sandbox's npm 9.2.0 is below
+  `@redocly/openapi-core`'s declared npm `>=9.5.0`; it did not fail.
+- `curl` checks for `https://padang.delegateops.business/` and
+  `/api/v1/health` both failed with `Could not resolve host` from this host.
+  Public routing and browser acceptance are unverified; no OrbStack volume,
+  tunnel, or live secret was inspected. The separate staged and unstaged
+  worktree edits are outside this committed Compose validation snapshot.
 
 ### Luna implementation progress — 2026-09-24
 

@@ -10,9 +10,12 @@ This is the manual, demo-only release procedure for
 builds the images; OrbStack is the showroom that runs imported images. Compose
 does not build or deploy automatically.
 
-Static validation passed for the rendered Compose configuration and the manual
-shell snippets. No application images were built or application services
-deployed; no tunnel changes or public URL checks were performed.
+Isolated Compose configuration and runtime tests passed on committed `026d983`;
+the local backend image and frontend production build also passed. No images
+were exported or imported into OrbStack, and no live application services or
+tunnel changes were made. Public URL checks could not resolve the hostname on
+2026-09-24. The secret-handling correction in `docs/HANDOFF.md` remains a
+release gate before these operator steps.
 
 The demo uses fictional data, no authentication, and no B2/R2 credentials.
 Attachment upload is unavailable until an R2-backed attachment demonstration is
