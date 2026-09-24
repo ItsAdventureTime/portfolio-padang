@@ -43,6 +43,7 @@ build/
 *.key
 *.p12
 *.pfx
+/secrets/db-password
 secrets/
 .secrets/
 *.credentials

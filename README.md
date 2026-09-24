@@ -2,26 +2,29 @@
 
 ## Demo deployment
 
-The demo is served at `https://padang.delegateops.business/`. Build its images
-manually in Docker Sandbox, then import and run them manually with OrbStack
-Docker Compose. The complete procedure is the [Compose guide](docs/MACOS-DOCKER-COMPOSE.md).
+The planned demo URL is `https://padang.delegateops.business/`. Its public route
+still needs deployment and verification. The [OrbStack deployment
+guide](docs/MACOS-DOCKER-COMPOSE.md) has the ordered commands and current
+release hold.
 
 **Padang Construction and Supplies Corporation**  
 Design | Construct | Supply · AAA Accredited Contractor · Pampanga, Philippines
 
 ---
 
-## What This Is
+## About
 
-Padang ERP Lite is an **operations management system** for Padang Construction and Supplies Corporation — a PCAB AAA-accredited ("Large B") construction and fabrication company.
+Padang ERP Lite is an operations app for Padang Construction and Supplies
+Corporation, a construction and fabrication company in Pampanga. The current
+demo shows a dashboard and read-only registers. Editing, approvals, payments,
+uploads, and QBO exports are still being built.
 
-QuickBooks Online (QBO) remains the official accounting system of record. This ERP captures complete operational and financial transaction details for bookkeeping entry in QBO, with export capability and a path to future live API sync.
-
-**This system is NOT an accounting system. There is no general ledger.**
+QuickBooks Online (QBO) remains the accounting system of record. Padang ERP
+Lite has no general ledger.
 
 ---
 
-## For Developers — Start Here
+## For developers
 
 1. Read `AGENTS.md` for the project map.
 2. Read `docs/PROJECT_CONSTITUTION.md` for engineering rules.
@@ -51,7 +54,7 @@ QuickBooks Online (QBO) remains the official accounting system of record. This E
 jk-sbx-project ensure
 
 # Run a project command inside the sandbox
-jk-sbx-project exec bash -lc 'bash -n scripts/*.sh'
+jk-sbx-project validate 'bash -n scripts/*.sh'
 ```
 
 Use the commands in `docs/TESTING.md` for backend, frontend, and deployment
@@ -65,32 +68,14 @@ If a sandbox workload runs out of memory, inspect the sandbox status and adjust
 the Docker Sandbox resources before retrying; do not stop unrelated host
 containers.
 
-## Update the Deployed Demo
+## Release or update the demo
 
-From the repository root on macOS, run:
-
-```sh
-scripts/update-padang-demo.sh
-```
-
-The command uses `jk@216.75.75.136:22` by default, preserves demo data, and
-checks both `https://delegateops.business/padang/demo` and
-`https://delegateops.business/padang/demo/api/v1/health` after an apply. Use
-`--dry-run` to validate without changing Quadlets, secrets, Caddy, or runtime
-data. Before the SSH sync, it builds the Linux/amd64 API and the
-`/padang/demo` standalone frontend inside the Docker Sandbox and uploads the
-prepared artifacts; the VPS does not compile or install Node/Go dependencies.
-Use `--seed-demo` only when an intentional synthetic-data reset is required.
-After a successful demo apply, run
-`scripts/check-padang-public-routes.sh --demo-only`; use the default checker
-once production is deployed as well. See `docs/DEPLOYMENT.md` for the full
-runbook.
-
-Use `scripts/check-padang-public-routes.sh --demo-only` when validating the
-demo release by itself. The default check covers both environments and should
-be used after production is deployed. The last end-to-end audit found HTTP 404
-responses from both BunnyCDN and the direct VPS Caddy origin. Do not treat a
-GitHub push or a successful local build as a public deployment.
+Use the [OrbStack deployment guide](docs/MACOS-DOCKER-COMPOSE.md) for both the
+first release and upgrades. It covers the PostgreSQL volume check, file-backed
+secret, image export, migration, seed, Cloudflare Tunnel route, and public
+health checks. The older `scripts/update-padang-demo.sh` deploys to a VPS and
+is not the active demo release path. Stop at the release hold in
+[HANDOFF.md](docs/HANDOFF.md) until the password handling fix passes review.
 
 ---
 
@@ -108,6 +93,7 @@ GitHub push or a successful local build as a public deployment.
 | `docs/DATABASE.md` | Schema design and migration strategy |
 | `docs/SECURITY.md` | Auth, RBAC, OWASP controls |
 | `docs/TESTING.md` | Test strategy and commands |
+| `docs/MACOS-DOCKER-COMPOSE.md` | Manual OrbStack demo release and rollback |
 | `docs/GIT_WORKFLOW.md` | Branch, Conventional Commit, and HTTPS-only GitHub workflow |
 | `docs/DEPLOYMENT.md` | Quadlet naming, Caddy, VPS layout |
 | `docs/OPERATIONS.md` | Health checks, updates, monitoring |
@@ -125,10 +111,10 @@ GitHub push or a successful local build as a public deployment.
 | Environment | URL | Purpose |
 |---|---|---|
 | Demo | `https://padang.delegateops.business/` | Stakeholder preview; manual synthetic-data reset; no authentication |
-| Production | `https://delegateops.business/padang` | Live system; Email OTP auth; full backups |
+| Production | `https://delegateops.business/prod/padang` | Planned authenticated operations and backups |
 
-The demo has no authentication and contains synthetic data only. Production
-uses passwordless Email OTP, RS256 access tokens, and rotating refresh tokens.
+The demo has no authentication and contains synthetic data only. The production
+design uses passwordless Email OTP, RS256 access tokens, and rotating refresh tokens.
 Future iOS and Android clients use the same API and business rules with
 platform-appropriate secure refresh-token storage.
 

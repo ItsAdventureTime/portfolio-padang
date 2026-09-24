@@ -1,11 +1,11 @@
 # Demo platform decision and implementation handoff
 
 Date: 2026-09-24. Target: `https://padang.delegateops.business/`.
-This is the current plan for the portfolio **demo only**. Production remains on
-its existing architecture. The user will start the GPT-6 Luna (High)
-implementation pass manually; GPT-6 Sol (Medium) will independently review and
-validate each result. The user performs the final OrbStack and Cloudflare
-dashboard deployment steps.
+This plan covers the portfolio **demo only**. Production keeps its existing
+architecture. Luna's Compose pass landed in `026d983`. Sol (Medium) found a
+database-password exposure during independent review, so deployment is on
+hold until Luna fixes it and Sol checks the result. The user performs the final
+OrbStack and Cloudflare dashboard steps.
 
 ## Decision
 
@@ -79,9 +79,12 @@ commit unrelated edits.
    PostgreSQL major to the schema's supported major (17) for fresh demo state;
    if a volume already exists, inspect its `PG_VERSION` before image change.
    Never auto-upgrade or wipe it.
-2. Make secret handling meet the user's no-`.env` rule: non-secret values in
-   `compose.yaml`; password and any later R2 keys only in external files under
-   `~/docker/portfolio/padang/secrets/`. Verify host permissions and actual
+2. Make secret handling meet the user's no-`.env` rule. Non-secret values stay in
+   `compose.yaml`. The live password and any later R2 keys stay in external
+   files under `~/docker/portfolio/padang/secrets/`. A new installation may
+   stage its generated password in the ignored workspace `secrets/` folder
+   before copying it to that runtime directory. Never replace an existing
+   runtime password. Verify host permissions and actual
    read access as the non-root API and PostgreSQL processes. Minimize file
    permission scope without breaking the runtime. No secret values in Git,
    Compose output, logs, or commands.

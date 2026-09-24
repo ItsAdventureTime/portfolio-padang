@@ -1,14 +1,15 @@
-# Padang demo on OrbStack Docker Compose
+# Deploy the Padang demo with OrbStack
 
-Read the [2026-09-24 platform plan and Luna handoff](DEMO_PLATFORM_PLAN.md)
-before using this runbook. Its acceptance gates and stop conditions govern
-the next demo release. This runbook describes operator actions after Luna's
-implementation has passed Sol's independent review.
+This guide covers the manual release of the portfolio demo at
+`https://padang.delegateops.business/`. Build the API and frontend images in
+Docker Sandbox, then import them into OrbStack. Docker Compose runs the app.
+Cloudflare Tunnel serves the public hostname.
 
-This is the manual, demo-only release procedure for
-`https://padang.delegateops.business`. Docker Sandbox is the workshop that
-builds the images; OrbStack is the showroom that runs imported images. Compose
-does not build or deploy automatically.
+**Release hold:** The migration and seed jobs still expose the database password
+in a process argument or environment variable. Wait for the correction and
+independent review recorded in [HANDOFF.md](HANDOFF.md) before running the
+OrbStack steps below. [The platform plan](DEMO_PLATFORM_PLAN.md) records the
+remaining acceptance checks.
 
 Isolated Compose configuration and runtime tests passed on committed `026d983`;
 the local backend image and frontend production build also passed. No images
@@ -17,26 +18,44 @@ tunnel changes were made. Public URL checks could not resolve the hostname on
 2026-09-24. The secret-handling correction in `docs/HANDOFF.md` remains a
 release gate before these operator steps.
 
-The demo uses fictional data, no authentication, and no B2/R2 credentials.
-Attachment upload is unavailable until an R2-backed attachment demonstration is
-explicitly needed.
+The demo uses fictional data and has no login. It needs one generated database
+password, stored in an ignored `secrets/db-password` file. The database name,
+username, and public hostname in `compose.yaml` are configuration values, not
+credentials. Uploads are unavailable, so this release needs no B2 or R2 API
+keys. If uploads are added later, the operator must supply those keys in
+separate secret files.
 
 ## Repository and build-context safety
 
-`.gitignore` keeps new local files out of Git, but it does not protect secrets
-that are already tracked. Docker uses each service's `.dockerignore` to filter
-its build context; Git ignore rules do not filter Docker contexts. Keep the
-Compose password and other file-backed secrets in
-`~/docker/portfolio/padang/secrets/`, outside this checkout, and never copy them
-into the repository. See [GitHub's ignoring-files guidance](https://docs.github.com/en/get-started/git-basics/ignoring-files)
+The generated password lives in the ignored `secrets/` directory in this
+checkout. Its runtime copy lives at `~/docker/portfolio/padang/secrets/`.
+Neither file belongs in Git. `.gitignore` cannot hide a file that was already
+tracked, so check `git status` before publishing. The image builds use
+`backend/` and `frontend/` as their contexts. The root `secrets/` directory is
+outside both. See [GitHub's ignore rules](https://docs.github.com/en/get-started/git-basics/ignoring-files)
 and [Docker's build-context rules](https://docs.docker.com/build/concepts/context/#dockerignore-files).
 
-## 1. First release: prepare the runtime folder and secret
+## 1. Check OrbStack, then prepare the runtime files
+
+Run each shell block from top to bottom on the Mac. `set -e` stops a block when
+a command fails. Confirm that the `orbstack` Docker context, the
+existing `cloudflared-network`, and its `cloudflared` container are present:
+
+```sh
+set -e
+docker context inspect orbstack
+docker --context orbstack network inspect cloudflared-network
+docker --context orbstack ps --filter name=cloudflared
+```
+
+Stop if any check fails or the listed `cloudflared` container is not attached
+to `cloudflared-network`. Keep the existing tunnel and other homelab services.
 
 Before replacing an existing demo image, inspect its named volume. This mounts
 the volume read-only and does not start PostgreSQL or change its data:
 
 ```sh
+set -e
 if docker --context orbstack volume inspect padang-demo_postgres-data >/dev/null 2>&1; then
   docker --context orbstack run --rm \
     --mount type=volume,source=padang-demo_postgres-data,target=/data,readonly \
@@ -68,26 +87,61 @@ If inspection fails, `PG_VERSION` is absent, or the version is not 17, stop.
 Keep the existing volume and perform a planned dump/restore migration to a new
 volume; never start PostgreSQL against an unverified data directory.
 
-From the repository root:
+From the repository root, copy the checked-in runtime files. The local password
+file was generated for this checkout. On a fresh clone, the guarded command
+below creates one. If the OrbStack runtime already has a password file, keep
+it: replacing it would break access to an existing database.
 
 ```sh
-mkdir -p ~/docker/portfolio/padang/{backend/migrations,seed,gateway,secrets}
-cp compose.yaml ~/docker/portfolio/padang/compose.yaml
-cp backend/migrations/* ~/docker/portfolio/padang/backend/migrations/
-cp seed/demo_seed.sql ~/docker/portfolio/padang/seed/
-cp gateway/default.conf ~/docker/portfolio/padang/gateway/
-chmod 700 ~/docker/portfolio/padang/secrets
-if [ ! -e ~/docker/portfolio/padang/secrets/db-password ]; then
-  umask 077
-  openssl rand -hex 32 > ~/docker/portfolio/padang/secrets/db-password
-  chmod 644 ~/docker/portfolio/padang/secrets/db-password
+set -e
+runtime_dir="$HOME/docker/portfolio/padang"
+mkdir -p "$runtime_dir/backend/migrations" "$runtime_dir/seed" "$runtime_dir/gateway" "$runtime_dir/secrets"
+test ! -L "$runtime_dir/secrets" || {
+  echo "Runtime secret directory is a symlink. Stop." >&2
+  exit 1
+}
+chmod 700 "$runtime_dir/secrets"
+cp compose.yaml "$runtime_dir/compose.yaml"
+cp backend/migrations/* "$runtime_dir/backend/migrations/"
+cp seed/demo_seed.sql "$runtime_dir/seed/"
+cp gateway/default.conf "$runtime_dir/gateway/"
+test ! -L "$runtime_dir/secrets/db-password" || {
+  echo "Runtime password path is a symlink. Stop." >&2
+  exit 1
+}
+if [ ! -e "$runtime_dir/secrets/db-password" ]; then
+  mkdir -p secrets
+  test ! -L secrets && test ! -L secrets/db-password || {
+    echo "Local secret path is a symlink. Stop." >&2
+    exit 1
+  }
+  chmod 700 secrets
+  if [ ! -s secrets/db-password ]; then
+    umask 077
+    openssl rand -hex 32 > secrets/db-password
+  fi
+  chmod 644 secrets/db-password
+  git check-ignore -q secrets/db-password || {
+    echo "Local database password is not ignored by Git. Stop." >&2
+    exit 1
+  }
+  cp secrets/db-password "$runtime_dir/secrets/db-password"
+  chmod 644 "$runtime_dir/secrets/db-password"
+else
+  test -f "$runtime_dir/secrets/db-password" &&
+    test -s "$runtime_dir/secrets/db-password" || {
+    echo "Existing database password is not a nonempty file. Stop." >&2
+    exit 1
+  }
+  echo "Keeping the existing OrbStack database password."
 fi
 ```
 
-This is a Compose file-mounted secret, not `.env` or the macOS Keychain. Its
-private directory limits host access. The file itself must be readable because
-Compose bind-mounts file secrets and the API image runs as a non-root user.
-Never replace this password during an upgrade and never use a production one.
+Compose mounts this file only into the services named in `compose.yaml`. The
+`0700` directory keeps other Mac users out. The file is `0644` so the API and
+PostgreSQL users inside their containers can read the mount. Never put this
+password in Git, an `.env` file, a shell argument, or a screenshot. Never reuse
+a production password.
 
 ## 2. Build and export application images in Docker Sandbox
 
@@ -127,13 +181,14 @@ Use the `orbstack` context so these commands cannot accidentally operate on the
 Docker Sandbox daemon. Confirm the pre-existing network before starting:
 
 ```sh
+set -e
 docker --context orbstack network inspect cloudflared-network
 docker --context orbstack load -i build/padang-demo/images/padang-demo-api.tar
 docker --context orbstack load -i build/padang-demo/images/padang-demo-frontend.tar
 cd ~/docker/portfolio/padang
-docker --context orbstack compose config
+docker --context orbstack compose config --quiet
 docker --context orbstack compose pull db migrate gateway demo-seed
-docker --context orbstack compose up -d db
+docker --context orbstack compose up -d --wait db
 docker --context orbstack compose ps
 docker --context orbstack compose --profile migrate run --rm migrate
 docker --context orbstack compose --profile demo-seed run --rm demo-seed
@@ -157,15 +212,20 @@ continue to float within 17. Nginx uses its supported floating `alpine` tag;
 `migrate:latest` uses its upstream
 [Alpine runtime](https://raw.githubusercontent.com/golang-migrate/migrate/master/Dockerfile).
 
-## 4. Connect the existing Cloudflared container
+## 4. Add the public route in Cloudflare
 
-The existing `cloudflared` container stays on `cloudflared-network`. In the
-Cloudflare dashboard, add a public hostname for
-`padang.delegateops.business` to that installed, configured tunnel and set its
-service to `http://padang-demo-gateway:80`. This creates the DNS route. Ensure
-Cloudflare does not cache dynamic HTML or `/api/*` responses for this hostname.
-Create a Cache Rule for hostname `padang.delegateops.business` with **Cache
-eligibility: Bypass cache**; this simple demo does not need static caching.
+Use the existing tunnel. Keep its `cloudflared` container on
+`cloudflared-network`.
+
+1. Open **Cloudflare Zero Trust > Networking > Tunnels** and select the
+   existing healthy tunnel.
+2. Under **Routes**, add a **Published application**. Set the hostname to
+   `padang.delegateops.business`, leave the path empty, and set the service URL
+   to `http://padang-demo-gateway:80`.
+3. Save the route and confirm that Cloudflare created the hostname's DNS
+   record. Do not change the other homelab routes.
+4. Add a Cache Rule for `padang.delegateops.business` with **Cache eligibility:
+   Bypass cache**. The dashboard and `/api/*` responses must stay fresh.
 
 Only `gateway` joins `cloudflared-network` and the internal `padang-network`.
 Database and application services join only `padang-network`; Compose publishes
@@ -174,17 +234,21 @@ no host ports and has no `expose` declarations.
 ## 5. Verify
 
 ```sh
+set -e
 cd ~/docker/portfolio/padang
 docker --context orbstack compose ps
 docker --context orbstack compose exec gateway wget -qO- http://api:8080/api/v1/health
 curl -fsS https://padang.delegateops.business/api/v1/health
+curl -fsS https://padang.delegateops.business/api/v1/dashboard/summary
 curl -fsSI https://padang.delegateops.business/
 ```
 
 Check the existing Cloudflared container logs if the public URL fails. The app
-containers deliberately have no host-reachable ports. Expect HTTP 200 HTML at
-`/` and a successful JSON health response. In a browser, open the root URL and
-confirm the fictional demo registers and demo roles appear.
+containers deliberately have no host-reachable ports. The health response must
+contain `"status":"ok"` and `"environment":"demo"`. The dashboard summary
+must contain seeded project data, and `/` must return HTTP 200 HTML. In a
+browser, open `/` and `/projects`, switch demo roles, and check the layout at a
+mobile width. Unfinished actions must say they are unavailable or read-only.
 
 Stop and investigate if any command fails; do not paste later commands over a
 failed migration, seed, image import, or public health check.
@@ -192,6 +256,7 @@ failed migration, seed, image import, or public health check.
 For ordinary restarts, do not re-run migration or seed:
 
 ```sh
+set -e
 docker --context orbstack compose stop
 docker --context orbstack compose start db api frontend gateway
 ```
@@ -204,6 +269,7 @@ database.
 Before replacing images, archive the current images and take a database backup:
 
 ```sh
+set -e
 cd ~/docker/portfolio/padang
 docker --context orbstack save -o padang-demo-api-before.tar padang-demo-api:manual
 docker --context orbstack save -o padang-demo-frontend-before.tar padang-demo-frontend:manual
@@ -216,6 +282,7 @@ images, run the migration profile once, then recreate the gateway so it resolves
 the current backend addresses:
 
 ```sh
+set -e
 docker --context orbstack compose stop api frontend gateway
 docker --context orbstack compose --profile migrate run --rm migrate
 docker --context orbstack compose up -d --force-recreate api frontend gateway

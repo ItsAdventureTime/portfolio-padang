@@ -1,6 +1,6 @@
 # HANDOFF.md — Padang ERP Lite
 
-## Active demo handoff — 2026-09-24
+## Active demo handoff — 2026-09-25
 
 - **Git policy:** Use local and remote `main` only. Do not create feature,
   task, or documentation branches. Preserve any existing dirty worktree while
@@ -34,6 +34,31 @@
 
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
+
+### Reviewer continuation — 2026-09-25
+
+- Generated a fresh 64-character hex database password at the ignored local
+  `secrets/db-password` path. The workspace `secrets/` directory is mode 0700;
+  the file is mode 0644 so the non-root API and PostgreSQL containers can read
+  its Compose mount. The value was not printed, committed, or copied to
+  OrbStack. For an existing deployment, keep its current runtime password;
+  this new local value is for a fresh database only.
+- `.gitignore` now names `/secrets/db-password` explicitly. The existing
+  `secrets/`, credential, key, build, and database-dump rules remain in force.
+  `git check-ignore` confirms the generated file is ignored. No B2/R2 key is
+  needed while uploads are unavailable. The database username and public URL
+  are fixed non-secret configuration values in Compose and the tunnel route.
+- The public [README](../README.md) now points to the active OrbStack guide
+  instead of the historical VPS updater. The [Compose
+  guide](MACOS-DOCKER-COMPOSE.md) gives ordered operator steps, preserves an
+  existing password, and keeps the security release hold visible. Both were
+  edited for direct, specific language using the requested humanize guidance.
+- Documentation checks passed: `git diff --check`; all 11 shell blocks in the
+  edited README and Compose guide parse with `sh -n`; their relative Markdown
+  links resolve locally. No deployment command was run.
+- The Compose secret exposure found on 2026-09-24 is still unresolved in code.
+  Luna must fix and test it before the user runs the OrbStack steps. Public
+  route, browser, and existing-volume checks remain open.
 
 ### Sol independent review — 2026-09-24
 
