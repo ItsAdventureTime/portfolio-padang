@@ -73,9 +73,10 @@ containers.
 Use the [OrbStack deployment guide](docs/MACOS-DOCKER-COMPOSE.md) for both the
 first release and upgrades. It covers the PostgreSQL volume check, file-backed
 secret, image export, migration, seed, Cloudflare Tunnel route, and public
-health checks. The older `scripts/update-padang-demo.sh` deploys to a VPS and
-is not the active demo release path. Stop at the release hold in
-[HANDOFF.md](docs/HANDOFF.md) until the password handling fix passes review.
+health checks. The password handling fix passed independent Compose validation;
+OrbStack startup, the public route, and browser checks remain to be done. The
+older `scripts/update-padang-demo.sh` deploys to a VPS and is not the active
+demo release path. See [HANDOFF.md](docs/HANDOFF.md) for the current state.
 
 ---
 

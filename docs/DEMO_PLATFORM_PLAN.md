@@ -1,11 +1,11 @@
 # Demo platform decision and implementation handoff
 
-Date: 2026-09-24. Target: `https://padang.delegateops.business/`.
-This plan covers the portfolio **demo only**. Production keeps its existing
-architecture. Luna's Compose pass landed in `026d983`. Sol (Medium) found a
-database-password exposure during independent review, so deployment is on
-hold until Luna fixes it and Sol checks the result. The user performs the final
-OrbStack and Cloudflare dashboard steps.
+Date: 2026-09-24; status updated 2026-09-25. Target:
+`https://padang.delegateops.business/`. This plan covers the portfolio
+**demo only**. Production keeps its existing architecture. Luna's Compose pass
+landed in `026d983`; the password handling fix landed in `a0b2749` and passed
+Sol's independent Compose validation. The user performs the remaining OrbStack
+and Cloudflare dashboard steps. Public and browser acceptance remain open.
 
 ## Decision
 
@@ -55,11 +55,10 @@ checked in the user's own Cloudflare account before adopting a paid service.
   live register/workflow endpoints. `frontend/components/module-workspace.tsx`
   labels read-only and preview surfaces. A healthy deployment alone does not
   prove the complete ERP workflows promised by `docs/PRODUCT.md`.
-- `docs/MACOS-DOCKER-COMPOSE.md` currently uses a `0700` secret directory and
-  a `0644` password file so non-root containers can read its bind mount. The
-  private parent restricts host traversal. Luna must verify and implement the
-  narrowest working file access before the public release; do not blindly set
-  `0600` and break PostgreSQL/API startup.
+- `docs/MACOS-DOCKER-COMPOSE.md` uses a `0700` secret directory and a `0644`
+  password file so non-root containers can read its bind mount. The private
+  parent restricts host traversal. The disposable runtime check verified
+  PostgreSQL and API secret reads; OrbStack startup remains to be checked.
 - The working tree had unrelated staged and unstaged changes on 2026-09-24.
   Preserve them. A clean, reviewed deployment diff is a separate deliverable.
   The public URL and live OrbStack state were not verified in this planning

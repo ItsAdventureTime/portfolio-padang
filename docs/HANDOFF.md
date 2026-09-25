@@ -5,11 +5,11 @@
 - **Git policy:** Use local and remote `main` only. Do not create feature,
   task, or documentation branches. Preserve any existing dirty worktree while
   syncing local `main`; never include unrelated changes in a commit.
-- **Current role:** GPT-6 Luna (High), implementation.
+- **Current role:** GPT-6 Sol (High), independent review and validation.
 - **Next owner:** User, load the committed app images and start the stack in
   OrbStack using Step 3 of [MACOS-DOCKER-COMPOSE.md](MACOS-DOCKER-COMPOSE.md).
-  The host Docker shell command was rejected by the execution guard, which only
-  permits Docker through the private Docker Sandbox daemon. After startup,
+  A prior host Docker load/start request was rejected by the execution guard.
+  Read-only OrbStack checks now work. After startup,
   Cloudflare should target `http://padang-demo-gateway:80` on the existing
   `cloudflared-network`.
 - **Deployment owner:** User owns Cloudflare dashboard changes. The user
@@ -28,9 +28,8 @@
   runtime test. The host OrbStack context is available; no demo database volume
   exists. App images were built from this commit in Docker Sandbox and exported
   under `build/padang-demo/images/`. Runtime files are prepared at
-  `~/docker/portfolio/padang/`. The shell guard rejected the Compose
-  config/load/pull request before execution with the reason `Use jk-sbx-project
-  so Docker execution occurs inside Docker Sandbox`; that daemon is not OrbStack.
+  `~/docker/portfolio/padang/`. The prior shell guard rejected the Compose
+  load/start request before execution; that sandbox daemon is not OrbStack.
   No app container started and no `cloudflared` or tunnel setting changed.
   User must run Step 3 from the runbook, then add the route and verify public
   access.
@@ -38,13 +37,35 @@
 The dated C1 history below remains for context. This section supersedes its
 older role, route, and deployment instructions for the demo.
 
+### Sol independent continuation — 2026-09-25
+
+- Fresh `jk-sbx-project validate 'python3 scripts/test-padang-demo-compose.py &&
+  python3 scripts/test-padang-demo-compose-runtime.py'` passed on committed
+  `8f202aa`: Compose configuration, migration, seed, process metadata, secret
+  reads, gateway health, dashboard data, and read-only UI. This verifies the
+  password handling fix in an independent clone.
+- Read-only OrbStack checks confirm `cloudflared` is running on
+  `cloudflared-network`; `padang-demo_postgres-data` and both `:manual` app
+  images are absent. The prepared runtime Compose, gateway config, seed SQL,
+  and database password match the checkout; the runtime Compose config parses.
+  The local secret remains ignored and untracked. No app container was started.
+- Public `curl` still fails with `Could not resolve host:
+  padang.delegateops.business`. The user must complete Step 3 onward in the
+  [OrbStack guide](MACOS-DOCKER-COMPOSE.md), add the Cloudflare route, and
+  verify the public and browser checks. The read-only app shell remains a
+  product limitation, independent of deployment health.
+- Corrected stale release-hold wording in the public README and platform plan.
+  Existing unrelated staged and unstaged work remains untouched. Only these
+  reviewer documentation changes are for publication.
+
 ### Reviewer continuation — 2026-09-25
 
 - Generated a fresh 64-character hex database password at the ignored local
   `secrets/db-password` path. The workspace `secrets/` directory is mode 0700;
   the file is mode 0644 so the non-root API and PostgreSQL containers can read
-  its Compose mount. The value was not printed, committed, or copied to
-  OrbStack. For an existing deployment, keep its current runtime password;
+  its Compose mount. The value was not printed or committed. It was later
+  copied to the prepared OrbStack runtime folder. For an existing deployment,
+  keep its current runtime password;
   this new local value is for a fresh database only.
 - `.gitignore` now names `/secrets/db-password` explicitly. The existing
   `secrets/`, credential, key, build, and database-dump rules remain in force.

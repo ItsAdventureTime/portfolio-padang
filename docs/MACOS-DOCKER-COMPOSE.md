@@ -5,16 +5,16 @@ This guide covers the manual release of the portfolio demo at
 Docker Sandbox, then import them into OrbStack. Docker Compose runs the app.
 Cloudflare Tunnel serves the public hostname.
 
-**Release gate:** The migration and seed jobs now use a temporary mode-0600
+**Current status:** The migration and seed jobs use a temporary mode-0600
 PostgreSQL passfile. The disposable runtime test checks their live process
-arguments and environment for the password. This check passed, and Sol's final
-review found no issues. App images are exported under
+arguments and environment for the password. This check passed again in an
+independent validation clone on 2026-09-25. App images are exported under
 `build/padang-demo/images/`, and runtime files are prepared at
-`~/docker/portfolio/padang/`. The shell guard blocked Docker commands against
-OrbStack, so images are not loaded and app services are not running. Run Step 3
-below from macOS Terminal; leave the existing Cloudflare Tunnel container and
-configuration unchanged. [The platform plan](DEMO_PLATFORM_PLAN.md) records
-the remaining acceptance checks.
+`~/docker/portfolio/padang/`. Read-only OrbStack checks confirm the existing
+`cloudflared-network`, but the demo images are not loaded and app services are
+not running. Run Step 3 below from macOS Terminal; leave the existing
+Cloudflare Tunnel container and configuration unchanged. [The platform
+plan](DEMO_PLATFORM_PLAN.md) records the remaining acceptance checks.
 
 The isolated Compose runtime check and focused independent review passed on
 commit `a0b2749`. Public URL checks could not resolve the hostname on
